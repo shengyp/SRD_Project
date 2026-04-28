@@ -1,0 +1,315 @@
+{
+  "code": "DASS-21",
+  "name": "抑郁焦虑压力量表-21",
+  "full_name": "Depression Anxiety Stress Scale-21",
+  "version": "Chinese Simplified v1.0",
+  "description": "DASS-21由Lovibond夫妇于1995年编制，是评估抑郁、焦虑和压力三个独立维度的自评量表。共21道题，每维度7题。与PHQ-9和GAD-7相比，DASS-21能更清晰地区分压力与焦虑，提供三个独立的严重程度评分。",
+  "purpose": "抑郁/焦虑/压力三维独立评估（与PHQ-9+GAD-7互补）",
+  "estimated_minutes": 6,
+  "total_questions": 21,
+  "instruction": "请仔细阅读以下每一条描述，然后在过去一周内，该描述与您的情况相符的程度，在相应的选项上划圈。0=不符合，1=有时符合，2=常常符合，3=总是符合。",
+  "scoring": {
+    "type": "dimensional",
+    "max_score": 63,
+    "dimensions": [
+      {
+        "id": "depression",
+        "name": "抑郁",
+        "name_en": "Depression",
+        "questions": [3, 5, 10, 13, 16, 17, 21],
+        "max_score": 21,
+        "thresholds": [
+          { "min": 0, "max": 9, "level": "normal", "label": "正常", "risk_level": "low" },
+          { "min": 10, "max": 13, "level": "mild", "label": "轻度抑郁", "risk_level": "low" },
+          { "min": 14, "max": 20, "level": "moderate", "label": "中度抑郁", "risk_level": "medium" },
+          { "min": 21, "max": 27, "level": "severe", "label": "重度抑郁", "risk_level": "high" },
+          { "min": 28, "max": 63, "level": "extremely_severe", "label": "极重度抑郁", "risk_level": "high" }
+        ]
+      },
+      {
+        "id": "anxiety",
+        "name": "焦虑",
+        "name_en": "Anxiety",
+        "questions": [2, 4, 7, 9, 15, 19, 20],
+        "max_score": 21,
+        "thresholds": [
+          { "min": 0, "max": 7, "level": "normal", "label": "正常", "risk_level": "low" },
+          { "min": 8, "max": 9, "level": "mild", "label": "轻度焦虑", "risk_level": "low" },
+          { "min": 10, "max": 14, "level": "moderate", "label": "中度焦虑", "risk_level": "medium" },
+          { "min": 15, "max": 19, "level": "severe", "label": "重度焦虑", "risk_level": "high" },
+          { "min": 20, "max": 21, "level": "extremely_severe", "label": "极重度焦虑", "risk_level": "high" }
+        ]
+      },
+      {
+        "id": "stress",
+        "name": "压力",
+        "name_en": "Stress",
+        "questions": [1, 6, 8, 11, 12, 14, 18],
+        "max_score": 21,
+        "thresholds": [
+          { "min": 0, "max": 14, "level": "normal", "label": "正常", "risk_level": "low" },
+          { "min": 15, "max": 18, "level": "mild", "label": "轻度压力", "risk_level": "low" },
+          { "min": 19, "max": 25, "level": "moderate", "label": "中度压力", "risk_level": "medium" },
+          { "min": 26, "max": 33, "level": "severe", "label": "重度压力", "risk_level": "high" },
+          { "min": 34, "max": 63, "level": "extremely_severe", "label": "极重度压力", "risk_level": "high" }
+        ]
+      }
+    ]
+  },
+  "questions": [
+    {
+      "id": 1,
+      "dimension": "stress",
+      "text": "我觉得很难让自己安静下来",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 2,
+      "dimension": "anxiety",
+      "text": "我感到口干舌燥",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 3,
+      "dimension": "depression",
+      "text": "我好像一点都没有感觉到任何愉快、舒畅",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 4,
+      "dimension": "anxiety",
+      "text": "我感到呼吸困难（例如：气喘或透不过气来）",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 5,
+      "dimension": "depression",
+      "text": "我感到很难主动去开始工作",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 6,
+      "dimension": "stress",
+      "text": "我对事情往往做出过敏反应",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 7,
+      "dimension": "anxiety",
+      "text": "我感到颤抖（例如，手抖）",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 8,
+      "dimension": "stress",
+      "text": "我觉得自己消耗了很多精力",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 9,
+      "dimension": "anxiety",
+      "text": "我担心一些可能让自己恐慌或出丑的场合",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 10,
+      "dimension": "depression",
+      "text": "我觉得自己对不久的将来没有什么可期盼的",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 11,
+      "dimension": "stress",
+      "text": "我感到忐忑不安",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 12,
+      "dimension": "stress",
+      "text": "我感到很难放松自己",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 13,
+      "dimension": "depression",
+      "text": "我感到忧郁沮丧",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 14,
+      "dimension": "stress",
+      "text": "我无法容忍任何阻碍我继续工作的事情",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 15,
+      "dimension": "anxiety",
+      "text": "我感到快要崩溃了",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 16,
+      "dimension": "depression",
+      "text": "我对任何事情都不能产生热情",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 17,
+      "dimension": "depression",
+      "text": "我觉得自己不怎么配做人",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 18,
+      "dimension": "stress",
+      "text": "我发觉自己很容易被触怒",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 19,
+      "dimension": "anxiety",
+      "text": "即使在没有明显的体力活动时，我也感到心律不正常",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 20,
+      "dimension": "anxiety",
+      "text": "我无缘无故地感到害怕",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    },
+    {
+      "id": 21,
+      "dimension": "depression",
+      "text": "我感到生命毫无意义",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "不符合" },
+        { "value": 1, "label": "有时符合" },
+        { "value": 2, "label": "常常符合" },
+        { "value": 3, "label": "总是符合" }
+      ]
+    }
+  ],
+  "interpretation": "DASS-21三个维度独立计分，无总分。每个维度反映不同心理状态：抑郁维度（悲伤、兴趣丧失、自我贬低）、焦虑维度（自主神经兴奋、恐惧）、压力维度（紧张、烦躁、易激惹）。三维度均与自杀风险正相关，其中抑郁和绝望感是最直接的预测因子。",
+  "references": "Lovibond PF, Lovibond SH. The structure of negative emotional states: comparison of the Depression Anxiety Stress Scales (DASS) with the Beck Depression and Anxiety Inventories. Behav Res Ther. 1995;33(3):335-343. 中文版验证：龚栩等. 中国临床心理学杂志. 2011."
+}

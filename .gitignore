@@ -1,0 +1,107 @@
+# =============================================
+# VIS4SRD 根目录 .gitignore
+# =============================================
+
+# ---- Python（后端）----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+ENV/
+env/
+.venv/
+
+# ---- IDE ----
+.idea/
+*.swp
+*.swo
+*.swn
+
+# ---- Testing ----
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ---- Environment variables ----
+.env
+.env.local
+.env.*.local
+# 不忽略 .env.example（示例文件）
+!.env.example
+
+# ---- Uploads（后端）----
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# ---- Logs ----
+*.log
+logs/
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- Node.js（前端）----
+frontend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ---- Build outputs ----
+frontend/dist/
+frontend/build/
+*.tgz
+
+# ---- Temporary files ----
+*.tmp
+*.temp
+.cache/
+tmp/
+temp/
+
+# ---- Docker ----
+# 注意：deploy/docker-compose.server.yml 和 Dockerfile*.server 是生产部署必需文件
+# 不忽略各目录内的 .dockerignore（它们在 docker build 时有用）
+!backend/.dockerignore
+!frontend/.dockerignore
+
+# ---- Cursor / Agent rules ----
+.cursor/
+.agent-transcripts/
+
+# ---- Project docs (not needed in repo) ----
+VIS4SRD前端页面架构图.md
+VIS4SRD前端页面架构图.pdf
+后端设计说明.md
+
+# ---- External data (large files) ----
+数据/
+map_data/
+datasets/
+
+# ---- ML model files ----
+*.pkl
+*.pickle
+
+# ---- Misc ----
+*.bak
+*.swp
+*.DS_Store

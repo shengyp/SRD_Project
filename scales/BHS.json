@@ -1,0 +1,246 @@
+{
+  "code": "BHS",
+  "name": "贝克绝望量表",
+  "full_name": "Beck Hopelessness Scale",
+  "version": "Chinese Simplified v1.0",
+  "description": "BHS由Aaron Beck于1974年编制，是测量绝望感（对未来的消极期待）的经典量表。共20道是/否题，总分0-20分。绝望是抑郁和自杀行为之间的核心中介变量，是自杀意念和自杀行为的独立预测因子，在自杀风险评估中具有不可替代的作用。",
+  "purpose": "绝望感评估（自杀意念与行为的独立预测因子）",
+  "estimated_minutes": 5,
+  "total_questions": 20,
+  "instruction": "请仔细阅读以下每一条陈述，然后根据您的真实感受，选择"是"或"否"。",
+  "scoring": {
+    "type": "sum",
+    "max_score": 20,
+    "reverse_questions": [1, 3, 5, 6, 8, 10, 13, 15, 19],
+    "note": "第1、3、5、6、8、10、13、15、19题为反向计分题（选择"是"得0分），其余为正向计分题（选择"是"得1分）"
+  },
+  "thresholds": [
+    {
+      "min": 0,
+      "max": 3,
+      "level": "normal",
+      "label": "正常范围",
+      "label_en": "Normal Hopelessness",
+      "risk_level": "low",
+      "suggestion": "无明显绝望感"
+    },
+    {
+      "min": 4,
+      "max": 8,
+      "level": "mild",
+      "label": "轻度绝望",
+      "label_en": "Mild Hopelessness",
+      "risk_level": "low",
+      "suggestion": "关注心理健康，可进行一般性心理疏导"
+    },
+    {
+      "min": 9,
+      "max": 14,
+      "level": "moderate",
+      "label": "中度绝望",
+      "label_en": "Moderate Hopelessness",
+      "risk_level": "medium",
+      "suggestion": "建议进行心理评估和干预，关注自杀风险"
+    },
+    {
+      "min": 15,
+      "max": 20,
+      "level": "severe",
+      "label": "重度绝望",
+      "label_en": "Severe Hopelessness",
+      "risk_level": "high",
+      "suggestion": "高自杀风险信号，建议立即进行专项自杀风险评估（C-SSRS）和临床干预"
+    }
+  ],
+  "cutoff_suicide_risk": 9,
+  "cutoff_note": "以9分为自杀风险cutoff，得分>9分的患者自杀风险显著升高",
+  "factor_structure": {
+    "future_feeling": [1, 5, 6, 10, 13, 15, 19],
+    "motivation_loss": [2, 3, 9, 11, 12, 16, 17, 20],
+    "future_expectation": [4, 7, 8, 14, 18]
+  },
+  "questions": [
+    {
+      "id": 1,
+      "text": "我对前途充满希望和乐观",
+      "reverse": true,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 2,
+      "text": "因为我做不好任何事情，所以我会放弃一切努力的机会",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 3,
+      "text": "一旦事情变糟了，会有人来帮我的，因为我知道人们是不会袖手旁观的",
+      "reverse": true,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 4,
+      "text": "我不敢想象10年后我的生活会是啥样的",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 5,
+      "text": "我有足够的时间来完成我最想做的事",
+      "reverse": true,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 6,
+      "text": "我希望在将来我能取得一些成绩",
+      "reverse": true,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 7,
+      "text": "将来对我来说可能是一团漆黑",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 8,
+      "text": "我想我生活中的好事会比一般人多一些",
+      "reverse": true,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 9,
+      "text": "如果给我的工作当中不能休息的话，那么不要指望我会有什么发展前途",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 10,
+      "text": "我目前的经验和资历足以使我的前途光明",
+      "reverse": true,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 11,
+      "text": "我认为我周围的一切充满了悲观，没有任何值得高兴的事",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 12,
+      "text": "我认为我不会得到真正想要得到的东西",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 13,
+      "text": "当我憧憬未来时，我想我会比现在幸福得多",
+      "reverse": true,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 14,
+      "text": "事情的结局总是出乎我的意料之外",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 15,
+      "text": "我对未来充满信心",
+      "reverse": true,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 16,
+      "text": "由于达不到我所希望的，因此我认为一切事情都是无聊乏味的",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 17,
+      "text": "将来我会心满意足，这是绝对不可能的",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 18,
+      "text": "将来对我来说似乎很模糊和飘渺",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 19,
+      "text": "我对将来的憧憬是好多于坏",
+      "reverse": true,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    },
+    {
+      "id": 20,
+      "text": "我想没有必要再做任何努力去得到什么了，因为我不可能会得到",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "是" },
+        { "value": 0, "label": "否" }
+      ]
+    }
+  ],
+  "interpretation": "BHS测量的是认知层面的绝望感——对未来的系统性消极期待。绝望是自杀意念从产生到转化为实际行为之间的核心心理机制。大量研究表明，BHS得分是自杀意念和自杀未遂的强预测因子，独立于抑郁程度。绝望感评分>9分的患者需要高度关注。",
+  "references": "Beck AT, et al. Hopelessness and eventual suicide: a 10-year prospective study of patients hospitalized with suicidal ideation. Am J Psychiatry. 1975;132(6):559-565. 中文版验证：王丽颖等. 中国临床心理学杂志. 2011."
+}

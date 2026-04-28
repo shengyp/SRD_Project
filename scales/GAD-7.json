@@ -1,0 +1,144 @@
+{
+  "code": "GAD-7",
+  "name": "广泛性焦虑障碍量表",
+  "full_name": "Generalized Anxiety Disorder Scale-7",
+  "version": "Chinese Simplified v1.0",
+  "description": "GAD-7由Spitzer等人于2006年开发，是评估广泛性焦虑障碍（GAD）的标准化筛查工具。共7道题目，询问过去两周内焦虑相关症状的频率。焦虑与抑郁高度共病，且是自杀风险的重要调节因素。",
+  "purpose": "焦虑筛查（与抑郁共病评估，自杀风险调节因素）",
+  "estimated_minutes": 3,
+  "total_questions": 7,
+  "instruction": "在过去两周内，您有多频繁地受到以下问题的困扰？",
+  "scoring": {
+    "type": "sum",
+    "max_score": 21,
+    "dimensions": []
+  },
+  "thresholds": [
+    {
+      "min": 0,
+      "max": 4,
+      "level": "normal",
+      "label": "无焦虑",
+      "label_en": "Minimal Anxiety",
+      "risk_level": "low",
+      "suggestion": "无需特殊干预"
+    },
+    {
+      "min": 5,
+      "max": 9,
+      "level": "mild",
+      "label": "轻度焦虑",
+      "label_en": "Mild Anxiety",
+      "risk_level": "low",
+      "suggestion": "给予心理健康教育，1个月后随访"
+    },
+    {
+      "min": 10,
+      "max": 14,
+      "level": "moderate",
+      "label": "中度焦虑",
+      "label_en": "Moderate Anxiety",
+      "risk_level": "medium",
+      "suggestion": "考虑进一步评估和干预，可联合PHQ-9评估共病"
+    },
+    {
+      "min": 15,
+      "max": 21,
+      "level": "severe",
+      "label": "重度焦虑",
+      "label_en": "Severe Anxiety",
+      "risk_level": "high",
+      "suggestion": "建议立即寻求专业帮助，进行综合心理评估"
+    }
+  ],
+  "cutoff_screening": 10,
+  "cutoff_note": "以10分为筛查阳性cutoff，灵敏度89%，特异度82%",
+  "questions": [
+    {
+      "id": 1,
+      "text": "感觉紧张、焦虑或烦躁",
+      "dimension": null,
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "完全没有" },
+        { "value": 1, "label": "几天" },
+        { "value": 2, "label": "一半以上天数" },
+        { "value": 3, "label": "几乎每天" }
+      ]
+    },
+    {
+      "id": 2,
+      "text": "不能停止或控制担忧",
+      "dimension": null,
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "完全没有" },
+        { "value": 1, "label": "几天" },
+        { "value": 2, "label": "一半以上天数" },
+        { "value": 3, "label": "几乎每天" }
+      ]
+    },
+    {
+      "id": 3,
+      "text": "对各种各样的事情担忧过多",
+      "dimension": null,
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "完全没有" },
+        { "value": 1, "label": "几天" },
+        { "value": 2, "label": "一半以上天数" },
+        { "value": 3, "label": "几乎每天" }
+      ]
+    },
+    {
+      "id": 4,
+      "text": "很难放松下来",
+      "dimension": null,
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "完全没有" },
+        { "value": 1, "label": "几天" },
+        { "value": 2, "label": "一半以上天数" },
+        { "value": 3, "label": "几乎每天" }
+      ]
+    },
+    {
+      "id": 5,
+      "text": "由于不安而无法静坐",
+      "dimension": null,
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "完全没有" },
+        { "value": 1, "label": "几天" },
+        { "value": 2, "label": "一半以上天数" },
+        { "value": 3, "label": "几乎每天" }
+      ]
+    },
+    {
+      "id": 6,
+      "text": "变得容易烦恼或急躁",
+      "dimension": null,
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "完全没有" },
+        { "value": 1, "label": "几天" },
+        { "value": 2, "label": "一半以上天数" },
+        { "value": 3, "label": "几乎每天" }
+      ]
+    },
+    {
+      "id": 7,
+      "text": "害怕将有可怕的事情发生",
+      "dimension": null,
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "完全没有" },
+        { "value": 1, "label": "几天" },
+        { "value": 2, "label": "一半以上天数" },
+        { "value": 3, "label": "几乎每天" }
+      ]
+    }
+  ],
+  "interpretation": "GAD-7专门用于评估广泛性焦虑障碍。焦虑与抑郁高度共病（共病率约50%），联合PHQ-9使用可全面评估情绪状态。焦虑程度是自杀风险的重要调节变量，GAD-7评分应与PHQ-9第9题联合分析。",
+  "references": "Spitzer RL, et al. A brief measure for assessing generalized anxiety disorder. Arch Intern Med. 2006;166(10):1092-1097. 中文版验证：He XY, et al. BMJ Open. 2010."
+}

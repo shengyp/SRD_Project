@@ -1,0 +1,9 @@
+{
+  "session_id": "session_114",
+  "turn": 9,
+  "timestamp": "2026-04-26_10-48-29_366",
+  "error_context": "_decompose_questions",
+  "error_message": "如何区分抑郁与焦虑？: invalid character '：' (U+FF1A) (<unknown>, line 3)",
+  "traceback": "Traceback (most recent call last):\n  File \"/www/wwwroot/vis4srd-V2.0/backend/SuiAgent-main/agent.py\", line 428, in _decompose_questions\n    items = ast.literal_eval(resp)\n            ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib64/python3.11/ast.py\", line 64, in literal_eval\n    node_or_string = parse(node_or_string.lstrip(\" \\t\"), mode='eval')\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib64/python3.11/ast.py\", line 50, in parse\n    return compile(source, filename, mode, flags,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<unknown>\", line 3\n    注意：虽然当前任务为“自杀危机干预”且用户处于“中风险”，但问题本身聚焦于“区分抑郁与焦虑”的知识性理解。因此，理论层面需提供专业区分依据；用户层面则需结合其个人表述进一步确认是否存在特定症状表现，以支持精准评估与干预。\n      ^\nSyntaxError: invalid character '：' (U+FF1A)\n",
+  "agent_name": "suicide_intervention_agent"
+}

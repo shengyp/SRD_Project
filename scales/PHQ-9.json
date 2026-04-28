@@ -1,0 +1,188 @@
+{
+  "code": "PHQ-9",
+  "name": "患者健康问卷-9",
+  "full_name": "Patient Health Questionnaire-9",
+  "version": "Chinese Simplified v2.0",
+  "description": "PHQ-9是国际广泛使用的抑郁症筛查量表，由Kroenke等人于2001年开发。共9道题目，对应DSM-IV抑郁症诊断标准的9个症状条目。第9题直接评估自杀意念，是自杀风险检测的核心指标。",
+  "purpose": "抑郁症筛查，含自杀意念条目",
+  "estimated_minutes": 4,
+  "total_questions": 9,
+  "instruction": "在过去两周内，您有多频繁地受到以下问题的困扰？",
+  "scoring": {
+    "type": "sum",
+    "max_score": 27,
+    "dimensions": [],
+    "suicide_risk_item": 9,
+    "note": "第9题为自杀意念直接筛查条目，任何非0分均需立即关注"
+  },
+  "thresholds": [
+    {
+      "min": 0,
+      "max": 4,
+      "level": "normal",
+      "label": "无抑郁",
+      "label_en": "Minimal Depression",
+      "risk_level": "low",
+      "suggestion": "无需特殊干预，保持关注"
+    },
+    {
+      "min": 5,
+      "max": 9,
+      "level": "mild",
+      "label": "轻度抑郁",
+      "label_en": "Mild Depression",
+      "risk_level": "low",
+      "suggestion": "给予心理健康教育，1个月后随访"
+    },
+    {
+      "min": 10,
+      "max": 14,
+      "level": "moderate",
+      "label": "中度抑郁",
+      "label_en": "Moderate Depression",
+      "risk_level": "medium",
+      "suggestion": "建议抗抑郁药物治疗或心理治疗"
+    },
+    {
+      "min": 15,
+      "max": 19,
+      "level": "moderately_severe",
+      "label": "中重度抑郁",
+      "label_en": "Moderately Severe Depression",
+      "risk_level": "high",
+      "suggestion": "建议抗抑郁药物联合心理治疗"
+    },
+    {
+      "min": 20,
+      "max": 27,
+      "level": "severe",
+      "label": "重度抑郁",
+      "label_en": "Severe Depression",
+      "risk_level": "high",
+      "suggestion": "建议立即进行抗抑郁药物治疗与心理治疗，评估住院必要性"
+    }
+  ],
+  "special_rules": [
+    {
+      "item_id": 9,
+      "condition": "score > 0",
+      "action": "immediate_attention",
+      "message": "第9题得分不为零，存在自杀意念，需立即进行专项自杀风险评估（C-SSRS）"
+    }
+  ],
+  "questions": [
+    {
+      "id": 1,
+      "text": "做事时提不起劲或没有兴趣",
+      "dimension": null,
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "完全不会" },
+        { "value": 1, "label": "好几天" },
+        { "value": 2, "label": "超过一周" },
+        { "value": 3, "label": "几乎每天" }
+      ]
+    },
+    {
+      "id": 2,
+      "text": "感到心情低落、沮丧或绝望",
+      "dimension": null,
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "完全不会" },
+        { "value": 1, "label": "好几天" },
+        { "value": 2, "label": "超过一周" },
+        { "value": 3, "label": "几乎每天" }
+      ]
+    },
+    {
+      "id": 3,
+      "text": "入睡困难、睡不安稳或睡眠过多",
+      "dimension": null,
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "完全不会" },
+        { "value": 1, "label": "好几天" },
+        { "value": 2, "label": "超过一周" },
+        { "value": 3, "label": "几乎每天" }
+      ]
+    },
+    {
+      "id": 4,
+      "text": "感觉疲倦或没有活力",
+      "dimension": null,
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "完全不会" },
+        { "value": 1, "label": "好几天" },
+        { "value": 2, "label": "超过一周" },
+        { "value": 3, "label": "几乎每天" }
+      ]
+    },
+    {
+      "id": 5,
+      "text": "食欲不振或吃太多",
+      "dimension": null,
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "完全不会" },
+        { "value": 1, "label": "好几天" },
+        { "value": 2, "label": "超过一周" },
+        { "value": 3, "label": "几乎每天" }
+      ]
+    },
+    {
+      "id": 6,
+      "text": "觉得自己很糟糕，或觉得自己很失败，或让自己和家人失望",
+      "dimension": null,
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "完全不会" },
+        { "value": 1, "label": "好几天" },
+        { "value": 2, "label": "超过一周" },
+        { "value": 3, "label": "几乎每天" }
+      ]
+    },
+    {
+      "id": 7,
+      "text": "对事物专注有困难，例如阅读报纸或看电视时",
+      "dimension": null,
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "完全不会" },
+        { "value": 1, "label": "好几天" },
+        { "value": 2, "label": "超过一周" },
+        { "value": 3, "label": "几乎每天" }
+      ]
+    },
+    {
+      "id": 8,
+      "text": "动作或说话速度缓慢到别人已经察觉；或正好相反——烦躁或坐立不安、动来动去的情况更胜于平常",
+      "dimension": null,
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "完全不会" },
+        { "value": 1, "label": "好几天" },
+        { "value": 2, "label": "超过一周" },
+        { "value": 3, "label": "几乎每天" }
+      ]
+    },
+    {
+      "id": 9,
+      "text": "有不如死掉或用某种方式伤害自己的念头",
+      "dimension": null,
+      "reverse": false,
+      "is_suicide_item": true,
+      "options": [
+        { "value": 0, "label": "完全不会" },
+        { "value": 1, "label": "好几天" },
+        { "value": 2, "label": "超过一周" },
+        { "value": 3, "label": "几乎每天" }
+      ]
+    }
+  ],
+  "cutoff_chinese_population": 7,
+  "cutoff_note": "针对中国普通人群，建议以7分及以上作为筛查阳性cutoff（灵敏度0.86，特异度0.86）",
+  "interpretation": "PHQ-9总分越高，抑郁程度越重。第9题（自杀意念）任何非零得分均需启动进一步评估，与C-SSRS联合使用效果最佳。",
+  "references": "Kroenke K, Spitzer RL, Williams JB. The PHQ-9: validity of a brief depression severity measure. J Gen Intern Med. 2001;16(9):606-613. 中文版验证：Yu X, et al. BMC Psychiatry. 2012;12:74."
+}

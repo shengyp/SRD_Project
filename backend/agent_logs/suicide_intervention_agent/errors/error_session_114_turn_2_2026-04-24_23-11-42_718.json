@@ -1,0 +1,9 @@
+{
+  "session_id": "session_114",
+  "turn": 2,
+  "timestamp": "2026-04-24_23-11-42_712",
+  "error_context": "_decompose_questions",
+  "error_message": "如何区分抑郁与焦虑？: invalid character '（' (U+FF08) (<unknown>, line 5)",
+  "traceback": "Traceback (most recent call last):\n  File \"/www/wwwroot/vis4srd-V2.0/backend/SuiAgent-main/agent.py\", line 428, in _decompose_questions\n    items = ast.literal_eval(resp)\n            ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib64/python3.11/ast.py\", line 64, in literal_eval\n    node_or_string = parse(node_or_string.lstrip(\" \\t\"), mode='eval')\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib64/python3.11/ast.py\", line 50, in parse\n    return compile(source, filename, mode, flags,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<unknown>\", line 5\n    **补充说明（非输出部分）：**\n          ^\nSyntaxError: invalid character '（' (U+FF08)\n",
+  "agent_name": "suicide_intervention_agent"
+}

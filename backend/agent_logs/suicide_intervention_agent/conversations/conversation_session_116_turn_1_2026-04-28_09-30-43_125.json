@@ -1,0 +1,13 @@
+{
+  "session_id": "session_116",
+  "turn": 1,
+  "timestamp": "2026-04-28_09-30-43_125",
+  "user_input": "你好",
+  "agent_response": "你好呀，很高兴见到你～  \n今天感觉怎么样？如果有任何想聊的、心里不舒服的地方，我都在这里认真听着。无论是一点小烦恼，还是情绪上的波动，都可以慢慢说给我听。  \n\n如果你愿意，也可以简单分享一下最近的生活状态，比如睡眠、心情、压力等方面，我会尽力给你一些温和的建议和支持。  \n\n记住：你并不孤单，表达本身就已经是迈出的重要一步 ❤️",
+  "risk_assessment": {
+    "emocc_risk": "低风险",
+    "fealearn_risk": "暂无历史数据"
+  },
+  "intent_classification": "casual_chat",
+  "agent_name": "suicide_intervention_agent"
+}

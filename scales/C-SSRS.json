@@ -1,0 +1,137 @@
+{
+  "code": "C-SSRS",
+  "name": "哥伦比亚自杀严重程度评定量表（筛查版）",
+  "full_name": "Columbia Suicide Severity Rating Scale - Screen Version",
+  "version": "Chinese Simplified Screen Version",
+  "description": "C-SSRS由哥伦比亚大学研究团队开发，是评估自杀风险的国际金标准工具，已在150多种语言中验证。本版本为临床筛查版（Screen Version），共6道是/否题，分为自杀意念（4题）和自杀行为（2题）两个模块。",
+  "purpose": "专项自杀风险评定（国际临床金标准）",
+  "estimated_minutes": 4,
+  "total_questions": 6,
+  "instruction": "以下问题询问您是否曾有过某些想法或行为。请如实回答，您的回答将严格保密。",
+  "time_reference": "过去一个月内（首次评估）；过去一周内（随访评估）",
+  "scoring": {
+    "type": "dimensional",
+    "dimensions": [
+      {
+        "id": "ideation",
+        "name": "自杀意念",
+        "questions": [1, 2, 3, 4],
+        "note": "条目1-4，按严重程度递增排列，最高阳性条目决定意念严重程度"
+      },
+      {
+        "id": "behavior",
+        "name": "自杀行为",
+        "questions": [5, 6],
+        "note": "条目5-6，任一阳性即存在自杀行为史"
+      }
+    ],
+    "suicide_risk_all": true
+  },
+  "risk_levels": [
+    {
+      "level": "low",
+      "label": "低风险",
+      "condition": "所有条目均为否",
+      "suggestion": "常规随访，提供心理健康支持"
+    },
+    {
+      "level": "medium",
+      "label": "中风险",
+      "condition": "仅第1-2题阳性（被动死亡意念或一般性自杀想法）",
+      "suggestion": "加强随访频率，进行心理健康教育，评估保护因素"
+    },
+    {
+      "level": "high",
+      "label": "高风险",
+      "condition": "第3题或第4题阳性（有方法/有计划的自杀意念）",
+      "suggestion": "需要立即临床评估，考虑危机干预，通知相关人员"
+    },
+    {
+      "level": "critical",
+      "label": "极高风险",
+      "condition": "第5题或第6题阳性（有自杀行为史）",
+      "suggestion": "立即启动危机干预程序，联系精神科医生，评估住院必要性"
+    }
+  ],
+  "questions": [
+    {
+      "id": 1,
+      "module": "ideation",
+      "severity_level": 1,
+      "text": "您是否曾希望自己已经死去，或者希望可以睡着后不再醒来？",
+      "description": "被动死亡意念（Passive Death Wish）——对生命的消极态度，但没有主动的自杀想法",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "否" },
+        { "value": 1, "label": "是" }
+      ]
+    },
+    {
+      "id": 2,
+      "module": "ideation",
+      "severity_level": 2,
+      "text": "您是否曾有过伤害自己或结束自己生命的想法？",
+      "description": "非特异性主动自杀意念（Non-specific Active Suicidal Thoughts）——有伤害自己的想法，但无具体方法",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "否" },
+        { "value": 1, "label": "是" }
+      ]
+    },
+    {
+      "id": 3,
+      "module": "ideation",
+      "severity_level": 3,
+      "text": "您是否曾想过结束自己的生命，并且想到了具体的方法（但没有制定完整计划，也没有打算付诸行动）？",
+      "description": "有方法但无计划意图的主动自杀意念——有具体伤害方式，但尚未形成计划",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "否" },
+        { "value": 1, "label": "是" }
+      ]
+    },
+    {
+      "id": 4,
+      "module": "ideation",
+      "severity_level": 4,
+      "text": "您是否曾想过结束自己的生命，并且有一定的意图去付诸行动（即使还没有具体计划）？",
+      "description": "有意图但无具体计划的主动自杀意念——有明确想法并有一定意图实施",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "否" },
+        { "value": 1, "label": "是" }
+      ]
+    },
+    {
+      "id": 5,
+      "module": "behavior",
+      "severity_level": 5,
+      "text": "您是否曾为结束自己的生命做过任何准备（例如：收集药品、准备工具、分配财产、写遗书等）？",
+      "description": "准备行为（Preparatory Acts）——为实施自杀做准备的具体行动",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "否" },
+        { "value": 1, "label": "是" }
+      ]
+    },
+    {
+      "id": 6,
+      "module": "behavior",
+      "severity_level": 6,
+      "text": "您是否曾经尝试过自杀？",
+      "description": "实际自杀尝试（Actual Attempt）——曾经实施过自杀行为（即使未成功）",
+      "reverse": false,
+      "options": [
+        { "value": 0, "label": "否" },
+        { "value": 1, "label": "是" }
+      ]
+    }
+  ],
+  "scoring_guide": {
+    "ideation_score": "取第1-4题中最高阳性条目的编号作为意念严重程度（1-4级，0=无意念）",
+    "behavior_score": "第5题阳性=存在准备行为；第6题阳性=有自杀未遂史",
+    "combined_risk": "综合意念严重程度和行为史确定整体风险等级"
+  },
+  "interpretation": "C-SSRS是自杀风险评估的国际标准工具。任何条目阳性均需进行临床关注。第3-4题阳性或第5-6题阳性代表高度危险信号，应立即启动临床干预流程。",
+  "references": "Posner K, et al. The Columbia-Suicide Severity Rating Scale: initial validity and internal consistency findings from three multisite studies with adolescents and adults. Am J Psychiatry. 2011;168(12):1266-1277. 中文版验证：Zhang H, et al. BMC Psychiatry. 2025."
+}

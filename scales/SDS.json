@@ -1,0 +1,309 @@
+{
+  "code": "SDS",
+  "name": "Zung抑郁自评量表",
+  "full_name": "Zung Self-Rating Depression Scale",
+  "version": "Chinese Simplified v1.0",
+  "description": "SDS由Zung于1965年编制，是国内最经典、使用最广泛的抑郁自评量表之一。共20道题目，采用1-4级评分（反向题采用4-1分），标准分=粗分×1.25（取整数）。专为评估中国患者抑郁状态设计，在中文人群中积累了丰富的临床数据。",
+  "purpose": "抑郁自评（国内经典量表，与PHQ-9互补验证）",
+  "estimated_minutes": 6,
+  "total_questions": 20,
+  "instruction": "请仔细阅读每一条陈述，然后根据您最近一周的实际情况，在相应的选项上划圈。",
+  "scoring": {
+    "type": "weighted",
+    "max_raw_score": 80,
+    "max_standard_score": 100,
+    "reverse_questions": [2, 5, 6, 11, 12, 14, 16, 17, 18, 20],
+    "note": "第2、5、6、11、12、14、16、17、18、20题为反向计分题（选项从"没有或很少时间"到"绝大部分或全部时间"反向赋分为4-1分）"
+  },
+  "thresholds": [
+    {
+      "min": 0,
+      "max": 52,
+      "level": "normal",
+      "label": "正常范围",
+      "label_en": "Normal",
+      "risk_level": "low",
+      "suggestion": "无明显抑郁症状"
+    },
+    {
+      "min": 53,
+      "max": 62,
+      "level": "mild",
+      "label": "轻度抑郁",
+      "label_en": "Mild Depression",
+      "risk_level": "low",
+      "suggestion": "建议心理疏导和健康教育，1个月后复测"
+    },
+    {
+      "min": 63,
+      "max": 72,
+      "level": "moderate",
+      "label": "中度抑郁",
+      "label_en": "Moderate Depression",
+      "risk_level": "medium",
+      "suggestion": "建议药物干预联合心理治疗"
+    },
+    {
+      "min": 73,
+      "max": 100,
+      "level": "severe",
+      "label": "重度抑郁",
+      "label_en": "Severe Depression",
+      "risk_level": "high",
+      "suggestion": "建议立即寻求专业心理/精神科帮助，评估住院必要性"
+    }
+  ],
+  "alternative_threshold": {
+    "method": "抑郁严重指数",
+    "formula": "抑郁严重指数 = 粗分 / 80",
+    "thresholds": [
+      { "min": 0, "max": 0.49, "level": "none", "label": "无抑郁" },
+      { "min": 0.5, "max": 0.59, "level": "mild", "label": "轻度抑郁" },
+      { "min": 0.6, "max": 0.69, "level": "moderate", "label": "中度抑郁" },
+      { "min": 0.7, "max": 1.0, "level": "severe", "label": "重度抑郁" }
+    ]
+  },
+  "questions": [
+    {
+      "id": 1,
+      "text": "我觉得闷闷不乐，情绪低沉",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "没有或很少时间" },
+        { "value": 2, "label": "小部分时间" },
+        { "value": 3, "label": "相当多时间" },
+        { "value": 4, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 2,
+      "text": "我觉得一天之中早晨最好",
+      "reverse": true,
+      "note": "反向计分题",
+      "options": [
+        { "value": 4, "label": "没有或很少时间" },
+        { "value": 3, "label": "小部分时间" },
+        { "value": 2, "label": "相当多时间" },
+        { "value": 1, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 3,
+      "text": "我一阵阵地哭出来或是想哭",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "没有或很少时间" },
+        { "value": 2, "label": "小部分时间" },
+        { "value": 3, "label": "相当多时间" },
+        { "value": 4, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 4,
+      "text": "我晚上睡眠不好",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "没有或很少时间" },
+        { "value": 2, "label": "小部分时间" },
+        { "value": 3, "label": "相当多时间" },
+        { "value": 4, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 5,
+      "text": "我吃的跟平时一样多",
+      "reverse": true,
+      "note": "反向计分题",
+      "options": [
+        { "value": 4, "label": "没有或很少时间" },
+        { "value": 3, "label": "小部分时间" },
+        { "value": 2, "label": "相当多时间" },
+        { "value": 1, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 6,
+      "text": "我与异性密切接触时和以往一样感到愉快",
+      "reverse": true,
+      "note": "反向计分题",
+      "options": [
+        { "value": 4, "label": "没有或很少时间" },
+        { "value": 3, "label": "小部分时间" },
+        { "value": 2, "label": "相当多时间" },
+        { "value": 1, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 7,
+      "text": "我发觉我的体重在下降",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "没有或很少时间" },
+        { "value": 2, "label": "小部分时间" },
+        { "value": 3, "label": "相当多时间" },
+        { "value": 4, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 8,
+      "text": "我有便秘的苦恼",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "没有或很少时间" },
+        { "value": 2, "label": "小部分时间" },
+        { "value": 3, "label": "相当多时间" },
+        { "value": 4, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 9,
+      "text": "我心跳比平时快",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "没有或很少时间" },
+        { "value": 2, "label": "小部分时间" },
+        { "value": 3, "label": "相当多时间" },
+        { "value": 4, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 10,
+      "text": "我无缘无故感到疲乏",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "没有或很少时间" },
+        { "value": 2, "label": "小部分时间" },
+        { "value": 3, "label": "相当多时间" },
+        { "value": 4, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 11,
+      "text": "我的头脑和平时一样清楚",
+      "reverse": true,
+      "note": "反向计分题",
+      "options": [
+        { "value": 4, "label": "没有或很少时间" },
+        { "value": 3, "label": "小部分时间" },
+        { "value": 2, "label": "相当多时间" },
+        { "value": 1, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 12,
+      "text": "我觉得经常做的事情并没有困难",
+      "reverse": true,
+      "note": "反向计分题",
+      "options": [
+        { "value": 4, "label": "没有或很少时间" },
+        { "value": 3, "label": "小部分时间" },
+        { "value": 2, "label": "相当多时间" },
+        { "value": 1, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 13,
+      "text": "我觉得不安而平静不下来",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "没有或很少时间" },
+        { "value": 2, "label": "小部分时间" },
+        { "value": 3, "label": "相当多时间" },
+        { "value": 4, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 14,
+      "text": "我对将来抱有希望",
+      "reverse": true,
+      "note": "反向计分题",
+      "options": [
+        { "value": 4, "label": "没有或很少时间" },
+        { "value": 3, "label": "小部分时间" },
+        { "value": 2, "label": "相当多时间" },
+        { "value": 1, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 15,
+      "text": "我比平常容易激动",
+      "reverse": false,
+      "options": [
+        { "value": 1, "label": "没有或很少时间" },
+        { "value": 2, "label": "小部分时间" },
+        { "value": 3, "label": "相当多时间" },
+        { "value": 4, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 16,
+      "text": "我觉得做出决定是容易的",
+      "reverse": true,
+      "note": "反向计分题",
+      "options": [
+        { "value": 4, "label": "没有或很少时间" },
+        { "value": 3, "label": "小部分时间" },
+        { "value": 2, "label": "相当多时间" },
+        { "value": 1, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 17,
+      "text": "我觉得自己是个有用的人，有人需要我",
+      "reverse": true,
+      "note": "反向计分题",
+      "options": [
+        { "value": 4, "label": "没有或很少时间" },
+        { "value": 3, "label": "小部分时间" },
+        { "value": 2, "label": "相当多时间" },
+        { "value": 1, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 18,
+      "text": "我的生活过得很有意思",
+      "reverse": true,
+      "note": "反向计分题",
+      "options": [
+        { "value": 4, "label": "没有或很少时间" },
+        { "value": 3, "label": "小部分时间" },
+        { "value": 2, "label": "相当多时间" },
+        { "value": 1, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 19,
+      "text": "我觉得死了别人会生活得好些",
+      "reverse": false,
+      "is_suicide_related": true,
+      "options": [
+        { "value": 1, "label": "没有或很少时间" },
+        { "value": 2, "label": "小部分时间" },
+        { "value": 3, "label": "相当多时间" },
+        { "value": 4, "label": "绝大部分或全部时间" }
+      ]
+    },
+    {
+      "id": 20,
+      "text": "平常感兴趣的事我仍然照样感兴趣",
+      "reverse": true,
+      "note": "反向计分题",
+      "options": [
+        { "value": 4, "label": "没有或很少时间" },
+        { "value": 3, "label": "小部分时间" },
+        { "value": 2, "label": "相当多时间" },
+        { "value": 1, "label": "绝大部分或全部时间" }
+      ]
+    }
+  ],
+  "special_rules": [
+    {
+      "item_id": 19,
+      "condition": "score >= 2",
+      "action": "immediate_attention",
+      "message": "第19题（死亡念头）得分≥2，需立即关注并进行专项自杀风险评估（C-SSRS）"
+    }
+  ],
+  "interpretation": "SDS标准分≥53表示存在抑郁情绪。SDS与PHQ-9虽均评估抑郁，但SDS包含更多躯体症状条目（如便秘、心跳、体重变化），两者结合可更全面评估中国患者的抑郁状态。第19题直接涉及死亡念头，是重要的自杀风险信号。",
+  "references": "Zung WW. A self-rating depression scale. Arch Gen Psychiatry. 1965;12:63-70. 王征宇等. 上海精神医学. 1984."
+}
