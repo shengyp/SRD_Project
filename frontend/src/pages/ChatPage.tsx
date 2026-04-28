@@ -230,21 +230,21 @@ function extractKeywords(question: string, content: string): string[] {
 }
 
 const DOMAIN_KNOWLEDGE_LIBRARY = {
-  riskSignals: ['高危言语信号', '绝望与无助表达', '行为退缩与失控'],
-  evidence: ['对话线索', '量表结果', '既往危机事件'],
-  support: ['家庭支持系统', '同伴与班级支持', '校内外专业求助'],
-  action: ['风险分级评估', '即时安抚陪伴', '紧急转介处置'],
+  riskSignals: ['即时危险表达', '情绪耗竭轨迹', '现实失控征兆'],
+  evidence: ['对话证据片段', '量表与档案交叉验证', '既往危机事件回放'],
+  support: ['支持网络可用性', '校园协同响应', '专业转介资源'],
+  action: ['风险分层与升级阈值', '陪伴看护执行单', '紧急转介闭环'],
 };
 
 function pickDomainKeywords(question: string, content: string): string[] {
   const text = `${question} ${content}`;
   const candidates: string[] = [];
-  if (/自杀|轻生|活着没意义|不想活|结束生命/i.test(text)) candidates.push('高危言语信号');
-  if (/绝望|无助|崩溃|抑郁|焦虑|情绪|压抑|失眠/i.test(text)) candidates.push('情绪失衡线索');
-  if (/自残|伤害自己|冲动|离家|拒学|失控/i.test(text)) candidates.push('行为失控风险');
-  if (/量表|评分|分数|phq|gad|睡眠/i.test(text)) candidates.push('量表结果解读');
-  if (/家长|父母|家庭|老师|辅导员|同学|朋友/i.test(text)) candidates.push('支持系统协同');
-  if (/转介|医院|热线|求助|报警|120|专业机构/i.test(text)) candidates.push('危机转介路径');
+  if (/自杀|轻生|活着没意义|不想活|结束生命|告别/i.test(text)) candidates.push('自杀意念强度');
+  if (/计划|方式|时间|地点|工具|跳楼|割腕|吃药/i.test(text)) candidates.push('计划与工具可得性');
+  if (/绝望|无助|崩溃|抑郁|焦虑|情绪|压抑|失眠|麻木/i.test(text)) candidates.push('情绪耗竭程度');
+  if (/家长|父母|家庭|老师|辅导员|同学|朋友|舍友/i.test(text)) candidates.push('支持网络可用性');
+  if (/牵挂|放不下|求助|愿意|还想|责任|家人/i.test(text)) candidates.push('保护性因素');
+  if (/转介|医院|热线|求助|报警|120|专业机构/i.test(text)) candidates.push('干预升级路径');
   return uniqueBy([...candidates, ...extractKeywords(question, content)], (item) => item).slice(0, 6);
 }
 
@@ -270,12 +270,12 @@ function buildEvidenceList(question: string, content: string, references: Refere
 function buildMindMap(question: string, keywords: string[], evidenceList: EvidenceItem[]): MindMapPayload {
   const seeds = uniqueBy(
     [
-      keywords[0] || '高危言语信号',
-      keywords[1] || '情绪失衡线索',
-      keywords[2] || '行为失控风险',
-      keywords[3] || '支持系统协同',
-      keywords[4] || '量表结果解读',
-      keywords[5] || '危机转介路径',
+      keywords[0] || '自杀意念强度',
+      keywords[1] || '计划与工具可得性',
+      keywords[2] || '情绪耗竭程度',
+      keywords[3] || '支持网络可用性',
+      keywords[4] || '保护性因素',
+      keywords[5] || '干预升级路径',
     ],
     (item) => item,
   ).slice(0, 6);
@@ -284,7 +284,7 @@ function buildMindMap(question: string, keywords: string[], evidenceList: Eviden
       id: 'question',
       label: question.length > 16 ? `${question.slice(0, 16)}...` : question,
       group: 'question',
-      description: '当前问答的核心问题，右侧知识清单、证据链和干预建议都围绕这一节点展开。',
+      description: '这是当前对话的风险研判中心点。系统会把问答证据、支持资源和干预动作都挂接到这个问题上。',
       relatedEvidenceIds: evidenceList.map((item) => item.id),
     },
     ...seeds.map((seed, index): MindMapNode => ({
@@ -293,16 +293,16 @@ function buildMindMap(question: string, keywords: string[], evidenceList: Eviden
       group: toMindMapGroup(index < 3 ? 'core' : index < 5 ? 'support' : 'action'),
       description:
         index === 0
-          ? '优先识别是否存在直接、自伤或放弃生命相关表达，这是风险研判的第一信号。'
+          ? '先判断是否出现明确轻生、结束生命、告别或放弃求生等表达，这是整轮研判的第一危险门槛。'
           : index === 1
-            ? '观察绝望、麻木、持续低落、明显焦虑等情绪变化，判断风险是否持续升级。'
-            : index === 2
-              ? '结合退缩、失眠、冲动、自伤准备等行为线索，补全对当前危机程度的判断。'
+            ? '继续核查是否提到时间、地点、方式、工具准备，区分“想法”与“可能进入行动”的距离。'
+          : index === 2
+              ? '把绝望、麻木、崩溃、失眠、强烈自责等情绪体验串起来，看它是短时波动还是持续恶化。'
               : index === 3
-                ? '评估家庭、同伴、学校支持是否真实可用，决定陪伴与看护是否足够。'
+                ? '确认家属、室友、辅导员、班主任等是否真实在线，能否承担持续陪伴和限制独处。'
                 : index === 4
-                  ? '把对话中的判断映射到量表或已有记录，形成更可解释的证据依据。'
-                  : '明确是否需要立即联系家属、老师、医院或专业热线，形成下一步处置路径。',
+                  ? '除了风险信号，也要识别求生意愿、责任牵挂、主动求助和可接受干预，这些会影响处置级别。'
+                  : '把当前状态落到“继续观察、重点预警、立即看护、紧急转介”中的某一层，并给出执行动作。',
       relatedEvidenceIds: evidenceList[index] ? [evidenceList[index].id] : evidenceList[0] ? [evidenceList[0].id] : [],
     })),
   ];
@@ -311,9 +311,9 @@ function buildMindMap(question: string, keywords: string[], evidenceList: Eviden
     edges: nodes.slice(1).map((node, index) => ({
       source: 'question',
       target: node.id,
-      label: index < 3 ? '风险识别' : index < 5 ? '证据补强' : '干预处置',
+      label: index < 3 ? '危险核验' : index < 5 ? '支持校准' : '行动升级',
     })),
-    summary: '围绕当前问答串联风险信号、情绪行为、量表评估、支持系统与干预转介。',
+    summary: '围绕当前问答同步研判危险表达、行动准备、支持资源与干预升级路径，形成可执行的处置判断。',
     focusNodeId: 'question',
   };
 }
@@ -338,19 +338,19 @@ function buildKnowledgePanel(question: string, content: string, references: Refe
     mindMap: buildMindMap(question, keywords, evidenceList),
     tableRows: [
       {
-        topic: '风险识别',
-        knowledge: '高危言语、情绪失衡、行为失控',
-        description: '先识别是否出现轻生、绝望、退缩、冲动等警讯，再结合当前对话判断风险是否升级。',
+        topic: '问答判断',
+        knowledge: '意念强度、行动距离、情绪耗竭',
+        description: '先把对话中的危险表达、计划细节和情绪状态拆开看，明确风险究竟停留在想法、准备还是行动边缘。',
       },
       {
         topic: '证据依据',
-        knowledge: '对话线索、量表结果、既往记录',
-        description: '把回答中的关键判断映射到量表分数、历史危机事件、家校观察记录和参考工作指引。',
+        knowledge: '对话片段、量表档案、家校观察',
+        description: '把结论落回原始证据，避免只给情绪化安慰而没有依据，便于老师或辅导员后续接手。',
       },
       {
-        topic: '干预建议',
-        knowledge: '陪伴安抚、家校联动、专业转介',
-        description: '根据当前风险等级确定是否需要持续陪伴、联系家属老师，或进一步转介到医院与专业机构。',
+        topic: '处置动作',
+        knowledge: '陪伴看护、校内协同、紧急转介',
+        description: '根据风险层级决定是继续稳定情绪、立即联系家属辅导员，还是直接进入医疗与应急处置。',
       },
     ],
     preKnowledge: [
@@ -358,45 +358,45 @@ function buildKnowledgePanel(question: string, content: string, references: Refe
         DOMAIN_KNOWLEDGE_LIBRARY.riskSignals[0],
         0,
         'pre',
-        '先确认是否出现直接表达轻生、放弃生命、告别或安排后事等高危言语，这是最优先识别的危险信号。',
-        '请结合当前对话，梳理有哪些高危言语信号需要立即关注，并解释它们对应的风险含义。',
+        '先抓最硬的信号：是否直接说出不想活、想结束生命、想消失、像在告别，或者已经开始交代后事。',
+        '请结合当前对话，指出哪些表达属于即时危险表达，并说明它们为什么会触发更高等级处置。',
       ),
       makeItem(
         DOMAIN_KNOWLEDGE_LIBRARY.riskSignals[1],
         1,
         'pre',
-        '重点观察绝望、无助、麻木、强烈自责等情绪体验，它们通常决定风险是短时波动还是持续累积。',
-        '请分析当前案例中的绝望、无助或强烈自责表达，它们对风险研判意味着什么？',
+        '系统不只看一句“想不开”，还要看绝望、空心感、持续失眠、强烈羞耻或无助是否在持续堆积。',
+        '请分析当前案例中的情绪耗竭轨迹，说明它更像短时崩溃还是持续恶化。',
       ),
       makeItem(
-        DOMAIN_KNOWLEDGE_LIBRARY.riskSignals[2],
+        '现实安全约束',
         2,
         'pre',
-        '行为退缩、突然告别、拒学离群、冲动失控等线索，常常是高风险状态进入现实行动前的重要提示。',
-        '请结合当前信息说明有哪些行为线索提示风险正在上升，以及应如何继续核实。',
+        '还要确认他现在是不是独处、身边有没有危险工具、今晚有没有人陪、能不能联系到现实中的看护人。',
+        '请结合当前信息梳理现实安全约束，包括是否独处、是否有工具、是否有人可立即陪伴。',
       ),
     ],
     relatedKnowledge: [
       makeItem(
-        '量表结果如何辅助判断',
+        '保护性因素核验',
         0,
         'related',
-        'PHQ-9、GAD-7、睡眠或压力相关量表可以作为辅助证据，但不能替代对话中的风险判断。',
-        '请说明当前问答中如果结合量表结果，应该如何辅助判断风险等级与干预优先级。',
+        '除了危险信号，也要核验还有没有牵挂家人、学业目标、求助意愿、宗教伦理或同伴支持等保护因素。',
+        '请结合当前案例分析还有哪些保护性因素可被激活，它们能在多大程度上降低即时风险。',
       ),
       makeItem(
-        DOMAIN_KNOWLEDGE_LIBRARY.support[0],
+        '量表与档案交叉验证',
         1,
         'related',
-        '家庭是否知情、能否持续陪伴、是否存在冲突或忽视，会直接影响后续干预是否可执行。',
-        '请从家庭支持角度分析，当前情况里哪些资源可用，哪些地方需要补位。',
+        'PHQ-9、GAD-7、既往危机记录和辅导档案是辅助证据，用来校正判断，而不是替代对话本身。',
+        '请说明当前问答如果叠加量表分数和既往档案，应如何修正风险判断。',
       ),
       makeItem(
-        DOMAIN_KNOWLEDGE_LIBRARY.support[2],
+        DOMAIN_KNOWLEDGE_LIBRARY.support[1],
         2,
         'related',
-        '当个体难以独自承受时，需要尽快接入热线、校内心理中心、医院或本地专业求助渠道。',
-        '请整理当前情境下可以建议的求助资源，并说明各自适用的场景。',
+        '对高校场景来说，辅导员、班主任、宿舍同伴、家属和心理中心是否能快速联动，决定了方案能不能真正落地。',
+        '请从校园协同角度梳理当前案例最合适的联动顺序和通知对象。',
       ),
     ],
     deepDiveItems: [
@@ -404,28 +404,28 @@ function buildKnowledgePanel(question: string, content: string, references: Refe
         DOMAIN_KNOWLEDGE_LIBRARY.action[0],
         0,
         'deep',
-        '将风险区分为关注、预警、高危和紧急处置层级，有助于统一团队判断和后续响应。',
-        '请结合当前案例做一版风险分级，并说明每一级的依据是什么。',
+        '系统最终要把状态落到明确层级，不然老师看完回答还是不知道该不该马上找人、要不要升级。',
+        '请结合当前案例做一版风险分层，明确哪些条件会把它从预警推进到高危或紧急。',
       ),
       makeItem(
-        '陪伴与转介路径',
+        DOMAIN_KNOWLEDGE_LIBRARY.action[1],
         1,
         'deep',
-        '从即时安抚、限制独处、联系家属，到转介医院或心理机构，需要形成清晰可执行的路径。',
-        '请给出当前情境下更具体的陪伴方案和转介路径，按时间顺序说明。',
+        '回答里不能只说“多陪陪他”，而要细化到谁来陪、多久复核一次、哪些话能说、哪些动作要立刻做。',
+        '请输出一版可执行的陪伴看护清单，按接下来1小时、今晚、24小时三个时间段拆开。',
       ),
       makeItem(
         DOMAIN_KNOWLEDGE_LIBRARY.action[2],
         2,
         'deep',
-        '当出现明确计划、工具准备、无法保证安全时，应立刻升级处置，不再停留在普通安慰层面。',
-        '请说明在什么情况下应立即联系家属、老师或专业机构，并进入紧急处置流程。',
+        '一旦出现明确计划、工具到手、拒绝保证安全、无法联系陪护人等情况，就不能停留在普通安抚层面。',
+        '请说明哪些触发条件意味着必须立刻升级处置，并给出紧急转介闭环步骤。',
       ),
     ],
     followUpQuestions: [
-      '当前对话里有哪些高危信号需要立即关注？',
-      '如果家属或老师介入，下一步陪伴和沟通应该怎么做？',
-      '在什么情况下应该建议立即联系专业机构或紧急求助？',
+      '这段对话里最需要立即核实的危险细节是什么？',
+      '如果今晚只能安排一次现实干预，最优先应该做哪三步？',
+      '哪些迹象一旦出现，就必须从普通支持升级为紧急转介？',
     ],
   };
 }
@@ -547,18 +547,21 @@ function MindMapPreview({
 }) {
   const positions = layoutMindMap(mindMap);
   return (
-    <div className={`relative overflow-hidden rounded-[22px] border border-[#E0EAF4] bg-[linear-gradient(180deg,#EEF5FD_0%,#E9F1FB_100%)] ${compact ? 'h-[190px]' : 'h-[520px]'}`}>
+    <div className={`relative overflow-hidden rounded-[24px] border border-[#DCE7F5] bg-[radial-gradient(circle_at_top,#F8FBFF_0%,#EEF4FB_42%,#E7EEF7_100%)] ${compact ? 'h-[216px]' : 'h-[540px]'}`}>
       <div
-        className="absolute inset-0 opacity-25"
+        className="absolute inset-0 opacity-35"
         style={{
-          backgroundImage: 'radial-gradient(#8FB3D4 1px, transparent 1px)',
-          backgroundSize: '58px 58px',
+          backgroundImage: 'radial-gradient(#B8CAE0 1px, transparent 1px)',
+          backgroundSize: '42px 42px',
         }}
       />
-      <div className="absolute inset-x-4 top-3 flex items-center justify-between text-[12px] text-[#9AAABD]">
-        <span>风险识别图谱</span>
-        <span>节点联动</span>
+      <div className="absolute inset-0 bg-[linear-gradient(140deg,rgba(255,255,255,0.72)_0%,rgba(255,255,255,0)_40%,rgba(111,145,211,0.08)_100%)]" />
+      <div className="absolute inset-x-5 top-4 flex items-center justify-between text-[12px] text-[#91A2B5]">
+        <span>风险研判图谱</span>
+        <span>证据联动</span>
       </div>
+      <div className="absolute left-1/2 top-1/2 h-[34%] w-[34%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-[#B9CBE0]/80" />
+      <div className="absolute left-1/2 top-1/2 h-[54%] w-[54%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-[#D1DEEC]/90" />
       <svg className="absolute inset-0 h-full w-full">
         {mindMap.edges.map((edge, index) => {
           const source = positions[edge.source];
@@ -571,16 +574,17 @@ function MindMapPreview({
                 y1={`${source.y}%`}
                 x2={`${target.x}%`}
                 y2={`${target.y}%`}
-                stroke={selectedNodeId === edge.target ? '#F09E82' : '#C9D8E7'}
-                strokeWidth={selectedNodeId === edge.target ? 2.6 : 1.4}
+                stroke={selectedNodeId === edge.target ? '#7D72D9' : '#C7D5E5'}
+                strokeWidth={selectedNodeId === edge.target ? 2.8 : 1.5}
+                strokeDasharray={selectedNodeId === edge.target ? '0' : '5 5'}
               />
               {edge.label && !compact && (
                 <text
                   x={`${(source.x + target.x) / 2}%`}
                   y={`${(source.y + target.y) / 2}%`}
                   textAnchor="middle"
-                  fill="#97A4B0"
-                  fontSize="12"
+                  fill="#8FA0B1"
+                  fontSize="11"
                 >
                   {edge.label}
                 </text>
@@ -595,20 +599,28 @@ function MindMapPreview({
         const selected = selectedNodeId === node.id;
         const palette =
           node.group === 'question'
-            ? 'from-[#6E63DB] to-[#5448BF]'
+            ? 'from-[#6E63DB] via-[#5F55CD] to-[#4D44B8]'
             : node.group === 'action'
-              ? 'from-[#FFD168] to-[#F2A543]'
+              ? 'from-[#FFE19A] to-[#F6B44A]'
               : node.group === 'support'
-                ? 'from-[#9EDFC0] to-[#5DCC8D]'
-                : 'from-[#FFBFC8] to-[#F68B96]';
+                ? 'from-[#C8EED8] to-[#7ACEA0]'
+                : 'from-[#FFD1DA] to-[#F79AA9]';
+        const groupLabel =
+          node.group === 'question'
+            ? '当前问题'
+            : node.group === 'action'
+              ? '处置动作'
+              : node.group === 'support'
+                ? '支持资源'
+                : '风险判断';
         const labelPalette =
           node.group === 'question'
-            ? 'bg-white/88 text-[#4437A9]'
+            ? 'bg-[#EEEAFE] text-[#4C42B1]'
             : node.group === 'action'
-              ? 'bg-[#FFF4D8] text-[#8A5A16]'
+              ? 'bg-[#FFF2D6] text-[#96611B]'
               : node.group === 'support'
-                ? 'bg-[#E5F8ED] text-[#2E7A4E]'
-                : 'bg-[#FFE8EC] text-[#A04656]';
+                ? 'bg-[#E6F7EE] text-[#2F8356]'
+                : 'bg-[#FFE8ED] text-[#A74C61]';
         return (
           <button
             key={node.id}
@@ -617,28 +629,38 @@ function MindMapPreview({
             style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
             title={node.label}
           >
-            <span className={`mb-2 inline-flex max-w-[140px] rounded-full px-3 py-1 text-[11px] font-medium shadow-sm ${labelPalette}`}>
-              {node.label}
-            </span>
             <span
-              className={`block rounded-full bg-gradient-to-br ${palette} transition ${selected ? 'ring-4 ring-white/80 shadow-[0_0_0_10px_rgba(255,255,255,.28)]' : 'shadow-[0_10px_20px_rgba(61,94,129,.18)]'}`}
-              style={{
-                width: compact ? (node.group === 'question' ? 30 : 24) : node.group === 'question' ? 46 : 34,
-                height: compact ? (node.group === 'question' ? 30 : 24) : node.group === 'question' ? 46 : 34,
-              }}
-            />
+              className={`block overflow-hidden rounded-[18px] border border-white/70 bg-white/88 shadow-[0_14px_32px_rgba(86,108,139,0.12)] backdrop-blur-sm transition ${selected ? 'scale-[1.02] ring-2 ring-[#8590E8]/70' : 'hover:scale-[1.01]'}`}
+              style={{ width: compact ? (node.group === 'question' ? 154 : 126) : node.group === 'question' ? 188 : 156 }}
+            >
+              <span className={`block h-1.5 w-full bg-gradient-to-r ${palette}`} />
+              <span className="block px-3 py-2.5">
+                <span className={`mb-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${labelPalette}`}>
+                  {groupLabel}
+                </span>
+                <span className={`block font-semibold leading-5 text-[#1F2937] ${compact ? 'text-[13px]' : 'text-[14px]'}`}>
+                  {node.label}
+                </span>
+                {!compact && (
+                  <span className="mt-1.5 line-clamp-2 block text-[12px] leading-5 text-[#6B7B8D]">
+                    {node.description}
+                  </span>
+                )}
+              </span>
+            </span>
           </button>
         );
       })}
       {compact ? (
-        <div className="absolute inset-x-4 bottom-4 rounded-[18px] bg-white/82 px-4 py-3 shadow-sm backdrop-blur-sm">
-          <div className="flex items-center gap-2 text-[16px] font-semibold text-[#222]">
-            <Network className="h-4 w-4 text-[#425EC5]" />
-            {mindMap.nodes[0]?.label || '当前问题'}
+        <div className="absolute inset-x-4 bottom-4 rounded-[20px] border border-white/80 bg-white/84 px-4 py-3 shadow-sm backdrop-blur-sm">
+          <div className="flex items-center gap-2 text-[15px] font-semibold text-[#1F2A37]">
+            <Network className="h-4 w-4 text-[#4B5EC8]" />
+            当前风险工作台
           </div>
+          <div className="mt-1 text-[12px] leading-5 text-[#6C7B8C]">{mindMap.summary}</div>
         </div>
       ) : (
-        <div className="absolute bottom-4 left-5 right-5 rounded-2xl bg-white/72 px-4 py-3 text-sm text-[#333] backdrop-blur-sm">
+        <div className="absolute bottom-4 left-5 right-5 rounded-[20px] border border-white/80 bg-white/78 px-4 py-3 text-sm text-[#334155] backdrop-blur-sm">
           {mindMap.summary}
         </div>
       )}
@@ -855,11 +877,11 @@ export default function ChatPage() {
                 ...message,
                 knowledgePanel: {
                   ...panel,
-                  preKnowledge: parsed.slice(0, 2).map((item, index) => ({
+                  preKnowledge: parsed.slice(0, 3).map((item, index) => ({
                     id: `pre-${index}`,
                     title: String(item),
-                    description: `围绕“${String(item)}”补前置知识。`,
-                    prompt: `请解释“${String(item)}”并结合当前问题说明作用。`,
+                    description: `围绕“${String(item)}”补齐本轮风险识别里最先要核实的前置信息。`,
+                    prompt: `请解释“${String(item)}”在当前自杀风险检测场景中的判断作用，并结合这轮问答展开说明。`,
                   })),
                 },
               };
@@ -1063,7 +1085,7 @@ export default function ChatPage() {
                 {recommendedModes.map((mode, index) => (
                   <button
                     key={mode}
-                    className={`whitespace-nowrap rounded-full border px-4 py-2 text-[15px] ${index === 0 ? 'border-[#2F9E98] bg-[#E9FBF8] text-[#0B6F69]' : 'border-[#EAEAEA] bg-white text-[#313131]'}`}
+                    className={`whitespace-nowrap rounded-full border px-4 py-2 text-[15px] ${index === 0 ? 'border-[#8CB5F2] bg-[#EEF5FF] text-[#2457C5]' : 'border-[#E2E8F0] bg-white text-[#334155]'}`}
                   >
                     {mode}
                   </button>
@@ -1078,7 +1100,7 @@ export default function ChatPage() {
                 </button>
                 <button
                   onClick={() => handleSendMessage()}
-                  className="rounded-full bg-[#17233A] p-3 text-white shadow-[0_8px_18px_rgba(23,35,58,0.18)] transition hover:translate-y-[-1px]"
+                  className="rounded-full bg-[#2457C5] p-3 text-white shadow-[0_8px_18px_rgba(36,87,197,0.22)] transition hover:translate-y-[-1px]"
                 >
                   <Send className="h-5 w-5" />
                 </button>
@@ -1089,7 +1111,7 @@ export default function ChatPage() {
         </div>
       </div>
 
-      <aside className={`hidden lg:flex lg:w-[360px] lg:shrink-0 lg:flex-col lg:border-l lg:border-[#EAEAEA] lg:bg-[#FAFAFA] xl:w-[420px] ${rightPanelVisible ? '' : 'lg:w-0 lg:overflow-hidden lg:border-l-0'}`}>
+      <aside className={`hidden lg:flex lg:w-[360px] lg:shrink-0 lg:flex-col lg:border-l lg:border-[#E2E8F0] lg:bg-[#F8FAFD] xl:w-[420px] ${rightPanelVisible ? '' : 'lg:w-0 lg:overflow-hidden lg:border-l-0'}`}>
         <div className="flex items-center justify-between border-b border-[#E8E8E8] px-5 py-5">
           <div className="flex items-center gap-3 text-[18px] font-semibold text-[#202020]">
             <ArrowRight className="h-5 w-5" />
@@ -1102,7 +1124,7 @@ export default function ChatPage() {
         <div className="flex-1 overflow-y-auto px-4 py-4">
           {activeAnswer?.knowledgePanel ? (
             <div className="space-y-4">
-              <div className="rounded-[18px] bg-white p-3">
+              <div className="rounded-[20px] border border-[#E3EBF5] bg-white p-3 shadow-[0_14px_28px_rgba(104,126,153,0.08)]">
                 <MindMapPreview
                   mindMap={activeAnswer.knowledgePanel.mindMap}
                   selectedNodeId={selectedNode?.id || null}
@@ -1111,10 +1133,13 @@ export default function ChatPage() {
                 />
                 <button
                   onClick={() => setGraphModalOpen(true)}
-                  className="mt-3 flex items-center gap-2 text-[15px] text-[#222]"
+                  className="mt-3 flex w-full items-center justify-between rounded-[16px] bg-[#F5F8FC] px-4 py-3 text-left text-[14px] text-[#213042] transition hover:bg-[#EEF4FA]"
                 >
-                  <Network className="h-4 w-4" />
-                  {selectedNode?.label || activeAnswer.knowledgePanel.mindMap.summary}
+                  <span className="flex items-center gap-2">
+                    <Network className="h-4 w-4" />
+                    {selectedNode?.label || '查看完整图谱'}
+                  </span>
+                  <ArrowRight className="h-4 w-4 text-[#7A8B9D]" />
                 </button>
               </div>
 
@@ -1138,7 +1163,7 @@ export default function ChatPage() {
                 { title: '相关学习', items: activeAnswer.knowledgePanel.relatedKnowledge },
                 { title: '深入理解', items: activeAnswer.knowledgePanel.deepDiveItems },
               ].map((group) => (
-                <div key={group.title} className="rounded-[18px] bg-white px-4 py-4">
+                <div key={group.title} className="rounded-[20px] border border-[#E7EDF5] bg-white px-4 py-4 shadow-[0_12px_24px_rgba(105,125,151,0.06)]">
                   <div className="mb-3 flex items-center gap-2 text-[18px] font-semibold text-[#262626]">
                     <BrainCircuit className="h-4 w-4" />
                     {group.title}
@@ -1148,10 +1173,10 @@ export default function ChatPage() {
                       <button
                         key={item.id}
                         onClick={() => handleKnowledgeQuestion(item.prompt)}
-                        className="block w-full rounded-[16px] bg-[#F7F8FB] px-4 py-4 text-left transition hover:bg-[#F2F4F8]"
+                        className="block w-full rounded-[18px] border border-[#EEF2F7] bg-[#F8FAFD] px-4 py-4 text-left transition hover:bg-[#F1F5FB]"
                       >
-                        <div className="mb-2 text-[16px] font-semibold text-[#1F1F1F]">{item.title}</div>
-                        <div className="text-[14px] leading-7 text-[#717171]">{item.description}</div>
+                        <div className="mb-2 text-[16px] font-semibold text-[#1E2B38]">{item.title}</div>
+                        <div className="text-[14px] leading-7 text-[#5F7084]">{item.description}</div>
                       </button>
                     ))}
                   </div>
@@ -1167,10 +1192,10 @@ export default function ChatPage() {
       {!rightPanelVisible && (
         <button
           onClick={() => setRightPanelVisible(true)}
-          className="fixed right-6 top-24 z-30 inline-flex items-center gap-2 rounded-full border border-[#E8E8E8] bg-white px-4 py-2 text-[15px] text-[#202020] shadow-sm"
+          className="fixed right-0 top-1/2 z-30 inline-flex h-16 w-10 -translate-y-1/2 items-center justify-center rounded-l-[18px] border border-r-0 border-[#DCE5F1] bg-white/95 text-[#44566E] shadow-[0_10px_24px_rgba(91,115,143,0.14)] backdrop-blur-sm"
+          title="展开知识清单"
         >
           <PanelRightOpen className="h-4 w-4" />
-          知识清单
         </button>
       )}
 
