@@ -1264,6 +1264,9 @@ export async function sendChatMessageStream(
   onDone?: () => void,
   onError?: (err: Error) => void,
   onRagSources?: (sources: DocSource[]) => void,
+  onMindMap?: (mindMap: any) => void,
+  onRagEvidence?: (evidence: any[]) => void,
+  onPreKnowledge?: (terms: any) => void,
   onContextSources?: (sources: string[]) => void
 ): Promise<void> {
   const endpoint = `/api/chat/sessions/${sessionId}/messages/stream`;
@@ -1350,6 +1353,12 @@ export async function sendChatMessageStream(
             subTopic: s.subTopic || '',
           }));
           onRagSources?.(sources);
+        } else if (json.type === 'mind_map' && json.mindMap) {
+          onMindMap?.(json.mindMap);
+        } else if (json.type === 'rag_evidence' && Array.isArray(json.evidence)) {
+          onRagEvidence?.(json.evidence as any[]);
+        } else if (json.type === 'pre_knowledge') {
+          onPreKnowledge?.(json.terms);
         } else if (json.type === 'context_sources' && Array.isArray(json.sources)) {
           // 解析上下文数据来源（使用 Array.isArray 以支持空数组）
           onContextSources?.(json.sources as string[]);

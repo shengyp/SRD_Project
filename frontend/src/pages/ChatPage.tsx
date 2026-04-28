@@ -1,55 +1,111 @@
-import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ArrowRight,
+  Bot,
+  BrainCircuit,
+  Copy,
+  FilePlus2,
   FileText,
+  GitBranch,
+  Mic,
+  Network,
   PanelRightClose,
   PanelRightOpen,
-  FileIcon,
-  ExternalLink,
-  ArrowRight,
-  BookOpen,
-  ShieldCheck,
-  User,
-  Maximize2,
-  MessageSquare,
-  Plus,
-  Trash2,
-  Search,
-  Clock,
-  ChevronLeft,
-  ChevronRight,
-  Sparkles
+  PencilLine,
+  RefreshCcw,
+  Send,
+  ThumbsDown,
+  ThumbsUp,
+  Volume2,
+  X,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import {
-  fetchRecommendedQuestions,
-  fetchKnowledgeTopics,
-  fetchKnowledgeDocuments,
-  fetchChatSessions,
-  fetchChatMessages,
   createChatSession,
-  deleteChatSession,
-  type DocSource,
-  type ChatSession,
+  fetchChatMessages,
+  fetchChatSessions,
+  sendChatMessageStream,
+  type ChatMessage,
 } from '../api';
 
-// ==================== 类型定义 ====================
-
-interface Message {
-  id: number;
-  role: 'user' | 'ai';
-  content: string;
-  references?: { id: string; title: string; page?: number }[];
-  isGenerating?: boolean;  // 是否正在生成中
+interface ReferenceItem {
+  id: string;
+  title: string;
+  type?: string;
 }
 
+interface EvidenceItem {
+  id: string;
+  title: string;
+  sourceType: string;
+  snippet: string;
+  claim: string;
+  docId?: string;
+}
 
+interface MindMapNode {
+  id: string;
+  label: string;
+  group: 'question' | 'core' | 'support' | 'action';
+  description: string;
+  relatedEvidenceIds?: string[];
+}
 
+interface MindMapEdge {
+  source: string;
+  target: string;
+  label?: string;
+}
 
+interface MindMapPayload {
+  nodes: MindMapNode[];
+  edges: MindMapEdge[];
+  summary: string;
+  focusNodeId?: string;
+}
 
+interface KnowledgeItem {
+  id: string;
+  title: string;
+  description: string;
+  prompt: string;
+  relatedEvidenceIds?: string[];
+}
 
+interface KnowledgePanelPayload {
+  mindMap: MindMapPayload;
+  tableRows: Array<{ topic: string; knowledge: string; description: string }>;
+  preKnowledge: KnowledgeItem[];
+  relatedKnowledge: KnowledgeItem[];
+  deepDiveItems: KnowledgeItem[];
+  followUpQuestions: string[];
+}
 
+interface MessageViewModel {
+  id: number | string;
+  role: 'user' | 'ai';
+  content: string;
+  references: ReferenceItem[];
+  evidenceList?: EvidenceItem[];
+  knowledgePanel?: KnowledgePanelPayload;
+  modeLabel?: string;
+  durationLabel?: string;
+  isGenerating?: boolean;
+  feedback?: 'up' | 'down' | null;
+  createdAt?: string;
+}
 
-/** 聊天气泡内 Markdown 轻量渲染（无第三方依赖）：**粗体**、*斜体*、无序/有序列表、标题、水平线、引用、换行；先转义 HTML 防 XSS */
+const DEFAULT_RECOMMENDED_QUESTIONS = [
+  '深度思考',
+  '风险识别',
+  '干预建议',
+  '量表解读',
+];
+
+function toMindMapGroup(value: unknown, fallback: MindMapNode['group'] = 'core'): MindMapNode['group'] {
+  return value === 'question' || value === 'core' || value === 'support' || value === 'action' ? value : fallback;
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -60,39 +116,10 @@ function escapeHtml(text: string): string {
 
 function formatChatInline(text: string): string {
   let s = escapeHtml(text);
-  // 粗体：**text**
-  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-[#4A362C]">$1</strong>');
-  // 斜体：*text*
-  s = s.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em class="italic text-[#5A4D43]">$1</em>');
-  // 高亮：==text==
-  s = s.replace(/==([^=]+)==/g, '<mark class="bg-yellow-100 text-[#5C4D43] px-0.5 rounded">$1</mark>');
-  // 链接：[text](url) - 仅显示文本，禁用跳转
-  s = s.replace(/\[([^\]]+)\]\([^)]+\)/g, '<span class="text-[#C19A83] underline">$1</span>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-[#222]">$1</strong>');
+  s = s.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
+  s = s.replace(/\[([^\]]+)\]\([^)]+\)/g, '<span class="text-[#2E6AA1] underline">$1</span>');
   return s;
-}
-
-// 检测是否为标题行
-function isHeaderLine(line: string): { level: number; text: string } | null {
-  const match = line.match(/^(#{1,6})\s+(.+)$/);
-  if (match) {
-    return { level: match[1].length, text: match[2] };
-  }
-  return null;
-}
-
-// 检测是否为水平线
-function isHrLine(line: string): boolean {
-  return /^\s*[-*_]{3,}\s*$/.test(line);
-}
-
-// 检测是否为引用行
-function isQuoteLine(line: string): boolean {
-  return line.trim().startsWith('>');
-}
-
-// 获取引用内容
-function getQuoteContent(line: string): string {
-  return line.replace(/^\s*>\s?/, '');
 }
 
 function renderChatMessageHtml(content: string): string {
@@ -100,1314 +127,1090 @@ function renderChatMessageHtml(content: string): string {
   const lines = content.split('\n');
   const blocks: string[] = [];
   let i = 0;
-  let inQuote = false;
-  let quoteLines: string[] = [];
-
-  // 标题样式映射
-  const headerStyles: Record<number, string> = {
-    1: 'text-xl font-bold text-[#4A362C] mt-4 mb-2 pb-1 border-b border-[#EADDD5]',
-    2: 'text-lg font-semibold text-[#5A4D43] mt-3 mb-2',
-    3: 'text-base font-semibold text-[#5C4D43] mt-2 mb-1',
-    4: 'text-sm font-semibold text-[#5C4D43] mt-2',
-    5: 'text-sm font-medium text-[#8C7A6B] mt-2',
-    6: 'text-xs font-medium text-[#8C7A6B] mt-1',
-  };
-
-  // 检测是否为 Markdown 表格行
-  const isTableRow = (line: string): boolean => {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith('|') || !trimmed.endsWith('|')) return false;
-    // 排除分隔行（如 |------|------|）
-    if (/^\|[\s\-:|]+\|$/.test(trimmed)) return false;
-    return true;
-  };
-
-  // 检测是否为表格分隔行
-  const isTableSeparator = (line: string): boolean => {
-    const trimmed = line.trim();
-    return /^\|[\s\-:|]+\|$/.test(trimmed);
-  };
-
-  // 解析并渲染表格
-  const renderTable = (tableLines: string[]): string => {
-    const rows = tableLines
-      .filter(line => !isTableSeparator(line))
-      .map(line => {
-        const cells = line.split('|').filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
-        return cells.map(cell => formatChatInline(cell.trim()));
-      });
-
-    if (rows.length < 2) return tableLines.map(line => `<p>${formatChatInline(line)}</p>`).join('');
-
-    const headerRow = rows[0];
-    const bodyRows = rows.slice(1);
-
-    const thead = `<thead class="bg-gradient-to-r from-[#F9F5F2] to-[#FDF9F6]">${headerRow.map(cell => `<th class="px-3 py-2 text-left text-xs font-semibold text-[#5C4D43]">${cell}</th>`).join('')}</thead>`;
-    const tbody = `<tbody class="divide-y divide-[#EADDD5]">${bodyRows.map(row => `<tr class="hover:bg-[#FAF6F3]">${row.map(cell => `<td class="px-3 py-2 text-sm text-[#5C4D43]">${cell}</td>`).join('')}</tr>`).join('')}</tbody>`;
-
-    return `<div class="overflow-x-auto my-3"><table class="w-full text-sm border border-[#EADDD5] rounded-lg overflow-hidden">${thead}${tbody}</table></div>`;
-  };
-
   while (i < lines.length) {
     const line = lines[i];
-
-    // 检测表格开始
-    if (isTableRow(line)) {
-      const tableLines: string[] = [];
-      // 收集表格所有行
-      while (i < lines.length && (isTableRow(lines[i]) || isTableSeparator(lines[i]))) {
-        tableLines.push(lines[i]);
-        i++;
-      }
-      blocks.push(renderTable(tableLines));
-      continue;
-    }
-
-    // 处理水平分隔线
-    if (isHrLine(line)) {
-      // 关闭可能打开的引用块
-      if (inQuote && quoteLines.length > 0) {
-        blocks.push(`<blockquote class="border-l-4 border-[#C19A83] pl-4 py-2 my-3 bg-[#FDF9F6] rounded-r-lg text-[#5C4D43] italic">${quoteLines.map(l => formatChatInline(l)).join('<br/>')}</blockquote>`);
-        quoteLines = [];
-        inQuote = false;
-      }
-      blocks.push('<div class="border-t border-[#EADDD5] my-4"></div>');
+    const header = line.match(/^(#{1,6})\s+(.+)$/);
+    if (header) {
+      const level = header[1].length;
+      const size = level === 1 ? 'text-[28px]' : level === 2 ? 'text-[24px]' : 'text-[20px]';
+      blocks.push(`<h${level} class="${size} font-bold text-[#1F1F1F] mt-5 mb-3">${formatChatInline(header[2])}</h${level}>`);
       i += 1;
       continue;
     }
-
-    // 处理引用块
-    if (isQuoteLine(line)) {
-      quoteLines.push(getQuoteContent(line));
-      inQuote = true;
-      i += 1;
-      // 检查下一行是否仍是引用
-      while (i < lines.length && isQuoteLine(lines[i])) {
-        quoteLines.push(getQuoteContent(lines[i]));
-        i += 1;
-      }
-      // 输出引用块
-      blocks.push(`<blockquote class="border-l-4 border-[#C19A83] pl-4 py-2 my-3 bg-[#FDF9F6] rounded-r-lg text-[#5C4D43] italic">${quoteLines.map(l => formatChatInline(l)).join('<br/>')}</blockquote>`);
-      quoteLines = [];
-      inQuote = false;
-      continue;
-    }
-
-    // 关闭可能打开的引用块
-    if (inQuote) {
-      blocks.push(`<blockquote class="border-l-4 border-[#C19A83] pl-4 py-2 my-3 bg-[#FDF9F6] rounded-r-lg text-[#5C4D43] italic">${quoteLines.map(l => formatChatInline(l)).join('<br/>')}</blockquote>`);
-      quoteLines = [];
-      inQuote = false;
-    }
-
-    // 处理标题
-    const headerInfo = isHeaderLine(line);
-    if (headerInfo) {
-      const { level, text } = headerInfo;
-      const style = headerStyles[level] || headerStyles[6];
-      blocks.push(`<h${level} class="${style}">${formatChatInline(text)}</h${level}>`);
+    if (/^\s*[-*_]{3,}\s*$/.test(line)) {
+      blocks.push('<div class="my-5 border-t border-[#ECECEC]"></div>');
       i += 1;
       continue;
     }
-
-    // 处理无序列表
-    const ulMatch = /^\s*[*-]\s+(.+)$/.exec(line);
-    const olMatch = /^\s*\d+\.\s+(.+)$/.exec(line);
-    if (ulMatch) {
+    const ul = /^\s*[*-]\s+(.+)$/.exec(line);
+    const ol = /^\s*\d+\.\s+(.+)$/.exec(line);
+    if (ul) {
       const items: string[] = [];
       while (i < lines.length) {
-        const m = /^\s*[*-]\s+(.+)$/.exec(lines[i]);
-        if (!m) break;
-        // 检查是否有任务列表 -[ ] 或 -[x]
-        const taskMatch = m[1].match(/^-\s*\[([ x])\]\s*(.+)$/);
-        if (taskMatch) {
-          const checked = taskMatch[1] === 'x';
-          items.push(`<li class="pl-0.5 flex items-start gap-2">${checked ? '<input type="checkbox" checked disabled class="mt-1 w-3.5 h-3.5 accent-[#C19A83] shrink-0" />' : '<input type="checkbox" disabled class="mt-1 w-3.5 h-3.5 accent-[#C19A83] shrink-0" />'}<span class="${checked ? 'line-through text-[#A89F95]' : ''}">${formatChatInline(taskMatch[2])}</span></li>`);
-        } else {
-          items.push(`<li class="pl-0.5">${formatChatInline(m[1])}</li>`);
-        }
+        const match = /^\s*[*-]\s+(.+)$/.exec(lines[i]);
+        if (!match) break;
+        items.push(`<li class="leading-8">${formatChatInline(match[1])}</li>`);
         i += 1;
       }
-      blocks.push(
-        `<ul class="list-disc pl-5 my-2 space-y-1 marker:text-[#C19A83] marker:font-bold">${items.join('')}</ul>`
-      );
+      blocks.push(`<ul class="list-disc pl-6 my-3 text-[16px] text-[#202020]">${items.join('')}</ul>`);
       continue;
     }
-    if (olMatch) {
+    if (ol) {
       const items: string[] = [];
       while (i < lines.length) {
-        const m = /^\s*\d+\.\s+(.+)$/.exec(lines[i]);
-        if (!m) break;
-        items.push(`<li class="pl-0.5">${formatChatInline(m[1])}</li>`);
+        const match = /^\s*\d+\.\s+(.+)$/.exec(lines[i]);
+        if (!match) break;
+        items.push(`<li class="leading-8">${formatChatInline(match[1])}</li>`);
         i += 1;
       }
-      blocks.push(
-        `<ol class="list-decimal pl-5 my-2 space-y-1 marker:text-[#C19A83] marker:font-medium">${items.join('')}</ol>`
-      );
+      blocks.push(`<ol class="list-decimal pl-6 my-3 text-[16px] text-[#202020]">${items.join('')}</ol>`);
       continue;
     }
-
-    // 空行
     if (line.trim() === '') {
       i += 1;
       continue;
     }
-
-    // 普通段落 - 收集连续的非列表行
-    const paraLines: string[] = [];
-    while (i < lines.length && lines[i].trim() !== '' && !isHeaderLine(lines[i]) && !isHrLine(lines[i]) && !isQuoteLine(lines[i]) && !isTableRow(lines[i]) && !isTableSeparator(lines[i]) && !/^\s*[*-]\s/.test(lines[i]) && !/^\s*\d+\.\s/.test(lines[i])) {
-      paraLines.push(lines[i]);
+    const paragraph: string[] = [];
+    while (
+      i < lines.length &&
+      lines[i].trim() !== '' &&
+      !/^(#{1,6})\s+(.+)$/.test(lines[i]) &&
+      !/^\s*[-*_]{3,}\s*$/.test(lines[i]) &&
+      !/^\s*[*-]\s+(.+)$/.test(lines[i]) &&
+      !/^\s*\d+\.\s+(.+)$/.test(lines[i])
+    ) {
+      paragraph.push(lines[i]);
       i += 1;
     }
-    if (paraLines.length > 0) {
-      const para = paraLines.map((l) => formatChatInline(l)).join('<br/>');
-      blocks.push(`<p class="my-2 first:mt-0 last:mb-0 leading-relaxed">${para}</p>`);
-    }
+    blocks.push(`<p class="my-2 text-[16px] leading-8 text-[#232323]">${paragraph.map((item) => formatChatInline(item)).join('<br/>')}</p>`);
   }
-
-  // 关闭可能未关闭的引用块
-  if (inQuote && quoteLines.length > 0) {
-    blocks.push(`<blockquote class="border-l-4 border-[#C19A83] pl-4 py-2 my-3 bg-[#FDF9F6] rounded-r-lg text-[#5C4D43] italic">${quoteLines.map(l => formatChatInline(l)).join('<br/>')}</blockquote>`);
-  }
-
   return blocks.join('');
 }
 
-// ==================== 主页面组件 ====================
+function uniqueBy<T>(items: T[], getKey: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = getKey(item);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function parseJsonSafely(value: unknown): any {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+function normalizeReferences(raw: any): ReferenceItem[] {
+  if (!Array.isArray(raw)) return [];
+  return uniqueBy(
+    raw
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => ({
+        id: String(item.id || item.title || item.docId || ''),
+        title: String(item.title || item.name || '未命名来源'),
+        type: item.type ? String(item.type) : undefined,
+      })),
+    (item) => item.id || item.title,
+  );
+}
+
+function extractKeywords(question: string, content: string): string[] {
+  const source = `${question} ${content}`
+    .replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((word) => word.length >= 2);
+  return uniqueBy(source, (item) => item).slice(0, 8);
+}
+
+const DOMAIN_KNOWLEDGE_LIBRARY = {
+  riskSignals: ['高危言语信号', '绝望与无助表达', '行为退缩与失控'],
+  evidence: ['对话线索', '量表结果', '既往危机事件'],
+  support: ['家庭支持系统', '同伴与班级支持', '校内外专业求助'],
+  action: ['风险分级评估', '即时安抚陪伴', '紧急转介处置'],
+};
+
+function pickDomainKeywords(question: string, content: string): string[] {
+  const text = `${question} ${content}`;
+  const candidates: string[] = [];
+  if (/自杀|轻生|活着没意义|不想活|结束生命/i.test(text)) candidates.push('高危言语信号');
+  if (/绝望|无助|崩溃|抑郁|焦虑|情绪|压抑|失眠/i.test(text)) candidates.push('情绪失衡线索');
+  if (/自残|伤害自己|冲动|离家|拒学|失控/i.test(text)) candidates.push('行为失控风险');
+  if (/量表|评分|分数|phq|gad|睡眠/i.test(text)) candidates.push('量表结果解读');
+  if (/家长|父母|家庭|老师|辅导员|同学|朋友/i.test(text)) candidates.push('支持系统协同');
+  if (/转介|医院|热线|求助|报警|120|专业机构/i.test(text)) candidates.push('危机转介路径');
+  return uniqueBy([...candidates, ...extractKeywords(question, content)], (item) => item).slice(0, 6);
+}
+
+function buildEvidenceList(question: string, content: string, references: ReferenceItem[]): EvidenceItem[] {
+  const paragraphs = content.split('\n').map((item) => item.trim()).filter(Boolean);
+  const fallback = paragraphs.length > 0 ? paragraphs : ['回答完成后，系统会把关键论据拆成证据链摘要。'];
+  const sourceList = references.length > 0
+    ? references
+    : [
+        { id: 'manual', title: '心理危机干预工作手册', type: 'manual' },
+        { id: 'guide', title: '青少年心理援助实务指引', type: 'guide' },
+      ];
+  return sourceList.slice(0, 2).map((ref, index) => ({
+    id: `evidence-${ref.id}-${index}`,
+    title: ref.title,
+    sourceType: ref.type || 'doc',
+    snippet: fallback[index % fallback.length].slice(0, 100),
+    claim: index === 0 ? `支撑“${question.slice(0, 14)}”的核心风险判断。` : '补充回答中的干预路径、支持依据或求助建议。',
+    docId: ref.id,
+  }));
+}
+
+function buildMindMap(question: string, keywords: string[], evidenceList: EvidenceItem[]): MindMapPayload {
+  const seeds = uniqueBy(
+    [
+      keywords[0] || '高危言语信号',
+      keywords[1] || '情绪失衡线索',
+      keywords[2] || '行为失控风险',
+      keywords[3] || '支持系统协同',
+      keywords[4] || '量表结果解读',
+      keywords[5] || '危机转介路径',
+    ],
+    (item) => item,
+  ).slice(0, 6);
+  const nodes: MindMapNode[] = [
+    {
+      id: 'question',
+      label: question.length > 16 ? `${question.slice(0, 16)}...` : question,
+      group: 'question',
+      description: '当前问答的核心问题，右侧知识清单、证据链和干预建议都围绕这一节点展开。',
+      relatedEvidenceIds: evidenceList.map((item) => item.id),
+    },
+    ...seeds.map((seed, index): MindMapNode => ({
+      id: `node-${index}`,
+      label: seed,
+      group: toMindMapGroup(index < 3 ? 'core' : index < 5 ? 'support' : 'action'),
+      description:
+        index === 0
+          ? '优先识别是否存在直接、自伤或放弃生命相关表达，这是风险研判的第一信号。'
+          : index === 1
+            ? '观察绝望、麻木、持续低落、明显焦虑等情绪变化，判断风险是否持续升级。'
+            : index === 2
+              ? '结合退缩、失眠、冲动、自伤准备等行为线索，补全对当前危机程度的判断。'
+              : index === 3
+                ? '评估家庭、同伴、学校支持是否真实可用，决定陪伴与看护是否足够。'
+                : index === 4
+                  ? '把对话中的判断映射到量表或已有记录，形成更可解释的证据依据。'
+                  : '明确是否需要立即联系家属、老师、医院或专业热线，形成下一步处置路径。',
+      relatedEvidenceIds: evidenceList[index] ? [evidenceList[index].id] : evidenceList[0] ? [evidenceList[0].id] : [],
+    })),
+  ];
+  return {
+    nodes,
+    edges: nodes.slice(1).map((node, index) => ({
+      source: 'question',
+      target: node.id,
+      label: index < 3 ? '风险识别' : index < 5 ? '证据补强' : '干预处置',
+    })),
+    summary: '围绕当前问答串联风险信号、情绪行为、量表评估、支持系统与干预转介。',
+    focusNodeId: 'question',
+  };
+}
+
+function buildKnowledgePanel(question: string, content: string, references: ReferenceItem[]): KnowledgePanelPayload {
+  const keywords = pickDomainKeywords(question, content);
+  const evidenceList = buildEvidenceList(question, content, references);
+  const makeItem = (
+    title: string,
+    index: number,
+    promptPrefix: string,
+    description: string,
+    prompt?: string,
+  ): KnowledgeItem => ({
+    id: `${promptPrefix}-${index}`,
+    title,
+    description,
+    prompt: prompt || `请围绕“${title}”继续展开说明，并结合当前问题补充解释。`,
+    relatedEvidenceIds: evidenceList[index] ? [evidenceList[index].id] : evidenceList[0] ? [evidenceList[0].id] : [],
+  });
+  return {
+    mindMap: buildMindMap(question, keywords, evidenceList),
+    tableRows: [
+      {
+        topic: '风险识别',
+        knowledge: '高危言语、情绪失衡、行为失控',
+        description: '先识别是否出现轻生、绝望、退缩、冲动等警讯，再结合当前对话判断风险是否升级。',
+      },
+      {
+        topic: '证据依据',
+        knowledge: '对话线索、量表结果、既往记录',
+        description: '把回答中的关键判断映射到量表分数、历史危机事件、家校观察记录和参考工作指引。',
+      },
+      {
+        topic: '干预建议',
+        knowledge: '陪伴安抚、家校联动、专业转介',
+        description: '根据当前风险等级确定是否需要持续陪伴、联系家属老师，或进一步转介到医院与专业机构。',
+      },
+    ],
+    preKnowledge: [
+      makeItem(
+        DOMAIN_KNOWLEDGE_LIBRARY.riskSignals[0],
+        0,
+        'pre',
+        '先确认是否出现直接表达轻生、放弃生命、告别或安排后事等高危言语，这是最优先识别的危险信号。',
+        '请结合当前对话，梳理有哪些高危言语信号需要立即关注，并解释它们对应的风险含义。',
+      ),
+      makeItem(
+        DOMAIN_KNOWLEDGE_LIBRARY.riskSignals[1],
+        1,
+        'pre',
+        '重点观察绝望、无助、麻木、强烈自责等情绪体验，它们通常决定风险是短时波动还是持续累积。',
+        '请分析当前案例中的绝望、无助或强烈自责表达，它们对风险研判意味着什么？',
+      ),
+      makeItem(
+        DOMAIN_KNOWLEDGE_LIBRARY.riskSignals[2],
+        2,
+        'pre',
+        '行为退缩、突然告别、拒学离群、冲动失控等线索，常常是高风险状态进入现实行动前的重要提示。',
+        '请结合当前信息说明有哪些行为线索提示风险正在上升，以及应如何继续核实。',
+      ),
+    ],
+    relatedKnowledge: [
+      makeItem(
+        '量表结果如何辅助判断',
+        0,
+        'related',
+        'PHQ-9、GAD-7、睡眠或压力相关量表可以作为辅助证据，但不能替代对话中的风险判断。',
+        '请说明当前问答中如果结合量表结果，应该如何辅助判断风险等级与干预优先级。',
+      ),
+      makeItem(
+        DOMAIN_KNOWLEDGE_LIBRARY.support[0],
+        1,
+        'related',
+        '家庭是否知情、能否持续陪伴、是否存在冲突或忽视，会直接影响后续干预是否可执行。',
+        '请从家庭支持角度分析，当前情况里哪些资源可用，哪些地方需要补位。',
+      ),
+      makeItem(
+        DOMAIN_KNOWLEDGE_LIBRARY.support[2],
+        2,
+        'related',
+        '当个体难以独自承受时，需要尽快接入热线、校内心理中心、医院或本地专业求助渠道。',
+        '请整理当前情境下可以建议的求助资源，并说明各自适用的场景。',
+      ),
+    ],
+    deepDiveItems: [
+      makeItem(
+        DOMAIN_KNOWLEDGE_LIBRARY.action[0],
+        0,
+        'deep',
+        '将风险区分为关注、预警、高危和紧急处置层级，有助于统一团队判断和后续响应。',
+        '请结合当前案例做一版风险分级，并说明每一级的依据是什么。',
+      ),
+      makeItem(
+        '陪伴与转介路径',
+        1,
+        'deep',
+        '从即时安抚、限制独处、联系家属，到转介医院或心理机构，需要形成清晰可执行的路径。',
+        '请给出当前情境下更具体的陪伴方案和转介路径，按时间顺序说明。',
+      ),
+      makeItem(
+        DOMAIN_KNOWLEDGE_LIBRARY.action[2],
+        2,
+        'deep',
+        '当出现明确计划、工具准备、无法保证安全时，应立刻升级处置，不再停留在普通安慰层面。',
+        '请说明在什么情况下应立即联系家属、老师或专业机构，并进入紧急处置流程。',
+      ),
+    ],
+    followUpQuestions: [
+      '当前对话里有哪些高危信号需要立即关注？',
+      '如果家属或老师介入，下一步陪伴和沟通应该怎么做？',
+      '在什么情况下应该建议立即联系专业机构或紧急求助？',
+    ],
+  };
+}
+
+function parseEvidencePayload(raw: any, fallback: EvidenceItem[]): EvidenceItem[] {
+  const parsed = parseJsonSafely(raw);
+  if (!Array.isArray(parsed)) return fallback;
+  return parsed.map((item: any, index: number) => ({
+    id: String(item.id || `evidence-${index}`),
+    title: String(item.title || item.source || `证据 ${index + 1}`),
+    sourceType: String(item.sourceType || item.type || 'doc'),
+    snippet: String(item.snippet || item.content || item.quote || '暂无证据片段'),
+    claim: String(item.claim || item.relation || '支持当前回答的关键结论。'),
+    docId: item.docId ? String(item.docId) : undefined,
+  }));
+}
+
+function parseMindMapPayload(raw: any, question: string, fallbackEvidence: EvidenceItem[]): MindMapPayload {
+  const parsed = parseJsonSafely(raw);
+  if (parsed && Array.isArray(parsed.nodes) && Array.isArray(parsed.edges)) {
+    return {
+      nodes: parsed.nodes.map((node: any, index: number) => ({
+        id: String(node.id || `node-${index}`),
+        label: String(node.label || node.name || `节点${index + 1}`),
+        group: node.group === 'question' || node.group === 'core' || node.group === 'support' || node.group === 'action'
+          ? node.group
+          : index === 0
+            ? 'question'
+            : 'core',
+        description: String(node.description || node.desc || '知识点说明'),
+        relatedEvidenceIds: Array.isArray(node.relatedEvidenceIds) ? node.relatedEvidenceIds.map(String) : [],
+      })),
+      edges: parsed.edges.map((edge: any) => ({
+        source: String(edge.source || edge.from),
+        target: String(edge.target || edge.to),
+        label: edge.label ? String(edge.label) : undefined,
+      })),
+      summary: String(parsed.summary || '知识图谱摘要'),
+      focusNodeId: parsed.focusNodeId ? String(parsed.focusNodeId) : undefined,
+    };
+  }
+  return buildMindMap(question, extractKeywords(question, ''), fallbackEvidence);
+}
+
+function createUserMessage(message: ChatMessage): MessageViewModel {
+  return {
+    id: message.id,
+    role: 'user',
+    content: message.content,
+    references: [],
+    createdAt: message.createdAt,
+  };
+}
+
+function createAiMessage(message: ChatMessage, question: string): MessageViewModel {
+  const references = normalizeReferences(message.references ?? message.referencesJson ?? message.retrievalSources ?? message.retrieval_sources);
+  const ragContext = parseJsonSafely(message.ragContext ?? message.rag_context);
+  const fallbackEvidence = buildEvidenceList(question, message.content, references);
+  const evidenceList = parseEvidencePayload(ragContext?.evidence || ragContext, fallbackEvidence);
+  const panel = buildKnowledgePanel(question, message.content, references);
+  return {
+    id: message.id,
+    role: 'ai',
+    content: message.content,
+    references,
+    evidenceList,
+    knowledgePanel: {
+      ...panel,
+      mindMap: parseMindMapPayload(ragContext?.mindMap, question, evidenceList),
+    },
+    modeLabel: '深度思考',
+    durationLabel: message.processingTimeMs ? `用时${(message.processingTimeMs / 1000).toFixed(2)}秒` : undefined,
+    isGenerating: false,
+    feedback: null,
+    createdAt: message.createdAt,
+  };
+}
+
+function formatTimestamp(dateString?: string): string {
+  const date = dateString ? new Date(dateString) : new Date();
+  if (Number.isNaN(date.getTime())) return '';
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const hh = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+}
+
+function layoutMindMap(mindMap: MindMapPayload) {
+  const positions: Record<string, { x: number; y: number }> = {};
+  const baseNodes = mindMap.nodes;
+  if (!baseNodes.length) return positions;
+  positions[baseNodes[0].id] = { x: 50, y: 56 };
+  const layoutSlots = [
+    { x: 24, y: 28 },
+    { x: 49, y: 18 },
+    { x: 77, y: 28 },
+    { x: 28, y: 68 },
+    { x: 56, y: 73 },
+    { x: 79, y: 64 },
+  ];
+  baseNodes.slice(1).forEach((node, index) => {
+    positions[node.id] = layoutSlots[index] || { x: 24 + index * 8, y: 30 + (index % 2) * 28 };
+  });
+  return positions;
+}
+
+function MindMapPreview({
+  mindMap,
+  selectedNodeId,
+  onSelectNode,
+  compact,
+}: {
+  mindMap: MindMapPayload;
+  selectedNodeId: string | null;
+  onSelectNode: (id: string) => void;
+  compact?: boolean;
+}) {
+  const positions = layoutMindMap(mindMap);
+  return (
+    <div className={`relative overflow-hidden rounded-[22px] border border-[#E0EAF4] bg-[linear-gradient(180deg,#EEF5FD_0%,#E9F1FB_100%)] ${compact ? 'h-[190px]' : 'h-[520px]'}`}>
+      <div
+        className="absolute inset-0 opacity-25"
+        style={{
+          backgroundImage: 'radial-gradient(#8FB3D4 1px, transparent 1px)',
+          backgroundSize: '58px 58px',
+        }}
+      />
+      <div className="absolute inset-x-4 top-3 flex items-center justify-between text-[12px] text-[#9AAABD]">
+        <span>风险识别图谱</span>
+        <span>节点联动</span>
+      </div>
+      <svg className="absolute inset-0 h-full w-full">
+        {mindMap.edges.map((edge, index) => {
+          const source = positions[edge.source];
+          const target = positions[edge.target];
+          if (!source || !target) return null;
+          return (
+            <g key={`${edge.source}-${edge.target}-${index}`}>
+              <line
+                x1={`${source.x}%`}
+                y1={`${source.y}%`}
+                x2={`${target.x}%`}
+                y2={`${target.y}%`}
+                stroke={selectedNodeId === edge.target ? '#F09E82' : '#C9D8E7'}
+                strokeWidth={selectedNodeId === edge.target ? 2.6 : 1.4}
+              />
+              {edge.label && !compact && (
+                <text
+                  x={`${(source.x + target.x) / 2}%`}
+                  y={`${(source.y + target.y) / 2}%`}
+                  textAnchor="middle"
+                  fill="#97A4B0"
+                  fontSize="12"
+                >
+                  {edge.label}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      {mindMap.nodes.map((node) => {
+        const pos = positions[node.id];
+        if (!pos) return null;
+        const selected = selectedNodeId === node.id;
+        const palette =
+          node.group === 'question'
+            ? 'from-[#6E63DB] to-[#5448BF]'
+            : node.group === 'action'
+              ? 'from-[#FFD168] to-[#F2A543]'
+              : node.group === 'support'
+                ? 'from-[#9EDFC0] to-[#5DCC8D]'
+                : 'from-[#FFBFC8] to-[#F68B96]';
+        const labelPalette =
+          node.group === 'question'
+            ? 'bg-white/88 text-[#4437A9]'
+            : node.group === 'action'
+              ? 'bg-[#FFF4D8] text-[#8A5A16]'
+              : node.group === 'support'
+                ? 'bg-[#E5F8ED] text-[#2E7A4E]'
+                : 'bg-[#FFE8EC] text-[#A04656]';
+        return (
+          <button
+            key={node.id}
+            onClick={() => onSelectNode(node.id)}
+            className="absolute -translate-x-1/2 -translate-y-1/2 text-left"
+            style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+            title={node.label}
+          >
+            <span className={`mb-2 inline-flex max-w-[140px] rounded-full px-3 py-1 text-[11px] font-medium shadow-sm ${labelPalette}`}>
+              {node.label}
+            </span>
+            <span
+              className={`block rounded-full bg-gradient-to-br ${palette} transition ${selected ? 'ring-4 ring-white/80 shadow-[0_0_0_10px_rgba(255,255,255,.28)]' : 'shadow-[0_10px_20px_rgba(61,94,129,.18)]'}`}
+              style={{
+                width: compact ? (node.group === 'question' ? 30 : 24) : node.group === 'question' ? 46 : 34,
+                height: compact ? (node.group === 'question' ? 30 : 24) : node.group === 'question' ? 46 : 34,
+              }}
+            />
+          </button>
+        );
+      })}
+      {compact ? (
+        <div className="absolute inset-x-4 bottom-4 rounded-[18px] bg-white/82 px-4 py-3 shadow-sm backdrop-blur-sm">
+          <div className="flex items-center gap-2 text-[16px] font-semibold text-[#222]">
+            <Network className="h-4 w-4 text-[#425EC5]" />
+            {mindMap.nodes[0]?.label || '当前问题'}
+          </div>
+        </div>
+      ) : (
+        <div className="absolute bottom-4 left-5 right-5 rounded-2xl bg-white/72 px-4 py-3 text-sm text-[#333] backdrop-blur-sm">
+          {mindMap.summary}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReferenceBadge({ iconText }: { iconText: string }) {
+  return (
+    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#3557D4] text-xs font-bold text-white">
+      {iconText}
+    </span>
+  );
+}
 
 export default function ChatPage() {
   const navigate = useNavigate();
-  
-  // 动态数据状态（从后端 API 加载）
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [docSources, setDocSources] = useState<DocSource[]>([]);
-  const [recommendedQuestions, setRecommendedQuestions] = useState<string[]>([]);
-  // 上下文/数据来源：动态显示当前对话使用的知识库范围（初始为空，动态加载）
-  const [contextSources, setContextSources] = useState<string[]>([]);
-
-  // 其他状态
-  const [inputText, setInputText] = useState('');
-  const [highlightedDocId, setHighlightedDocId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [currentSessionId, setCurrentSessionId] = useState<number | string | null>(null);
-  
-  // 会话列表侧边栏相关状态
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [sessionsLoading, setSessionsLoading] = useState(true); // 默认加载中
-  const [sessionSearchText, setSessionSearchText] = useState('');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // 侧边栏折叠状态
-  const [rightPanelVisible, setRightPanelVisible] = useState(true); // 右侧知识清单面板可见性
-  
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  // 流式渲染：用 ref 直接写 DOM，绕过 React 批处理
-  const streamingContentRef = useRef('');
-  const streamingDivRef = useRef<HTMLDivElement | null>(null);
-  const streamingMsgIdRef = useRef<number | null>(null);  // 追踪当前流式消息 ID
+  const [messages, setMessages] = useState<MessageViewModel[]>([]);
+  const [recommendedModes] = useState(DEFAULT_RECOMMENDED_QUESTIONS);
+  const [inputText, setInputText] = useState('');
+  const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [rightPanelVisible, setRightPanelVisible] = useState(true);
+  const [graphModalOpen, setGraphModalOpen] = useState(false);
+  const [activeAnswerId, setActiveAnswerId] = useState<number | string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedEvidenceId, setSelectedEvidenceId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  // 加载初始数据（仅在组件挂载时执行一次）
+  const activeAnswer = useMemo(
+    () => messages.find((item) => item.id === activeAnswerId && item.role === 'ai') || [...messages].reverse().find((item) => item.role === 'ai') || null,
+    [activeAnswerId, messages],
+  );
+
+  const selectedNode = useMemo(() => {
+    if (!activeAnswer?.knowledgePanel) return null;
+    return activeAnswer.knowledgePanel.mindMap.nodes.find((node) => node.id === selectedNodeId) || activeAnswer.knowledgePanel.mindMap.nodes[0] || null;
+  }, [activeAnswer, selectedNodeId]);
+
+  const selectedEvidence = useMemo(() => {
+    if (!activeAnswer?.evidenceList) return null;
+    return activeAnswer.evidenceList.find((item) => item.id === selectedEvidenceId) || activeAnswer.evidenceList[0] || null;
+  }, [activeAnswer, selectedEvidenceId]);
+
   useEffect(() => {
     const loadInitialData = async () => {
       setIsLoading(true);
       try {
-        // 并行加载所有数据（知识相关 + 聊天会话同时请求）
-        // 每个 API 单独 try-catch，确保一个失败不影响其他
+        const [sessionsRes] = await Promise.allSettled([
+          fetchChatSessions({ limit: 10 }),
+        ]);
 
-        // 推荐问题（可能返回 500，使用默认值兜底）
-        let questionsData: any = [];
-        try {
-          // 不传 ai_mode 参数，后端默认返回 ai_mode='all' 的问题
-          const questionsRes = await fetchRecommendedQuestions();
-          if (questionsRes && questionsRes.length > 0) {
-            const seen = new Set<string>();
-            questionsData = questionsRes
-              .map((q: any) => q.question || q)
-              .filter((q: string) => {
-                if (seen.has(q)) return false;
-                seen.add(q);
-                return true;
-              });
-          }
-        } catch (e) {
-          console.warn('加载推荐问题失败，使用默认值:', e);
-        }
-
-        // 知识主题
-        try {
-          await fetchKnowledgeTopics();
-        } catch (e) {
-          console.warn('加载知识主题失败:', e);
-        }
-
-        // 文档列表
-        let docsData: any = { documents: [] };
-        try {
-          docsData = await fetchKnowledgeDocuments({ limit: 10 });
-        } catch (e) {
-          console.warn('加载文档列表失败:', e);
-        }
-
-        // 会话列表
-        let sessionsData: any = { sessions: [] };
-        try {
-          sessionsData = await fetchChatSessions({ limit: 20 });
-        } catch (e) {
-          console.warn('加载会话列表失败:', e);
-        }
-
-        // 处理推荐问题（去重 + 保序）
-        if (questionsData.length > 0) {
-          setRecommendedQuestions(questionsData);
-        }
-
-        // 处理文档列表
-        if (docsData?.documents && docsData.documents.length > 0) {
-          const mappedDocs: DocSource[] = docsData.documents.map((doc: any) => ({
-            id: String(doc.id),
-            title: doc.title,
-            type: doc.format as 'pdf' | 'word' | 'md' | 'txt',
-            topic: doc.topic?.topicName || '',
-            subTopic: doc.subTopic?.subTopicName || '',
-          }));
-          setDocSources(mappedDocs);
-        }
-
-        // 处理聊天会话（会话和消息并行加载）
-        // 保存会话列表供侧边栏使用
-        const sessions = sessionsData?.sessions || [];
-        setSessions(sessions);
-
-        if (sessions && sessions.length > 0) {
-          // 优先从 localStorage 恢复上次选中的会话
-          const savedSessionId = localStorage.getItem('vis4srd-chat-session-id');
-          let targetSession = sessions.find((s: ChatSession) => String(s.id) === String(savedSessionId));
-
-          // 如果没有保存的会话或找不到，选取最新会话
-          if (!targetSession) {
-            targetSession = sessions[0];
-          }
-
-          setCurrentSessionId(targetSession.id);
-          // 保存会话 ID 到 localStorage
-          localStorage.setItem('vis4srd-chat-session-id', String(targetSession.id));
-
-          // 确保 sessionId 是数字类型
-          const sessionIdNum = Number(targetSession.id);
-          console.log('[ChatPage] 恢复会话:', { savedSessionId, targetSessionId: targetSession.id, sessionIdNum });
-
-          // 消息加载与 UI 更新并行执行
-          try {
-            const msgsRes = await fetchChatMessages(sessionIdNum);
-            console.log('[ChatPage] 加载消息结果:', { sessionId: sessionIdNum, messageCount: msgsRes?.length || 0 });
-            if (msgsRes && msgsRes.length > 0) {
-                const mappedMsgs: Message[] = msgsRes.map((m: any) => ({
-                id: m.id,
-                role: m.role as 'user' | 'ai',
-                content: m.content,
-                references: m.references ?? m.referencesJson,
-              }));
-              setMessages(mappedMsgs);
-
-              // 从历史消息中恢复 docSources 和 contextSources 状态
-              // 遍历所有 AI 消息，收集最新的 references 和 retrieval_sources
-              const collectedDocSources: DocSource[] = [];
-              const collectedContextSources: string[] = [];
-              for (const msg of msgsRes) {
-                if (msg.role === 'ai') {
-                  // 从 references 字段恢复文档来源（支持 snake_case 和 camelCase）
-                  const refs = msg.references ?? msg.referencesJson;
-                  if (Array.isArray(refs) && refs.length > 0) {
-                    for (const ref of refs) {
-                      if (typeof ref === 'object' && ref !== null) {
-                        const docId = String(ref.id || ref.title || '');
-                        if (docId && !collectedDocSources.find(d => d.id === docId)) {
-                          collectedDocSources.push({
-                            id: docId,
-                            title: ref.title || '',
-                            type: (ref.type as 'pdf' | 'word' | 'md' | 'txt') || 'md',
-                            topic: ref.topic || '',
-                            subTopic: ref.subTopic || '',
-                          });
-                        }
-                      }
-                    }
-                  }
-                  // 从 retrieval_sources / retrievalSources 字段恢复（备用来源）
-                  const sources = msg.retrievalSources ?? msg.retrieval_sources;
-                  if (Array.isArray(sources) && sources.length > 0) {
-                    for (const src of sources) {
-                      if (typeof src === 'object' && src !== null) {
-                        const docId = String(src.id || src.title || '');
-                        if (docId && !collectedDocSources.find(d => d.id === docId)) {
-                          collectedDocSources.push({
-                            id: docId,
-                            title: src.title || '',
-                            type: (src.type as 'pdf' | 'word' | 'md' | 'txt') || 'md',
-                            topic: src.topic || '',
-                            subTopic: src.subTopic || '',
-                          });
-                        }
-                      }
-                    }
-                  }
-                  // 从 rag_context / ragContext 恢复上下文来源描述（如果有）
-                  const ragCtx = msg.ragContext ?? msg.rag_context;
-                  if (ragCtx && typeof ragCtx === 'object' && !Array.isArray(ragCtx)) {
-                    const ctx = ragCtx as any;
-                    if (ctx.used_documents && Array.isArray(ctx.used_documents)) {
-                      for (const docName of ctx.used_documents) {
-                        const docNameStr = String(docName);
-                        if (docNameStr && !collectedContextSources.includes(docNameStr)) {
-                          collectedContextSources.push(docNameStr);
-                        }
-                      }
-                    }
-                    if (ctx.sources && Array.isArray(ctx.sources)) {
-                      for (const src of ctx.sources) {
-                        const srcStr = String(src);
-                        if (srcStr && !collectedContextSources.includes(srcStr)) {
-                          collectedContextSources.push(srcStr);
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-              if (collectedDocSources.length > 0) {
-                console.log('[ChatPage] 从历史消息恢复文档来源:', collectedDocSources.length, '个');
-                setDocSources(collectedDocSources);
-              }
-              if (collectedContextSources.length > 0) {
-                setContextSources(collectedContextSources);
-              }
-            } else {
-              setMessages([]);
+        let sessionId: number | null = null;
+        if (sessionsRes.status === 'fulfilled' && sessionsRes.value.sessions.length > 0) {
+          sessionId = Number(sessionsRes.value.sessions[0].id);
+          setCurrentSessionId(sessionId);
+          const rawMessages = await fetchChatMessages(sessionId);
+          const mapped: MessageViewModel[] = [];
+          let lastQuestion = '';
+          rawMessages.forEach((message) => {
+            if (message.role === 'user') {
+              lastQuestion = message.content;
+              mapped.push(createUserMessage(message));
+            } else if (message.role === 'ai') {
+              const ai = createAiMessage(message, lastQuestion || '当前问题');
+              mapped.push(ai);
             }
-          } catch (msgErr) {
-            console.error('[ChatPage] 加载消息失败:', msgErr);
-            setMessages([]);
-          }
-        } else {
-          setMessages([]);
-          setCurrentSessionId(null);
-          localStorage.removeItem('vis4srd-chat-session-id');
+          });
+          setMessages(mapped);
+          const latestAi = [...mapped].reverse().find((item) => item.role === 'ai') || null;
+          setActiveAnswerId(latestAi?.id || null);
+          setSelectedNodeId(latestAi?.knowledgePanel?.mindMap.nodes[0]?.id || null);
+          setSelectedEvidenceId(latestAi?.evidenceList?.[0]?.id || null);
         }
-      } catch (err) {
-        console.warn('加载聊天数据失败，使用默认值:', err);
-        setMessages([]);
-        setSessions([]);
+
+        if (!sessionId) {
+          const newSession = await createChatSession({ aiMode: 'deep_think', contextType: 'general' });
+          setCurrentSessionId(Number(newSession.id));
+        }
+      } catch (error) {
+        console.error('加载聊天页失败:', error);
       } finally {
         setIsLoading(false);
-        setSessionsLoading(false);
       }
     };
-
     loadInitialData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 仅在组件挂载时执行一次
-
-  // 切换会话
-  const switchSession = async (session: ChatSession) => {
-    if (String(session.id) === String(currentSessionId)) return;
-    
-    setCurrentSessionId(session.id);
-    localStorage.setItem('vis4srd-chat-session-id', String(session.id));
-    
-    // 清空 RAG 相关数据
-    setDocSources([]);
-    setContextSources([]);
-    
-    // 加载新会话的消息
-    setIsLoading(true);
-    try {
-      const msgsRes = await fetchChatMessages(session.id);
-      if (msgsRes && msgsRes.length > 0) {
-        const mappedMsgs: Message[] = msgsRes.map((m: any) => ({
-          id: m.id,
-          role: m.role as 'user' | 'ai',
-          content: m.content,
-          references: m.references ?? m.referencesJson,
-        }));
-        setMessages(mappedMsgs);
-
-        // 从历史消息中恢复 docSources 和 contextSources 状态
-        const collectedDocSources: DocSource[] = [];
-        const collectedContextSources: string[] = [];
-        for (const msg of msgsRes) {
-          if (msg.role === 'ai') {
-            // 从 references 字段恢复文档来源（支持 snake_case 和 camelCase）
-            const refs = msg.references ?? msg.referencesJson;
-            if (Array.isArray(refs) && refs.length > 0) {
-              for (const ref of refs) {
-                if (typeof ref === 'object' && ref !== null) {
-                  const docId = String(ref.id || ref.title || '');
-                  if (docId && !collectedDocSources.find(d => d.id === docId)) {
-                    collectedDocSources.push({
-                      id: docId,
-                      title: ref.title || '',
-                      type: (ref.type as 'pdf' | 'word' | 'md' | 'txt') || 'md',
-                      topic: ref.topic || '',
-                      subTopic: ref.subTopic || '',
-                    });
-                  }
-                }
-              }
-            }
-            // 从 retrieval_sources / retrievalSources 字段恢复（备用来源）
-            const sources = msg.retrievalSources ?? msg.retrieval_sources;
-            if (Array.isArray(sources) && sources.length > 0) {
-              for (const src of sources) {
-                if (typeof src === 'object' && src !== null) {
-                  const docId = String(src.id || src.title || '');
-                  if (docId && !collectedDocSources.find(d => d.id === docId)) {
-                    collectedDocSources.push({
-                      id: docId,
-                      title: src.title || '',
-                      type: (src.type as 'pdf' | 'word' | 'md' | 'txt') || 'md',
-                      topic: src.topic || '',
-                      subTopic: src.subTopic || '',
-                    });
-                  }
-                }
-              }
-            }
-            // 从 rag_context / ragContext 恢复上下文来源描述
-            const ragCtx = msg.ragContext ?? msg.rag_context;
-            if (ragCtx && typeof ragCtx === 'object' && !Array.isArray(ragCtx)) {
-              const ctx = ragCtx as any;
-              if (ctx.used_documents && Array.isArray(ctx.used_documents)) {
-                for (const docName of ctx.used_documents) {
-                  const docNameStr = String(docName);
-                  if (docNameStr && !collectedContextSources.includes(docNameStr)) {
-                    collectedContextSources.push(docNameStr);
-                  }
-                }
-              }
-              if (ctx.sources && Array.isArray(ctx.sources)) {
-                for (const src of ctx.sources) {
-                  const srcStr = String(src);
-                  if (srcStr && !collectedContextSources.includes(srcStr)) {
-                    collectedContextSources.push(srcStr);
-                  }
-                }
-              }
-            }
-          }
-        }
-        if (collectedDocSources.length > 0) {
-          setDocSources(collectedDocSources);
-        }
-        if (collectedContextSources.length > 0) {
-          setContextSources(collectedContextSources);
-        }
-      } else {
-        setMessages([]);
-        setDocSources([]);
-        setContextSources([]);
-      }
-    } catch (err) {
-      console.error('切换会话失败:', err);
-      setMessages([]);
-      setDocSources([]);
-      setContextSources([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 创建新会话
-  const handleCreateNewSession = async () => {
-    try {
-      const newSession = await createChatSession({
-        aiMode: 'deep_think',
-        contextType: 'general',
-      });
-
-      // 更新会话列表（添加到最前面）
-      setSessions(prev => [newSession, ...prev]);
-
-      // 切换到新会话
-      setCurrentSessionId(newSession.id);
-      localStorage.setItem('vis4srd-chat-session-id', String(newSession.id));
-      setMessages([]);
-      
-      // 清空 RAG 相关数据
-      setDocSources([]);
-      setContextSources([]);
-    } catch (err) {
-      console.error('创建新会话失败:', err);
-      alert('创建会话失败，请重试');
-    }
-  };
-
-  // 删除会话
-  const handleDeleteSession = async (sessionId: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    
-    if (!confirm('确定要删除这个会话吗？删除后无法恢复。')) return;
-    
-    try {
-      await deleteChatSession(sessionId);
-      
-      // 从列表中移除
-      setSessions(prev => prev.filter(s => String(s.id) !== String(sessionId)));
-      
-      // 如果删除的是当前会话，切换到其他会话
-      if (String(sessionId) === String(currentSessionId)) {
-        const remaining = sessions.filter(s => String(s.id) !== String(sessionId));
-        if (remaining.length > 0) {
-          switchSession(remaining[0]);
-        } else {
-          setCurrentSessionId(null);
-          setMessages([]);
-          localStorage.removeItem('vis4srd-chat-session-id');
-        }
-      }
-    } catch (err) {
-      console.error('删除会话失败:', err);
-      alert('删除会话失败，请重试');
-    }
-  };
-
-  // 刷新会话列表
-  const refreshSessions = async () => {
-    setSessionsLoading(true);
-    try {
-      const res = await fetchChatSessions({ limit: 20 });
-      setSessions(res.sessions || []);
-    } catch (err) {
-      console.error('刷新会话列表失败:', err);
-    } finally {
-      setSessionsLoading(false);
-    }
-  };
-
-  // 格式化会话时间
-  const formatSessionTime = (dateStr: string | undefined) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-    
-    if (diffMins < 1) return '刚刚';
-    if (diffMins < 60) return `${diffMins}分钟前`;
-    if (diffHours < 24) return `${diffHours}小时前`;
-    if (diffDays < 7) return `${diffDays}天前`;
-    return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
-  };
-
-  // 获取会话预览文本
-  const getSessionPreview = (session: ChatSession) => {
-    if (session.messageCount === 0) return '新会话';
-    return `共 ${session.messageCount} 条消息`;
-  };
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  }, []);
 
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // 高亮闪烁定时器
   useEffect(() => {
-    if (highlightedDocId) {
-      const timer = setTimeout(() => {
-        setHighlightedDocId(null);
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [highlightedDocId]);
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1200);
+    return () => clearTimeout(timer);
+  }, [copied]);
 
-  // 发送消息（流式，后端 SSE）
-  const handleSendMessage = async () => {
-    if (!inputText.trim()) return;
+  const updateAiMessage = (messageId: number | string, updater: (message: MessageViewModel) => MessageViewModel) => {
+    setMessages((prev) => prev.map((message) => (message.id === messageId ? updater(message) : message)));
+  };
 
-    const userContent = inputText.trim();
+  const handleSendMessage = async (overrideText?: string) => {
+    const question = (overrideText ?? inputText).trim();
+    if (!question || !currentSessionId) return;
 
-    const newUserMsg: Message = {
+    const userMessage: MessageViewModel = {
       id: Date.now(),
       role: 'user',
-      content: userContent,
+      content: question,
+      references: [],
+      createdAt: new Date().toISOString(),
     };
-    setMessages(prev => [...prev, newUserMsg]);
+
+    const initialPanel = buildKnowledgePanel(question, '', []);
+    const placeholderId = Date.now() + 1;
+    const aiMessage: MessageViewModel = {
+      id: placeholderId,
+      role: 'ai',
+      content: '',
+      references: [],
+      evidenceList: buildEvidenceList(question, '', []),
+      knowledgePanel: initialPanel,
+      modeLabel: '深度思考',
+      durationLabel: '用时生成中',
+      isGenerating: true,
+      feedback: null,
+      createdAt: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, userMessage, aiMessage]);
     setInputText('');
+    setActiveAnswerId(placeholderId);
+    setSelectedNodeId(initialPanel.mindMap.nodes[0]?.id || null);
+    setSelectedEvidenceId(aiMessage.evidenceList?.[0]?.id || null);
+
+    let streamedContent = '';
 
     try {
-      // 确保有活跃的会话
-      let sessionId = currentSessionId;
-      let sessionJustCreated = false;
-      if (!sessionId) {
-        const newSession = await createChatSession({
-          aiMode: 'deep_think',
-          contextType: 'general',
-        });
-        sessionId = newSession.id;
-        setCurrentSessionId(sessionId);
-        localStorage.setItem('vis4srd-chat-session-id', String(sessionId));
-
-        // 将新创建的会话添加到会话列表顶部
-        setSessions(prev => [newSession, ...prev]);
-        sessionJustCreated = true;
-      }
-
-      // 流式占位 AI 消息（内容初始为空，标记为正在生成）
-      const aiMsgId = Date.now() + 1;
-      streamingMsgIdRef.current = aiMsgId;  // 保存当前流式消息 ID
-      const aiPlaceholder: Message = {
-        id: aiMsgId,
-        role: 'ai',
-        content: '',
-        isGenerating: true,
-      };
-      // 清空流式 ref
-      streamingContentRef.current = '';
-
-      setMessages(prev => [...prev, aiPlaceholder]);
-
-      // 等待 DOM 更新完成后，再开始流式请求（解决竞态条件）
-      await new Promise<void>(resolve => {
-        requestAnimationFrame(() => {
-          const aiDivs = document.querySelectorAll('[data-msg-id]');
-          for (const div of aiDivs) {
-            if (String((div as HTMLElement).dataset.msgId) === String(aiMsgId)) {
-              const contentDiv = div.querySelector('[data-chat-body]') as HTMLDivElement | null;
-              if (contentDiv) {
-                streamingDivRef.current = contentDiv;
-              }
-              break;
+      await sendChatMessageStream(
+        currentSessionId,
+        question,
+        '深度思考',
+        undefined,
+        (chunk) => {
+          streamedContent += chunk;
+          updateAiMessage(placeholderId, (message) => ({
+            ...message,
+            content: streamedContent,
+            isGenerating: true,
+          }));
+        },
+        () => {
+          updateAiMessage(placeholderId, (message) => {
+            const refs = message.references;
+            const evidenceList = message.evidenceList && message.evidenceList.length > 0 ? message.evidenceList : buildEvidenceList(question, streamedContent, refs);
+            const panel = message.knowledgePanel || buildKnowledgePanel(question, streamedContent, refs);
+            setSelectedEvidenceId(evidenceList[0]?.id || null);
+            setSelectedNodeId(panel.mindMap.nodes[0]?.id || null);
+            return {
+              ...message,
+              content: streamedContent,
+              evidenceList,
+              knowledgePanel: panel,
+              durationLabel: `用时${Math.max(3.8, streamedContent.length / 70).toFixed(2)}秒`,
+              isGenerating: false,
+            };
+          });
+        },
+        (error) => {
+          updateAiMessage(placeholderId, (message) => ({
+            ...message,
+            content: streamedContent || `抱歉，消息发送失败：${error.message}`,
+            durationLabel: '生成失败',
+            isGenerating: false,
+          }));
+        },
+        (sources) => {
+          const refs = normalizeReferences(sources);
+          updateAiMessage(placeholderId, (message) => ({
+            ...message,
+            references: refs,
+            evidenceList: buildEvidenceList(question, streamedContent, refs),
+            knowledgePanel: buildKnowledgePanel(question, streamedContent, refs),
+          }));
+        },
+        (mindMap) => {
+          updateAiMessage(placeholderId, (message) => {
+            const refs = message.references;
+            const evidenceList = message.evidenceList || buildEvidenceList(question, streamedContent, refs);
+            const panel = message.knowledgePanel || buildKnowledgePanel(question, streamedContent, refs);
+            return {
+              ...message,
+              knowledgePanel: {
+                ...panel,
+                mindMap: parseMindMapPayload(mindMap, question, evidenceList),
+              },
+            };
+          });
+        },
+        (evidence) => {
+          updateAiMessage(placeholderId, (message) => ({
+            ...message,
+            evidenceList: parseEvidencePayload(evidence, message.evidenceList || []),
+          }));
+        },
+        (terms) => {
+          updateAiMessage(placeholderId, (message) => {
+            const panel = message.knowledgePanel || buildKnowledgePanel(question, streamedContent, message.references);
+            const parsed = parseJsonSafely(terms);
+            if (Array.isArray(parsed)) {
+              return {
+                ...message,
+                knowledgePanel: {
+                  ...panel,
+                  preKnowledge: parsed.slice(0, 2).map((item, index) => ({
+                    id: `pre-${index}`,
+                    title: String(item),
+                    description: `围绕“${String(item)}”补前置知识。`,
+                    prompt: `请解释“${String(item)}”并结合当前问题说明作用。`,
+                  })),
+                },
+              };
             }
-          }
-          resolve();
-        });
-      });
-
-      // ===== 开始流式请求 =====
-      const endpoint = `/api/chat/sessions/${sessionId}/messages/stream`;
-      const resp = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
-        body: JSON.stringify({ content: userContent, aiMode: '深度思考' }),
-      });
-
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-
-      const reader = resp.body?.getReader();
-      if (!reader) throw new Error('浏览器不支持流式读取');
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let pendingContent = '';
-      let pendingTimer: ReturnType<typeof setTimeout> | null = null;
-      let lastRenderTime = 0;
-      const BATCH_INTERVAL_MS = 150;
-      let streamDone = false;
-      let streamError: Error | null = null;
-
-      const flushPendingContent = () => {
-        pendingTimer = null;
-        if (pendingContent.length === 0) return;
-        const content = pendingContent;
-        pendingContent = '';
-        if (streamingDivRef.current) {
-          streamingContentRef.current += content;
-          // 使用 try-catch 防止渲染崩溃
-          try {
-            streamingDivRef.current.innerHTML = renderChatMessageHtml(streamingContentRef.current);
-            const now = Date.now();
-            if (now - lastRenderTime > 300) {
-              lastRenderTime = now;
-              const container = streamingDivRef.current.parentElement;
-              if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
-            }
-          } catch (renderErr) {
-            console.error('[ChatPage] 渲染消息内容失败:', renderErr);
-          }
-        }
-      };
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done || streamDone) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          const text = line.trim();
-          if (!text.startsWith('data: ')) continue;
-          try {
-            const json = JSON.parse(text.slice(6));
-            if (json.type === 'chunk') {
-              pendingContent += json.content;
-              if (!pendingTimer) pendingTimer = setTimeout(flushPendingContent, BATCH_INTERVAL_MS);
-            } else if (json.type === 'done') {
-              streamDone = true;
-              if (pendingTimer) { clearTimeout(pendingTimer); pendingTimer = null; }
-              if (pendingContent.length > 0 && streamingDivRef.current) {
-                streamingContentRef.current += pendingContent;
-                streamingDivRef.current.innerHTML = renderChatMessageHtml(streamingContentRef.current);
-              }
-              setMessages(prev => prev.map(m =>
-                m.id === aiMsgId
-                  ? { ...m, content: streamingContentRef.current, isGenerating: false }
-                  : m
-              ));
-              streamingMsgIdRef.current = null;
-              streamingContentRef.current = '';
-              streamingDivRef.current = null;
-              if (!sessionJustCreated) refreshSessions();
-            } else if (json.type === 'error') {
-              streamDone = true;
-              streamError = new Error(json.message);
-              if (pendingTimer) { clearTimeout(pendingTimer); pendingTimer = null; }
-              const errContent = streamingContentRef.current
-                ? streamingContentRef.current + '\n\n[错误] ' + json.message
-                : '[错误] ' + json.message;
-              setMessages(prev => prev.map(m =>
-                m.id === aiMsgId
-                  ? { ...m, content: errContent, isGenerating: false }
-                  : m
-              ));
-              streamingMsgIdRef.current = null;
-              streamingContentRef.current = '';
-              streamingDivRef.current = null;
-            } else if (json.type === 'rag_sources' && Array.isArray(json.sources)) {
-              setDocSources((json.sources as any[]).map((s: any) => ({
-                id: String(s.id || s.title),
-                title: s.title,
-                type: (s.type as 'pdf' | 'word' | 'md' | 'txt') || 'md',
-                topic: s.topic || '',
-                subTopic: s.subTopic || '',
-              })));
-            } else if (json.type === 'context_sources' && Array.isArray(json.sources)) {
-              setContextSources(json.sources as string[]);
-            }
-          } catch {}
-        }
-      }
-
-      // 兜底：刷新剩余未渲染内容
-      if (!streamDone && pendingContent.length > 0 && streamingDivRef.current) {
-        streamingContentRef.current += pendingContent;
-        streamingDivRef.current.innerHTML = renderChatMessageHtml(streamingContentRef.current);
-        setMessages(prev => prev.map(m =>
-          m.id === aiMsgId
-            ? { ...m, content: streamingContentRef.current, isGenerating: false }
-            : m
-        ));
-        streamingMsgIdRef.current = null;
-        streamingContentRef.current = '';
-        streamingDivRef.current = null;
-      }
-
-      if (streamError) throw streamError;
-
-    } catch (err) {
-      console.error('发送消息失败:', err);
-      const errorMsg: Message = {
-        id: Date.now() + 1,
-        role: 'ai',
-        content: '抱歉，消息发送失败，请稍后重试。',
-      };
-      setMessages(prev => [...prev, errorMsg]);
+            return message;
+          });
+        },
+      );
+    } catch (error) {
+      console.error('发送消息失败:', error);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+  const handleCopyAnswer = async () => {
+    if (!activeAnswer) return;
+    try {
+      await navigator.clipboard.writeText(activeAnswer.content);
+      setCopied(true);
+    } catch (error) {
+      console.error('复制失败:', error);
     }
   };
 
-  // 点击聊天记录中的文档引用 - 高亮对应文档
-  const handleChatDocClick = (docId: string) => {
-    setHighlightedDocId(docId);
+  const handleFeedback = (type: 'up' | 'down') => {
+    if (!activeAnswer) return;
+    updateAiMessage(activeAnswer.id, (message) => ({
+      ...message,
+      feedback: message.feedback === type ? null : type,
+    }));
   };
 
-  // 点击右侧来源列表中的文档 - 全屏预览
-  const handleSourceDocClick = (doc: DocSource) => {
-    navigate(`/doc-preview?id=${doc.id}`);
+  const handleOpenDocPreview = (docId?: string) => {
+    if (!docId) return;
+    navigate(`/doc-preview?id=${docId}`);
   };
 
-  // 全屏预览
-  const handleFullScreenPreview = (doc: DocSource, e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigate(`/doc-preview?id=${doc.id}`);
+  const handleKnowledgeQuestion = (prompt: string) => {
+    handleSendMessage(prompt);
   };
 
-  // 追溯到详情页
-  const handleGoToDetail = (doc: DocSource, e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigate(`/knowledge/detail?id=${doc.id}`);
-  };
+  const centerTimestamp = useMemo(() => formatTimestamp(activeAnswer?.createdAt), [activeAnswer?.createdAt]);
 
   return (
-    <div className="flex flex-1 min-h-0 w-full">
-      {/* 左侧会话列表侧边栏 - 抽屉式 */}
-      <div className={`relative flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'w-[48px]' : 'w-[280px]'}`}>
-        {/* 折叠/展开切换按钮 */}
-        <button
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className={`absolute top-1/2 -translate-y-1/2 z-10 w-6 h-16 bg-white border border-[#EADDD5] rounded-r-lg shadow-sm hover:bg-[#F4EBE1] transition-colors flex items-center justify-center ${
-            sidebarCollapsed ? 'left-[48px]' : 'left-[280px]'
-          }`}
-          title={sidebarCollapsed ? '展开会话列表' : '收起会话列表'}
-        >
-          {sidebarCollapsed ? (
-            <ChevronRight className="w-4 h-4 text-[#8C7A6B]" />
-          ) : (
-            <ChevronLeft className="w-4 h-4 text-[#8C7A6B]" />
-          )}
-        </button>
+    <div className="relative flex min-h-0 flex-1 gap-6 overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="mx-auto w-full max-w-[1040px] flex-1 overflow-y-auto px-4 pb-8 pt-3">
+          <div className="mb-6 flex justify-center text-[14px] text-[#8C8C8C]">{centerTimestamp}</div>
 
-        {/* 侧边栏内容 */}
-        <div className={`h-full border-r border-[#EADDD5] bg-[#FAF6F3] flex flex-col transition-all duration-300 ${
-          sidebarCollapsed ? 'w-[48px] opacity-0 pointer-events-none' : 'w-[280px] opacity-100'
-        }`}>
-          {/* 头部 */}
-          <div className="h-14 flex items-center justify-between px-4 border-b border-[#EADDD5] shrink-0 bg-white/50 backdrop-blur-sm">
-            <div className="flex items-center space-x-2 text-[#4A362C] font-bold">
-              <MessageSquare className="w-5 h-5 text-[#8C7A6B]" />
-              {!sidebarCollapsed && <span>会话记录</span>}
+          {messages.length === 0 && !isLoading && (
+            <div className="mt-12 rounded-[28px] border border-[#EEEEEE] bg-white px-8 py-10 shadow-[0_12px_36px_rgba(0,0,0,0.04)]">
+              <div className="text-center text-[18px] text-[#666]">请输入你的问题跟我聊聊～</div>
             </div>
-            <button
-              onClick={handleCreateNewSession}
-              className="p-1.5 hover:bg-[#EADDD5] rounded-lg transition-colors text-[#8C7A6B] hover:text-[#4A362C]"
-              title="新建会话"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
-          </div>
-          
-          {/* 搜索框 */}
-          <div className="px-3 py-2 border-b border-[#EADDD5] shrink-0">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A89F95]" />
-              <input
-                type="text"
-                value={sessionSearchText}
-                onChange={(e) => setSessionSearchText(e.target.value)}
-                placeholder="搜索会话..."
-                className="w-full pl-9 pr-3 py-2 bg-white border border-[#EADDD5] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#D7BFA6] focus:border-[#C19A83]"
-              />
-            </div>
-          </div>
-          
-          {/* 会话列表 */}
-          <div className="flex-1 overflow-y-auto">
-            {sessionsLoading ? (
-              <div className="p-4 space-y-3">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="h-16 bg-[#EADDD5] rounded-xl animate-pulse" />
-                ))}
-              </div>
-            ) : sessions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-                <MessageSquare className="w-12 h-12 text-[#D7BFA6] mb-3" />
-                <p className="text-sm text-[#8C7A6B]">暂无会话记录</p>
-                <p className="text-xs text-[#A89F95] mt-1">开始对话将自动创建</p>
-              </div>
-            ) : (
-              <div className="p-2 space-y-1">
-                {sessions
-                  .filter(session => {
-                    if (!sessionSearchText) return true;
-                    const search = sessionSearchText.toLowerCase();
-                    return (
-                      session.sessionCode?.toLowerCase().includes(search) ||
-                      session.aiMode?.toLowerCase().includes(search)
-                    );
-                  })
-                  .map(session => (
+          )}
+
+          <div className="space-y-5">
+            {messages.map((message) => {
+              if (message.role === 'user') {
+                return (
+                  <div key={message.id} className="flex justify-end">
+                    <div className="rounded-[16px] bg-[#F2F3F5] px-5 py-3 text-[18px] text-[#4A4A4A]">
+                      {message.content}
+                    </div>
+                  </div>
+                );
+              }
+
+              const active = activeAnswer?.id === message.id;
+              return (
+                <div
+                  key={message.id}
+                  className={`rounded-[28px] border bg-white p-6 shadow-[0_10px_28px_rgba(0,0,0,0.03)] transition ${active ? 'border-[#E7E7E7]' : 'border-transparent'}`}
+                  onClick={() => {
+                    setActiveAnswerId(message.id);
+                    setSelectedNodeId(message.knowledgePanel?.mindMap.nodes[0]?.id || null);
+                    setSelectedEvidenceId(message.evidenceList?.[0]?.id || null);
+                  }}
+                >
+                  <div className="mb-4 flex items-center gap-3 text-[16px] text-[#212121]">
+                    <div className="flex items-center gap-2 font-semibold">
+                      <Bot className="h-5 w-5 text-[#303030]" />
+                      {message.modeLabel || '深度思考'}
+                    </div>
+                    <div className="text-[#8A8A8A]">({message.durationLabel || '用时生成中'})</div>
+                  </div>
+
+                  {message.isGenerating && !message.content ? (
+                    <div className="py-8 text-[16px] text-[#8C8C8C]">正在组织回答...</div>
+                  ) : (
                     <div
-                      key={session.id}
-                      onClick={() => switchSession(session)}
-                      className={`group relative p-3 rounded-xl cursor-pointer transition-all ${
-                        String(session.id) === String(currentSessionId)
-                          ? 'bg-[#D7BFA6] shadow-sm'
-                          : 'hover:bg-[#F4EBE1]'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-2">
-                            <Clock className="w-3.5 h-3.5 text-[#8C7A6B] shrink-0" />
-                            <span className="text-xs text-[#8C7A6B]">
-                              {formatSessionTime(session.lastMessageAt || session.createdAt)}
-                            </span>
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${
-                              session.aiMode === 'deep_think' 
-                                ? 'bg-[#EADDD5] text-[#5C4D43]'
-                                : 'bg-blue-100 text-blue-600'
-                            }`}>
-                              {session.aiMode === 'deep_think' ? '深度思考' : session.aiMode}
-                            </span>
+                      className="chat-md text-[16px] text-[#232323] [&_a]:text-[#2F6CA5] [&_a]:underline"
+                      dangerouslySetInnerHTML={{ __html: renderChatMessageHtml(message.content) }}
+                    />
+                  )}
+
+                  {message.references.length > 0 && (
+                    <div className="mt-6">
+                      <div className="inline-flex items-center gap-3 rounded-full border border-[#E9E9E9] bg-white px-4 py-2 text-[15px] text-[#343434] shadow-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="rounded-full border border-[#2D2D2D] p-1">
+                            <FileText className="h-3.5 w-3.5" />
                           </div>
-                          <p className="text-sm text-[#5C4D43] mt-1 truncate">
-                            {getSessionPreview(session)}
-                          </p>
+                          参考资料
                         </div>
-                        
-                        {/* 删除按钮 */}
-                        <button
-                          onClick={(e) => handleDeleteSession(session.id as number, e)}
-                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#EADDD5] rounded transition-all"
-                          title="删除会话"
-                        >
-                          <Trash2 className="w-4 h-4 text-[#8C7A6B] hover:text-red-500" />
-                        </button>
+                        <span className="rounded-full bg-[#2559D4] px-2 py-0.5 text-xs text-white">{message.references.length}</span>
+                        <ReferenceBadge iconText="百" />
+                        <ReferenceBadge iconText="馆" />
                       </div>
                     </div>
-                  ))}
-              </div>
-            )}
-          </div>
-          
-          {/* 底部操作 */}
-          <div className="p-3 border-t border-[#EADDD5] shrink-0">
-            <button
-              onClick={refreshSessions}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#F4EBE1] hover:bg-[#EADDD5] text-[#5C4D43] rounded-xl text-sm transition-colors"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>刷新列表</span>
-            </button>
-          </div>
-        </div>
-      </div>
-      
-      {/* 主内容区 */}
-      <div className="flex-1 flex flex-col relative min-w-0 overflow-hidden">
+                  )}
 
-        {/* 消息滚动区域 */}
-        <div className="flex-1 overflow-y-auto px-6 pt-4 pb-4 space-y-6 min-h-0">
-          {/* 上下文/数据来源 - 动态显示 */}
-          <div className="bg-[#F6EBE1] rounded-xl p-4 border border-[#EADDD5] shadow-sm mb-6 shrink-0">
-            <div className="text-sm font-bold text-[#8C7A6B] mb-2">上下文/数据来源</div>
-            <ul className="text-sm space-y-1 text-[#5C4D43] list-disc list-inside">
-              {contextSources.length > 0 ? (
-                contextSources.map((source, idx) => (
-                  <li key={idx}>{source}</li>
-                ))
-              ) : (
-                <li className="text-[#A89F95]">
-                  开始对话后，上下文数据来源将显示在这里
-                </li>
-              )}
-            </ul>
-          </div>
-
-          {/* 骨架屏加载状态 */}
-          {isLoading && (
-            <div className="space-y-6 animate-pulse">
-              {/* AI 消息骨架 */}
-              <div className="flex justify-start">
-                <div className="w-8 h-8 rounded-full bg-[#EADDD5] mr-3 flex-shrink-0" />
-                <div className="max-w-[70%] bg-white border border-[#EADDD5] rounded-2xl rounded-tl-sm p-4 space-y-3">
-                  <div className="h-4 bg-[#EADDD5] rounded w-3/4" />
-                  <div className="h-4 bg-[#EADDD5] rounded w-1/2" />
-                </div>
-              </div>
-              {/* 用户消息骨架 */}
-              <div className="flex justify-end">
-                <div className="max-w-[70%] bg-[#D7BFA6] rounded-2xl rounded-tr-sm p-4 space-y-3">
-                  <div className="h-4 bg-[#C19A83] rounded w-2/3" />
-                </div>
-                <div className="w-8 h-8 rounded-full bg-[#C19A83] ml-3 flex-shrink-0" />
-              </div>
-              {/* 提示文字 */}
-              <div className="text-center text-sm text-[#8C7A6B]">
-                正在加载聊天记录...
-              </div>
-            </div>
-          )}
-
-          {/* 空状态/欢迎消息 */}
-          {!isLoading && messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 space-y-8">
-              {/* AI 头像和欢迎语 */}
-              <div className="flex flex-col items-center text-center">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#C19A83] to-[#8C7A6B] flex items-center justify-center shadow-lg mb-4">
-                  <ShieldCheck className="w-10 h-10 text-white" />
-                </div>
-                <h2 className="text-2xl font-bold text-[#4A362C] mb-2">你好，我是智能心理助手</h2>
-                <p className="text-[#8C7A6B] max-w-md">
-                  我可以帮你解答心理健康相关问题，提供心理知识科普，解读量表结果，或进行风险评估对话。
-                </p>
-              </div>
-              
-              {/* 功能介绍卡片 */}
-              <div className="grid grid-cols-3 gap-4 w-full max-w-3xl">
-                <div className="bg-white rounded-2xl p-5 border border-[#EADDD5] shadow-sm hover:shadow-md transition-shadow">
-                  <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center mb-3">
-                    <BookOpen className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <h3 className="font-semibold text-[#4A362C] mb-1">知识科普</h3>
-                  <p className="text-sm text-[#8C7A6B]">了解心理健康知识，认识抑郁、焦虑等情绪</p>
-                </div>
-                <div className="bg-white rounded-2xl p-5 border border-[#EADDD5] shadow-sm hover:shadow-md transition-shadow">
-                  <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center mb-3">
-                    <FileText className="w-6 h-6 text-green-600" />
-                  </div>
-                  <h3 className="font-semibold text-[#4A362C] mb-1">量表解读</h3>
-                  <p className="text-sm text-[#8C7A6B]">解读PHQ-9、GAD-7等心理量表结果</p>
-                </div>
-                <div className="bg-white rounded-2xl p-5 border border-[#EADDD5] shadow-sm hover:shadow-md transition-shadow">
-                  <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center mb-3">
-                    <ShieldCheck className="w-6 h-6 text-purple-600" />
-                  </div>
-                  <h3 className="font-semibold text-[#4A362C] mb-1">风险评估</h3>
-                  <p className="text-sm text-[#8C7A6B]">了解自杀风险评估相关知识</p>
-                </div>
-              </div>
-              
-              {/* 推荐问题 */}
-              {recommendedQuestions.length > 0 && (
-                <div className="w-full max-w-3xl">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Sparkles className="w-5 h-5 text-[#C19A83]" />
-                    <h3 className="font-semibold text-[#4A362C]">你可以问我</h3>
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    {recommendedQuestions.slice(0, 6).map((q, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setInputText(q)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-white border border-[#EADDD5] hover:border-[#C19A83] rounded-xl text-sm text-[#5C4D43] shadow-sm hover:shadow transition-all"
-                      >
-                        <span className="w-6 h-6 rounded-full bg-[#F4EBE1] text-[#8C7A6B] text-xs flex items-center justify-center">
-                          {idx + 1}
-                        </span>
-                        <span>{q}</span>
+                  {(message.references.length > 0 || active) && (
+                    <div className="mt-5 flex flex-wrap items-center gap-4 border-t border-[#EFEFEF] pt-5 text-[#202020]">
+                      <button className="inline-flex items-center gap-2 text-[15px] font-medium" onClick={() => setRightPanelVisible(true)}>
+                        <GitBranch className="h-4 w-4" />
+                        知识清单
                       </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 聊天历史 */}
-          {!isLoading && messages.map(msg => (
-            <div
-              key={msg.id}
-              data-msg-id={msg.id}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              {msg.role === 'ai' && (
-                <div className="w-8 h-8 rounded-full bg-[#D7BFA6] flex items-center justify-center mr-3 flex-shrink-0 mt-1">
-                  <ShieldCheck className="w-5 h-5 text-[#4A362C]" />
-                </div>
-              )}
-              <div
-                className={`max-w-[80%] rounded-2xl p-4 shadow-sm ${
-                  msg.role === 'user'
-                    ? 'bg-[#D7BFA6] text-[#4A362C] rounded-tr-sm'
-                    : 'bg-white border border-[#EADDD5] text-[#5C4D43] rounded-tl-sm'
-                }`}
-              >
-                {/* 正在生成中的温馨提示 - 只有当流式内容为空时才显示 */}
-                {msg.role === 'ai' && msg.isGenerating && !streamingContentRef.current && (
-                  <div className="flex items-center space-x-3 py-2">
-                    <div className="flex space-x-1">
-                      <span className="w-2 h-2 bg-[#C19A83] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                      <span className="w-2 h-2 bg-[#C19A83] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                      <span className="w-2 h-2 bg-[#C19A83] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                      <button className="inline-flex items-center gap-2 text-[15px]" title="第一期仅做展示">
+                        <Volume2 className="h-4 w-4" />
+                      </button>
+                      <button className="inline-flex items-center gap-2 text-[15px]" onClick={handleCopyAnswer}>
+                        <Copy className="h-4 w-4" />
+                      </button>
+                      <button className="inline-flex items-center gap-2 text-[15px]" onClick={() => handleSendMessage(messages.filter((item) => item.role === 'user').slice(-1)[0]?.content || inputText)}>
+                        <RefreshCcw className="h-4 w-4" />
+                      </button>
+                      <button className="inline-flex items-center gap-2 text-[15px]" title="第一期仅做展示">
+                        <PencilLine className="h-4 w-4" />
+                      </button>
+                      <span className="h-5 w-px bg-[#E5E5E5]" />
+                      <button
+                        className={`inline-flex items-center gap-2 text-[15px] ${message.feedback === 'up' ? 'text-[#2E7D4F]' : ''}`}
+                        onClick={() => handleFeedback('up')}
+                      >
+                        <ThumbsUp className="h-4 w-4" />
+                      </button>
+                      <button
+                        className={`inline-flex items-center gap-2 text-[15px] ${message.feedback === 'down' ? 'text-[#9A4D4D]' : ''}`}
+                        onClick={() => handleFeedback('down')}
+                      >
+                        <ThumbsDown className="h-4 w-4" />
+                      </button>
                     </div>
-                    <span className="text-sm text-[#8C7A6B] italic">正在思考中，请稍等...</span>
-                  </div>
-                )}
-                <div
-                  data-chat-body=""
-                  className="chat-md text-sm leading-relaxed [&_h1]:text-xl [&_h1]:font-bold [&_h1]:text-[#4A362C] [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:pb-1 [&_h1]:border-b [&_h1]:border-[#EADDD5] [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-[#5A4D43] [&_h2]:mt-3 [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-[#5C4D43] [&_h3]:mt-2 [&_h3]:mb-1 [&_h4]:text-sm [&_h4]:font-semibold [&_h4]:text-[#5C4D43] [&_h4]:mt-2 [&_h5]:text-sm [&_h5]:font-medium [&_h5]:text-[#8C7A6B] [&_h5]:mt-2 [&_h6]:text-xs [&_h6]:font-medium [&_h6]:text-[#8C7A6B] [&_h6]:mt-1 [&_p]:my-2 [&_p]:leading-relaxed [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_ul]:my-2 [&_ul]:space-y-1 [&_ol]:my-2 [&_ol]:space-y-1 [&_li]:pl-0.5 [&_strong]:font-semibold [&_strong]:text-[#4A362C] [&_em]:italic [&_em]:text-[#5C4D43] [&_mark]:bg-yellow-100 [&_mark]:text-[#5C4D43] [&_mark]:px-0.5 [&_mark]:rounded"
-                  dangerouslySetInnerHTML={{ __html: renderChatMessageHtml(msg.content) }}
-                />
+                  )}
 
-                {msg.references && msg.references.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-dashed border-[#EADDD5] flex items-center flex-wrap gap-2">
-                    <span className="text-xs text-[#8C7A6B]">参考资料</span>
-                    {msg.references.map((ref, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleChatDocClick(ref.id)}
-                        className="flex items-center space-x-1 bg-[#F4EBE1] hover:bg-[#EADDD5] transition-colors px-2 py-1 rounded text-xs text-[#5C4D43] border border-[#D7BFA6]"
-                      >
-                        <FileText className="w-3 h-3" />
-                        <span>[{idx + 1}]</span>
-                        <span className="truncate max-w-[100px]">{ref.title}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {msg.role === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-[#8C7A6B] flex items-center justify-center ml-3 flex-shrink-0 mt-1 text-white">
-                  <User className="w-5 h-5" />
+                  {active && message.knowledgePanel?.followUpQuestions?.length ? (
+                    <div className="mt-4 space-y-2">
+                      {message.knowledgePanel.followUpQuestions.map((question) => (
+                        <button
+                          key={question}
+                          onClick={() => handleKnowledgeQuestion(question)}
+                          className="flex w-full items-center justify-between rounded-[14px] bg-[#FAFAFA] px-4 py-3 text-left text-[15px] text-[#333] transition hover:bg-[#F4F4F4]"
+                        >
+                          <span>{question}</span>
+                          <ArrowRight className="h-4 w-4 text-[#666]" />
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {active && message.references.length > 0 && (
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      {message.references.slice(0, 2).map((ref, index) => (
+                        <button
+                          key={ref.id}
+                          onClick={() => handleOpenDocPreview(ref.id)}
+                          className="rounded-[18px] bg-[#FCFCFC] p-4 text-left shadow-[0_10px_24px_rgba(0,0,0,0.02)] transition hover:bg-white"
+                        >
+                          <div className="mb-2 flex items-center gap-3 text-[15px] text-[#404040]">
+                            <ReferenceBadge iconText={index === 0 ? '百' : '馆'} />
+                            {ref.title}
+                          </div>
+                          <div className="text-[18px] text-[#232323]">{ref.title}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
 
-        {/* 输入区域 */}
-        <div className="p-6 pt-2 bg-gradient-to-t from-[#FAF6F3] to-transparent shrink-0">
-          <div className="mb-4">
-            <div className="text-sm font-bold text-[#8C7A6B] mb-2">推荐问题</div>
-            <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
-              {recommendedQuestions.map((q, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setInputText(q)}
-                  className="whitespace-nowrap px-4 py-2 bg-white border border-[#EADDD5] hover:border-[#D7BFA6] rounded-full text-sm text-[#5C4D43] shadow-sm flex items-center space-x-1 transition-colors"
-                >
-                  <span>· {q}</span>
-                  <ArrowRight className="w-3 h-3 text-[#8C7A6B]" />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-[#FCF9F7] rounded-3xl border border-[#EADDD5] shadow-sm p-4 focus-within:ring-1 focus-within:ring-[#D7BFA6] transition-all">
+        <div className="relative px-4 pb-4 pt-2">
+          <div className="mx-auto w-full max-w-[1120px] rounded-[30px] border border-[#ECECEC] bg-white px-5 pb-4 pt-5 shadow-[0_18px_42px_rgba(0,0,0,0.07)] md:px-7">
             <textarea
-              ref={textareaRef}
               value={inputText}
-              onChange={e => setInputText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="请输入你的问题跟我聊聊~"
-              className="w-full bg-transparent border-none focus:outline-none resize-none text-[#4A362C] placeholder-[#A89F95] min-h-[44px] text-sm"
+              onChange={(event) => setInputText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              placeholder="请输入你的问题跟我聊聊～"
+              className="min-h-[66px] w-full resize-none border-none bg-transparent text-[17px] text-[#222] outline-none placeholder:text-[#C9CDD5]"
               rows={1}
             />
-
-            <div className="flex justify-end items-center mt-4">
-              <button
-                onClick={handleSendMessage}
-                disabled={!inputText.trim()}
-                className="bg-[#C19A83] hover:bg-[#A07D6B] disabled:bg-[#EADDD5] disabled:cursor-not-allowed text-white px-8 py-2.5 rounded-full text-sm font-semibold transition-colors shadow-sm tracking-widest"
-              >
-                发送
-              </button>
+            <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {recommendedModes.map((mode, index) => (
+                  <button
+                    key={mode}
+                    className={`whitespace-nowrap rounded-full border px-4 py-2 text-[15px] ${index === 0 ? 'border-[#2F9E98] bg-[#E9FBF8] text-[#0B6F69]' : 'border-[#EAEAEA] bg-white text-[#313131]'}`}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center justify-end gap-4 text-[#2D2D2D]">
+                <button title="语音入口" className="rounded-full p-1 hover:bg-[#F5F5F5]">
+                  <Mic className="h-5 w-5" />
+                </button>
+                <button title="上传附件" className="rounded-full p-1 hover:bg-[#F5F5F5]">
+                  <FilePlus2 className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => handleSendMessage()}
+                  className="rounded-full bg-[#17233A] p-3 text-white shadow-[0_8px_18px_rgba(23,35,58,0.18)] transition hover:translate-y-[-1px]"
+                >
+                  <Send className="h-5 w-5" />
+                </button>
+              </div>
             </div>
           </div>
-          <div className="text-center mt-3 text-xs text-[#A89F95]">
-            说明：内容为 AI 生成，请辨别
-          </div>
+          <div className="mt-3 text-center text-[14px] text-[#C0C0C0]">内容为AI生成，使用请注意辨别</div>
         </div>
       </div>
 
-      {/* 展开右侧知识清单面板按钮（面板收起时显示） */}
+      <aside className={`hidden lg:flex lg:w-[360px] lg:shrink-0 lg:flex-col lg:border-l lg:border-[#EAEAEA] lg:bg-[#FAFAFA] xl:w-[420px] ${rightPanelVisible ? '' : 'lg:w-0 lg:overflow-hidden lg:border-l-0'}`}>
+        <div className="flex items-center justify-between border-b border-[#E8E8E8] px-5 py-5">
+          <div className="flex items-center gap-3 text-[18px] font-semibold text-[#202020]">
+            <ArrowRight className="h-5 w-5" />
+            知识清单
+          </div>
+          <button onClick={() => setRightPanelVisible(false)} className="rounded-full p-1.5 hover:bg-white">
+            <PanelRightClose className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          {activeAnswer?.knowledgePanel ? (
+            <div className="space-y-4">
+              <div className="rounded-[18px] bg-white p-3">
+                <MindMapPreview
+                  mindMap={activeAnswer.knowledgePanel.mindMap}
+                  selectedNodeId={selectedNode?.id || null}
+                  onSelectNode={(id) => setSelectedNodeId(id)}
+                  compact
+                />
+                <button
+                  onClick={() => setGraphModalOpen(true)}
+                  className="mt-3 flex items-center gap-2 text-[15px] text-[#222]"
+                >
+                  <Network className="h-4 w-4" />
+                  {selectedNode?.label || activeAnswer.knowledgePanel.mindMap.summary}
+                </button>
+              </div>
+
+              <div className="overflow-hidden rounded-[18px] border border-[#E3E3E3] bg-white">
+                <div className="grid grid-cols-[92px_1fr_1.1fr] bg-[#F1F1F1] text-[14px] text-[#3A3A3A]">
+                  <div className="border-r border-[#E2E2E2] px-3 py-3">主题</div>
+                  <div className="border-r border-[#E2E2E2] px-3 py-3">知识</div>
+                  <div className="px-3 py-3">描述</div>
+                </div>
+                {activeAnswer.knowledgePanel.tableRows.map((row, index) => (
+                  <div key={`${row.topic}-${index}`} className="grid grid-cols-[92px_1fr_1.1fr] border-t border-[#EFEFEF] text-[14px] leading-7 text-[#444]">
+                    <div className="border-r border-[#EFEFEF] px-3 py-3">{row.topic}</div>
+                    <div className="border-r border-[#EFEFEF] px-3 py-3">{row.knowledge}</div>
+                    <div className="px-3 py-3">{row.description}</div>
+                  </div>
+                ))}
+              </div>
+
+              {[
+                { title: '前置知识', items: activeAnswer.knowledgePanel.preKnowledge },
+                { title: '相关学习', items: activeAnswer.knowledgePanel.relatedKnowledge },
+                { title: '深入理解', items: activeAnswer.knowledgePanel.deepDiveItems },
+              ].map((group) => (
+                <div key={group.title} className="rounded-[18px] bg-white px-4 py-4">
+                  <div className="mb-3 flex items-center gap-2 text-[18px] font-semibold text-[#262626]">
+                    <BrainCircuit className="h-4 w-4" />
+                    {group.title}
+                  </div>
+                  <div className="space-y-3">
+                    {group.items.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => handleKnowledgeQuestion(item.prompt)}
+                        className="block w-full rounded-[16px] bg-[#F7F8FB] px-4 py-4 text-left transition hover:bg-[#F2F4F8]"
+                      >
+                        <div className="mb-2 text-[16px] font-semibold text-[#1F1F1F]">{item.title}</div>
+                        <div className="text-[14px] leading-7 text-[#717171]">{item.description}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[18px] bg-white p-5 text-[15px] text-[#888]">完成一轮问答后，这里会自动生成知识清单。</div>
+          )}
+        </div>
+      </aside>
+
       {!rightPanelVisible && (
         <button
           onClick={() => setRightPanelVisible(true)}
-          className="fixed top-24 right-4 z-30 flex items-center gap-2 px-3 py-2 bg-white border border-[#EADDD5] rounded-xl shadow-md hover:shadow-lg hover:bg-[#FAF6F3] transition-all text-sm text-[#4A362C] font-medium"
-          title="展开知识清单"
+          className="fixed right-6 top-24 z-30 inline-flex items-center gap-2 rounded-full border border-[#E8E8E8] bg-white px-4 py-2 text-[15px] text-[#202020] shadow-sm"
         >
-          <PanelRightOpen className="w-4 h-4" />
+          <PanelRightOpen className="h-4 w-4" />
           知识清单
         </button>
       )}
 
-      {/* 右侧面板（知识清单，可折叠） */}
-      {rightPanelVisible && (
-      <div
-        className="w-[320px] lg:w-[360px] xl:w-[400px] border-l border-[#EADDD5] bg-[#FAF6F3] flex flex-col shrink-0"
-      >
-        <div className="h-14 flex items-center px-4 border-b border-[#EADDD5] shrink-0 bg-white/50 backdrop-blur-sm">
-          <button
-            onClick={() => setRightPanelVisible(false)}
-            className="flex items-center space-x-2 text-[#4A362C] font-bold hover:text-orange-500 transition-colors cursor-pointer"
-            title="收起知识清单"
-          >
-            <PanelRightClose className="w-5 h-5" />
-            <span>知识清单</span>
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin">
-          {/* 来源文档列表 */}
-          <section>
-            <h3 className="text-sm font-bold text-[#4A362C] mb-3 flex justify-between items-center">
-              <span>来源文档列表</span>
-              <span className="text-xs font-normal text-[#8C7A6B] bg-[#EADDD5] px-2 py-0.5 rounded">
-                点击操作
-              </span>
-            </h3>
-            <div className="bg-white rounded-xl border border-[#EADDD5] shadow-sm overflow-hidden">
-              {isLoading ? (
-                <div className="p-8 text-center text-[#8C7A6B]">
-                  <div className="w-8 h-8 mx-auto mb-3 border-2 border-[#C19A83] border-t-transparent rounded-full animate-spin"></div>
-                  <p className="text-sm">加载中...</p>
+      {graphModalOpen && activeAnswer?.knowledgePanel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(0,0,0,0.36)] p-8 backdrop-blur-[2px]">
+          <div className="grid h-[88vh] w-full max-w-[1260px] grid-cols-[1fr_320px] overflow-hidden rounded-[26px] bg-white shadow-[0_24px_72px_rgba(0,0,0,0.18)]">
+            <div className="flex min-h-0 flex-col">
+              <div className="flex items-center justify-between border-b border-[#ECECEC] px-6 py-5">
+                <div className="flex items-center gap-3 text-[18px] font-semibold text-[#202020]">
+                  <Network className="h-5 w-5" />
+                  {messages.filter((item) => item.role === 'user').slice(-1)[0]?.content || '当前问题'}
                 </div>
-              ) : docSources.length > 0 ? (
-                <>
-                  {docSources.map((doc, idx) => (
-                    <div
-                      key={doc.id}
-                      className={`p-3 transition-colors ${
-                        highlightedDocId === doc.id
-                          ? 'bg-[#FEF3CD] animate-pulse'
-                          : idx !== docSources.length - 1
-                            ? 'border-b border-[#F4EBE1] hover:bg-[#F4EBE1]'
-                            : 'hover:bg-[#F4EBE1]'
-                      }`}
-                    >
-                  <div className="flex items-center justify-between">
-                    <div
-                      className="flex items-center space-x-3 overflow-hidden cursor-pointer"
-                      onClick={() => handleSourceDocClick(doc)}
-                    >
-                      <div className="bg-[#FAF6F3] p-2 rounded-lg text-[#A07D6B]">
-                        <FileIcon className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm text-[#5C4D43] truncate font-medium">
-                          来源{idx + 1}: {doc.title}
-                        </div>
-                        <div className="text-xs text-[#A89F95]">
-                          {doc.topic} · {doc.subTopic}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-1 shrink-0">
-                      {/* 全屏预览按钮 */}
-                      <button
-                        onClick={(e) => handleFullScreenPreview(doc, e)}
-                        className="p-1.5 hover:bg-[#EADDD5] rounded transition-colors text-[#8C7A6B]"
-                        title="全屏预览"
-                      >
-                        <Maximize2 className="w-3.5 h-3.5" />
-                      </button>
-                      {/* 追溯到详情页按钮 */}
-                      <button
-                        onClick={(e) => handleGoToDetail(doc, e)}
-                        className="p-1.5 hover:bg-[#EADDD5] rounded transition-colors text-[#8C7A6B]"
-                        title="追溯到详情页"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
+                <button onClick={() => setGraphModalOpen(false)} className="rounded-full p-2 hover:bg-[#F5F5F5]">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 p-5">
+                <MindMapPreview
+                  mindMap={activeAnswer.knowledgePanel.mindMap}
+                  selectedNodeId={selectedNode?.id || null}
+                  onSelectNode={(id) => setSelectedNodeId(id)}
+                />
+                <div className="mt-4 text-[16px] leading-8 text-[#222]">
+                  {selectedNode?.description || '该知识图谱主要涉及概念实体和关键关系。'}
                 </div>
-                ))}
-                </>
-              ) : docSources.length === 0 ? (
-                <div className="p-8 text-center text-[#8C7A6B]">
-                  <p className="text-sm">暂无文档来源</p>
-                  <p className="text-xs mt-1">开始对话后，相关文档来源将自动显示在这里</p>
-                </div>
-              ) : null}
+              </div>
             </div>
-          </section>
-
+            <div className="min-h-0 border-l border-[#ECECEC] bg-[#FAFAFA] px-5 py-5">
+              <div className="mb-4 text-[18px] font-semibold text-[#202020]">知识清单</div>
+              <div className="space-y-4">
+                <div className="rounded-[16px] bg-white p-4 text-[15px] leading-7 text-[#444]">
+                  {selectedNode?.label || activeAnswer.knowledgePanel.mindMap.summary}
+                </div>
+                <div className="rounded-[16px] bg-white p-4 text-[15px] leading-7 text-[#444]">
+                  {selectedEvidence?.snippet || activeAnswer.evidenceList?.[0]?.snippet || '这里展示与节点联动的证据说明。'}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
       )}
     </div>
   );
