@@ -1,8 +1,9 @@
 # 模型中心路由：从 MySQL 数据库获取模型和提示词模板
 from fastapi import APIRouter, Query, HTTPException, Request, Body
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime
+import re
 
 router = APIRouter(prefix="", tags=["models"])
 
@@ -115,6 +116,44 @@ def convert_template_to_camel(row: dict) -> dict:
         else:
             result[new_key] = value
     return result
+
+
+def _get_first_value(data: dict, *keys: str, default: Any = None) -> Any:
+    """按顺序读取第一个存在且非 None 的字段值。"""
+    for key in keys:
+        if key in data and data[key] is not None:
+            return data[key]
+    return default
+
+
+def _build_model_code(model_data: dict) -> str:
+    """为模型生成稳定的 model_code，避免前端未传时插入失败。"""
+    raw_value = _get_first_value(
+        model_data,
+        'modelCode', 'model_code',
+        'ollamaModelName', 'ollama_model_name',
+        'modelName', 'model_name',
+        default='model'
+    )
+    normalized = re.sub(r'[^a-z0-9]+', '-', str(raw_value).strip().lower())
+    normalized = normalized.strip('-') or 'model'
+    suffix = datetime.now().strftime('%Y%m%d%H%M%S%f')
+    return f"{normalized}-{suffix}"
+
+
+def _normalize_template_payload(template_data: dict) -> dict:
+    """兼容前端 camelCase 和后端 snake_case。"""
+    normalized = dict(template_data)
+    field_mapping = {
+        'taskType': 'task_type',
+        'promptContent': 'prompt_content',
+        'modelId': 'model_id',
+        'isActive': 'is_active',
+    }
+    for camel_key, snake_key in field_mapping.items():
+        if camel_key in template_data and snake_key not in normalized:
+            normalized[snake_key] = template_data[camel_key]
+    return normalized
 
 
 # ========================
@@ -457,24 +496,24 @@ async def create_model(request: Request, model_data: dict = Body(...)):
     try:
         import json
         db_data = {
-            'model_name': model_data.get('modelName'),
-            'model_code': model_data.get('modelCode'),
-            'model_category': model_data.get('modelCategory'),
-            'model_type': model_data.get('modelType'),
+            'model_name': _get_first_value(model_data, 'modelName', 'model_name'),
+            'model_code': _get_first_value(model_data, 'modelCode', 'model_code') or _build_model_code(model_data),
+            'model_category': _get_first_value(model_data, 'modelCategory', 'model_category'),
+            'model_type': _get_first_value(model_data, 'modelType', 'model_type'),
             'provider': model_data.get('provider'),
-            'api_key': model_data.get('apiKey'),
-            'api_base_url': model_data.get('apiBaseUrl'),
-            'config_template': model_data.get('configTemplate'),
-            'ollama_model_name': model_data.get('ollamaModelName'),
-            'ollama_base_url': model_data.get('ollamaBaseUrl'),
-            'model_path': model_data.get('modelPath'),
-            'lora_path': model_data.get('loraPath'),
-            'detection_type': model_data.get('detectionType'),
-            'model_file_path': model_data.get('modelFilePath'),
-            'embedding_file_path': model_data.get('embeddingFilePath'),
-            'supported_datasets': json.dumps(model_data.get('supportedDatasets')) if model_data.get('supportedDatasets') else None,
+            'api_key': _get_first_value(model_data, 'apiKey', 'api_key'),
+            'api_base_url': _get_first_value(model_data, 'apiBaseUrl', 'api_base_url'),
+            'config_template': _get_first_value(model_data, 'configTemplate', 'config_template'),
+            'ollama_model_name': _get_first_value(model_data, 'ollamaModelName', 'ollama_model_name'),
+            'ollama_base_url': _get_first_value(model_data, 'ollamaBaseUrl', 'ollama_base_url'),
+            'model_path': _get_first_value(model_data, 'modelPath', 'model_path'),
+            'lora_path': _get_first_value(model_data, 'loraPath', 'lora_path'),
+            'detection_type': _get_first_value(model_data, 'detectionType', 'detection_type'),
+            'model_file_path': _get_first_value(model_data, 'modelFilePath', 'model_file_path'),
+            'embedding_file_path': _get_first_value(model_data, 'embeddingFilePath', 'embedding_file_path'),
+            'supported_datasets': json.dumps(_get_first_value(model_data, 'supportedDatasets', 'supported_datasets')) if _get_first_value(model_data, 'supportedDatasets', 'supported_datasets') else None,
             'description': model_data.get('description'),
-            'is_available': model_data.get('isAvailable', True),
+            'is_available': _get_first_value(model_data, 'isAvailable', 'is_available', default=True),
             'status': model_data.get('status', 'active'),
         }
         
@@ -616,7 +655,7 @@ async def update_model_api_key(request: Request, model_id: int, key_data: dict =
         if model.get('model_type') != 'api':
             raise HTTPException(status_code=400, detail="仅 API 模型支持配置 API Key")
 
-        api_key = key_data.get('apiKey', '').strip()
+        api_key = str(_get_first_value(key_data, 'apiKey', 'api_key', default='') or '').strip()
 
         async with mysql_pool.acquire() as conn:
             async with conn.cursor() as cursor:
@@ -713,6 +752,7 @@ async def create_template(request: Request, template_data: dict = Body(...)):
     model_svc = request.app.state.model_service
 
     try:
+        template_data = _normalize_template_payload(template_data)
         required = ['name', 'task_type']
         for field in required:
             if not template_data.get(field):
@@ -733,6 +773,7 @@ async def update_template(request: Request, template_id: int, template_data: dic
     model_svc = request.app.state.model_service
 
     try:
+        template_data = _normalize_template_payload(template_data)
         template = await model_svc.update_template(template_id, template_data)
         if not template:
             raise HTTPException(status_code=404, detail="模板不存在")

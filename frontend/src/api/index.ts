@@ -1462,10 +1462,12 @@ export interface PromptTemplate {
 export async function fetchModels(params?: {
   category?: string;
   type?: string;
+  status?: string;
 }): Promise<Model[]> {
   const searchParams = new URLSearchParams();
   if (params?.category) searchParams.set('category', params.category);
-  if (params?.type) searchParams.set('type', params.type);
+  if (params?.type) searchParams.set('model_type', params.type);
+  if (params?.status) searchParams.set('status', params.status);
 
   const endpoint = `/api/models?${searchParams.toString()}`;
   const data = await request<Model[]>(endpoint);
@@ -1549,7 +1551,7 @@ export async function updateModelApiKey(
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ api_key: apiKey }),
+    body: JSON.stringify({ apiKey }),
   });
 }
 
@@ -1972,7 +1974,7 @@ export async function fetchPromptTemplatesForRiskPage(): Promise<RiskPagePromptT
 /** 获取检测模型（detection 类型，适配后） */
 export async function fetchDetectionModelsForRiskPage(): Promise<RiskPageLocalModel[]> {
   try {
-    const models = await fetchModels({ category: 'detection' });
+    const models = await fetchModels({ category: 'detection', status: 'active' });
     return models.map(m => ({
       id: String(m.id),
       name: m.modelName,
@@ -1991,8 +1993,8 @@ export async function fetchDetectionModelsForRiskPage(): Promise<RiskPageLocalMo
 /** 获取所有本地 LLM 模型（仅 Ollama，适配后） */
 export async function fetchLlmModelsForRiskPage(): Promise<RiskPageLlmModel[]> {
   try {
-    // model_category='local_llm' 对应 Ollama 本地模型
-    const localModels = await fetchModels({ category: 'local_llm' });
+    // 风险检测页只加载启用中的本地 LLM，模型中心仍保留全部可见
+    const localModels = await fetchModels({ category: 'local_llm', status: 'active' });
     const result: RiskPageLlmModel[] = localModels.map(m => ({
       id: String(m.id),
       name: m.modelName,

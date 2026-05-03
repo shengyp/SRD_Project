@@ -954,9 +954,13 @@ export default function ModelCenterPage() {
           {/* 可用状态 */}
           <button
             type="button"
-            className="px-3 py-1.5 rounded-full text-xs font-medium border transition-all flex items-center gap-1 bg-emerald-50 border-emerald-200 text-emerald-700">
-            <CheckCircle2 className="w-3 h-3" />
-            可用
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all flex items-center gap-1 ${
+              m.status === 'active'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                : 'bg-slate-50 border-slate-200 text-slate-500'
+            }`}>
+            {m.status === 'active' ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+            {m.status === 'active' ? '可用' : '不可用'}
           </button>
 
           {/* 编辑 */}
