@@ -56,7 +56,7 @@ function UserAvatar({ user, size = 'md' }: { user: AuthUser; size?: 'sm' | 'md' 
   return (
     <div
       className={`${sizeClass} rounded-full flex items-center justify-center border-2 border-white shadow-sm shrink-0 text-white font-medium`}
-      style={{ background: `linear-gradient(135deg, #F2935A, #E07338)` }}
+      style={{ background: `linear-gradient(135deg, #2F6BFF, #1D4ED8)` }}
       title={user.nickname}
       aria-hidden
     >
@@ -107,72 +107,72 @@ function ProfileModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 animate-scale-in overflow-hidden border border-[#F5D9C0] pointer-events-auto">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 animate-scale-in overflow-hidden border border-[#E2E8F0] pointer-events-auto">
         {/* 顶部渐变条 - 暖橙色主题 */}
-        <div className="h-1.5 bg-gradient-to-r from-[#F2935A] to-[#E07338]" />
+        <div className="h-1.5 bg-gradient-to-r from-[#2F6BFF] to-[#1D4ED8]" />
         {/* 头部 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#F5D9C0]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#F2935A] to-[#E07338] flex items-center justify-center shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2F6BFF] to-[#1D4ED8] flex items-center justify-center shadow-sm">
               <UserCog className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-[#3A2E26]">修改资料</h3>
-              <p className="text-xs text-[#8A6F58]">更新您的个人信息</p>
+              <h3 className="text-base font-bold text-[#162033]">修改资料</h3>
+              <p className="text-xs text-[#6B7A90]">更新您的个人信息</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#FDF1E2] transition-colors cursor-pointer">
-            <X className="w-4 h-4 text-[#8A6F58]" />
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#F3F7FC] transition-colors cursor-pointer">
+            <X className="w-4 h-4 text-[#6B7A90]" />
           </button>
         </div>
 
         {/* 表单 */}
         <div className="px-6 py-5 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-[#8A6F58] mb-1.5">用户名</label>
+            <label className="block text-xs font-medium text-[#6B7A90] mb-1.5">用户名</label>
             <input
               type="text"
               value={nickname}
               readOnly
               disabled
-              className="w-full px-4 py-2.5 border border-[#F5D9C0] rounded-xl text-sm bg-[#FFF7EE] text-[#8A6F58] cursor-not-allowed"
+              className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm bg-[#F7F9FC] text-[#6B7A90] cursor-not-allowed"
               placeholder="用户名"
             />
-            <p className="text-xs text-[#B5A89C] mt-1">用户名注册后无法修改</p>
+            <p className="text-xs text-[#94A3B8] mt-1">用户名注册后无法修改</p>
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#8A6F58] mb-1.5">昵称</label>
+            <label className="block text-xs font-medium text-[#6B7A90] mb-1.5">昵称</label>
             <input
               type="text"
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
               maxLength={100}
-              className="w-full px-4 py-2.5 border border-[#F5D9C0] rounded-xl text-sm bg-white text-[#3A2E26] focus:outline-none focus:ring-2 focus:ring-[#F2935A]/40 focus:border-[#F2935A] transition-colors"
+              className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm bg-white text-[#162033] focus:outline-none focus:ring-2 focus:ring-[#2F6BFF]/40 focus:border-[#2F6BFF] transition-colors"
               placeholder="请输入昵称"
             />
           </div>
           {msg && (
             <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm border ${
-              msg.type === 'ok' ? 'bg-[#E2F0E6] border-[#7EB88E] text-[#5A8F6A]' : 'bg-[#FBDDD3] border-[#D9533A] text-[#D9533A]'
+              msg.type === 'ok' ? 'bg-[#EAF8F2] border-[#1F9D72] text-[#5A8F6A]' : 'bg-[#FEF0F0] border-[#DC2626] text-[#DC2626]'
             }`}>
-              {msg.type === 'ok' ? <Check className="w-4 h-4 flex-shrink-0" /> : <div className="w-1.5 h-1.5 rounded-full bg-[#D9533A] flex-shrink-0" />}
+              {msg.type === 'ok' ? <Check className="w-4 h-4 flex-shrink-0" /> : <div className="w-1.5 h-1.5 rounded-full bg-[#DC2626] flex-shrink-0" />}
               {msg.text}
             </div>
           )}
         </div>
 
         {/* 底部按钮 */}
-        <div className="flex gap-3 px-6 py-4 border-t border-[#F5D9C0] bg-[#FFF7EE]">
+        <div className="flex gap-3 px-6 py-4 border-t border-[#E2E8F0] bg-[#F7F9FC]">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 bg-[#F4EBE1] hover:bg-[#EADDD5] text-[#5A4B42] rounded-xl transition-colors text-sm font-medium border border-[#EADDD5] cursor-pointer"
+            className="flex-1 px-4 py-2.5 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl transition-colors text-sm font-medium border border-[#E2E8F0] cursor-pointer"
           >
             取消
           </button>
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-[#F2935A] to-[#E07338] hover:opacity-90 text-white rounded-xl transition-all text-sm font-medium shadow-sm disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+            className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-[#2F6BFF] to-[#1D4ED8] hover:opacity-90 text-white rounded-xl transition-all text-sm font-medium shadow-sm disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
           >
             {loading ? <><Loader2 className="w-4 h-4 animate-spin" />保存中...</> : <><Check className="w-4 h-4" />保存修改</>}
           </button>
@@ -240,97 +240,97 @@ function ChangePwdModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 animate-scale-in overflow-hidden border border-[#F5D9C0] pointer-events-auto">
-        <div className="h-1.5 bg-gradient-to-r from-[#F2935A] to-[#E07338]" />
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#F5D9C0]">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 animate-scale-in overflow-hidden border border-[#E2E8F0] pointer-events-auto">
+        <div className="h-1.5 bg-gradient-to-r from-[#2F6BFF] to-[#1D4ED8]" />
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#F2935A] to-[#E07338] flex items-center justify-center shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2F6BFF] to-[#1D4ED8] flex items-center justify-center shadow-sm">
               <KeyRound className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-[#3A2E26]">修改密码</h3>
-              <p className="text-xs text-[#8A6F58]">保护您的账户安全</p>
+              <h3 className="text-base font-bold text-[#162033]">修改密码</h3>
+              <p className="text-xs text-[#6B7A90]">保护您的账户安全</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#FDF1E2] transition-colors cursor-pointer">
-            <X className="w-4 h-4 text-[#8A6F58]" />
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#F3F7FC] transition-colors cursor-pointer">
+            <X className="w-4 h-4 text-[#6B7A90]" />
           </button>
         </div>
 
         <div className="px-6 py-5 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-[#8A6F58] mb-1.5">原密码</label>
+            <label className="block text-xs font-medium text-[#6B7A90] mb-1.5">原密码</label>
             <div className="relative">
               <input
                 type={inputType}
                 value={form.old}
                 onChange={update('old')}
                 placeholder="请输入当前密码"
-                className="w-full px-4 py-2.5 pr-10 border border-[#F5D9C0] rounded-xl text-sm bg-white text-[#3A2E26] focus:outline-none focus:ring-2 focus:ring-[#F2935A]/40 focus:border-[#F2935A] transition-colors"
+                className="w-full px-4 py-2.5 pr-10 border border-[#E2E8F0] rounded-xl text-sm bg-white text-[#162033] focus:outline-none focus:ring-2 focus:ring-[#2F6BFF]/40 focus:border-[#2F6BFF] transition-colors"
               />
               <button
                 type="button"
                 onClick={() => setShowPwd(!showPwd)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#B5A89C] hover:text-[#8A6F58] transition-colors cursor-pointer"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#6B7A90] transition-colors cursor-pointer"
               >
                 {showPwd ? <X className="w-4 h-4" /> : <KeyRound className="w-4 h-4" />}
               </button>
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#8A6F58] mb-1.5">新密码</label>
+            <label className="block text-xs font-medium text-[#6B7A90] mb-1.5">新密码</label>
             <input
               type={inputType}
               value={form.newPwd}
               onChange={update('newPwd')}
               placeholder="至少 6 个字符"
-              className="w-full px-4 py-2.5 border border-[#F5D9C0] rounded-xl text-sm bg-white text-[#3A2E26] focus:outline-none focus:ring-2 focus:ring-[#F2935A]/40 focus:border-[#F2935A] transition-colors"
+              className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm bg-white text-[#162033] focus:outline-none focus:ring-2 focus:ring-[#2F6BFF]/40 focus:border-[#2F6BFF] transition-colors"
             />
             <div className="flex items-center gap-3 mt-1.5">
-              <div className={`flex items-center gap-1 text-xs ${pwdOk ? 'text-[#7EB88E]' : 'text-[#B5A89C]'}`}>
-                <div className={`w-1.5 h-1.5 rounded-full ${pwdOk ? 'bg-[#7EB88E]' : 'bg-[#D4C4B0]'}`} />
+              <div className={`flex items-center gap-1 text-xs ${pwdOk ? 'text-[#1F9D72]' : 'text-[#94A3B8]'}`}>
+                <div className={`w-1.5 h-1.5 rounded-full ${pwdOk ? 'bg-[#1F9D72]' : 'bg-[#D4C4B0]'}`} />
                 6+ 字符
               </div>
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#8A6F58] mb-1.5">确认新密码</label>
+            <label className="block text-xs font-medium text-[#6B7A90] mb-1.5">确认新密码</label>
             <div className="relative">
               <input
                 type={inputType}
                 value={form.confirm}
                 onChange={update('confirm')}
                 placeholder="再次输入新密码"
-                className="w-full px-4 py-2.5 pr-10 border border-[#F5D9C0] rounded-xl text-sm bg-white text-[#3A2E26] focus:outline-none focus:ring-2 focus:ring-[#F2935A]/40 focus:border-[#F2935A] transition-colors"
+                className="w-full px-4 py-2.5 pr-10 border border-[#E2E8F0] rounded-xl text-sm bg-white text-[#162033] focus:outline-none focus:ring-2 focus:ring-[#2F6BFF]/40 focus:border-[#2F6BFF] transition-colors"
               />
               {pwdMatch && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <Check className="w-4 h-4 text-[#7EB88E]" />
+                  <Check className="w-4 h-4 text-[#1F9D72]" />
                 </div>
               )}
             </div>
           </div>
           {msg && (
             <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm border ${
-              msg.type === 'ok' ? 'bg-[#E2F0E6] border-[#7EB88E] text-[#5A8F6A]' : 'bg-[#FBDDD3] border-[#D9533A] text-[#D9533A]'
+              msg.type === 'ok' ? 'bg-[#EAF8F2] border-[#1F9D72] text-[#5A8F6A]' : 'bg-[#FEF0F0] border-[#DC2626] text-[#DC2626]'
             }`}>
-              {msg.type === 'ok' ? <Check className="w-4 h-4 flex-shrink-0" /> : <div className="w-1.5 h-1.5 rounded-full bg-[#D9533A] flex-shrink-0" />}
+              {msg.type === 'ok' ? <Check className="w-4 h-4 flex-shrink-0" /> : <div className="w-1.5 h-1.5 rounded-full bg-[#DC2626] flex-shrink-0" />}
               {msg.text}
             </div>
           )}
         </div>
 
-        <div className="flex gap-3 px-6 py-4 border-t border-[#F5D9C0] bg-[#FFF7EE]">
+        <div className="flex gap-3 px-6 py-4 border-t border-[#E2E8F0] bg-[#F7F9FC]">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 bg-[#F4EBE1] hover:bg-[#EADDD5] text-[#5A4B42] rounded-xl transition-colors text-sm font-medium border border-[#EADDD5] cursor-pointer"
+            className="flex-1 px-4 py-2.5 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl transition-colors text-sm font-medium border border-[#E2E8F0] cursor-pointer"
           >
             取消
           </button>
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-[#F2935A] to-[#E07338] hover:opacity-90 text-white rounded-xl transition-all text-sm font-medium shadow-sm disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+            className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-[#2F6BFF] to-[#1D4ED8] hover:opacity-90 text-white rounded-xl transition-all text-sm font-medium shadow-sm disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
           >
             {loading ? <><Loader2 className="w-4 h-4 animate-spin" />修改中...</> : <><Check className="w-4 h-4" />确认修改</>}
           </button>
@@ -393,19 +393,19 @@ function UserMenu({
   const menuContent = (
     <div
       ref={menuRef}
-      style={{ ...style, border: '1px solid #F5D9C0', paddingTop: '4px', paddingBottom: '4px' }}
+      style={{ ...style, border: '1px solid #E2E8F0', paddingTop: '4px', paddingBottom: '4px' }}
       className="fixed w-48 bg-white rounded-xl shadow-xl z-50"
     >
-      <div className="px-4 py-3" style={{ borderBottom: '1px solid #F5D9C0' }}>
-        <p className="text-sm font-semibold truncate" style={{ color: '#3A2E26' }}>{user.nickname}</p>
-        <p className="text-xs mt-0.5 truncate" style={{ color: '#B5A89C' }}>@{user.username}</p>
+      <div className="px-4 py-3" style={{ borderBottom: '1px solid #E2E8F0' }}>
+        <p className="text-sm font-semibold truncate" style={{ color: '#162033' }}>{user.nickname}</p>
+        <p className="text-xs mt-0.5 truncate" style={{ color: '#94A3B8' }}>@{user.username}</p>
       </div>
       <button
         onClick={() => { onClose(); onCloseModals(); onOpenProfile(); }}
         className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm cursor-pointer transition-colors"
-        style={{ color: '#5C4D43' }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = '#FFF7EE'; e.currentTarget.style.color = '#3A2E26'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#5C4D43'; }}
+        style={{ color: '#415168' }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = '#F7F9FC'; e.currentTarget.style.color = '#162033'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#415168'; }}
       >
         <UserCog className="w-4 h-4" />
         修改资料
@@ -413,9 +413,9 @@ function UserMenu({
       <button
         onClick={() => { onClose(); onCloseModals(); onOpenChangePwd(); }}
         className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm cursor-pointer transition-colors"
-        style={{ color: '#5C4D43' }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = '#FFF7EE'; e.currentTarget.style.color = '#3A2E26'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#5C4D43'; }}
+        style={{ color: '#415168' }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = '#F7F9FC'; e.currentTarget.style.color = '#162033'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#415168'; }}
       >
         <KeyRound className="w-4 h-4" />
         修改密码
@@ -423,8 +423,8 @@ function UserMenu({
       <button
         onClick={handleLogout}
         className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm cursor-pointer transition-colors"
-        style={{ color: '#D9533A' }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = '#FFF7EE'; }}
+        style={{ color: '#DC2626' }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = '#F7F9FC'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         <LogOut className="w-4 h-4" />
@@ -474,7 +474,7 @@ export default function TopBar({ isCollapsed, setIsCollapsed }: TopBarProps) {
   const headerContent = (
     <>
       <header className="flex items-center justify-between px-6 py-3 sticky top-0 z-20" style={{
-        background: 'rgba(255,251,247,.85)',
+        background: 'rgba(250,252,255,.88)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
         borderBottom: '1px solid rgba(245,217,192,.6)'
@@ -483,29 +483,29 @@ export default function TopBar({ isCollapsed, setIsCollapsed }: TopBarProps) {
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="p-2 rounded-lg transition-colors cursor-pointer"
-            style={{ color: '#8A6F58' }}
+            style={{ color: '#6B7A90' }}
             onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(242,147,90,.1)'}
             onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
           >
             <Menu className="w-5 h-5" />
           </button>
           {isHomePage ? (
-            <span className="font-medium" style={{ color: '#E07338' }}>首页</span>
+            <span className="font-medium" style={{ color: '#1D4ED8' }}>首页</span>
           ) : (
             <div className="flex items-center text-sm">
               <div
                 onClick={handleModuleClick}
                 className="flex items-center cursor-pointer transition-colors"
-                style={{ color: '#8A6F58' }}
-                onMouseEnter={(e) => e.currentTarget.style.color = '#E07338'}
-                onMouseLeave={(e) => e.currentTarget.style.color = '#8A6F58'}
+                style={{ color: '#6B7A90' }}
+                onMouseEnter={(e) => e.currentTarget.style.color = '#1D4ED8'}
+                onMouseLeave={(e) => e.currentTarget.style.color = '#6B7A90'}
               >
                 <span>{currentModule.label}</span>
               </div>
               {currentSubPage.label !== currentModule.label && (
                 <>
-                  <ChevronRight className="w-4 h-4 mx-2" style={{ color: '#B5A89C' }} />
-                  <span className="font-medium" style={{ color: '#E07338' }}>{currentSubPage.label}</span>
+                  <ChevronRight className="w-4 h-4 mx-2" style={{ color: '#94A3B8' }} />
+                  <span className="font-medium" style={{ color: '#1D4ED8' }}>{currentSubPage.label}</span>
                 </>
               )}
             </div>
@@ -519,13 +519,13 @@ export default function TopBar({ isCollapsed, setIsCollapsed }: TopBarProps) {
                 ref={avatarBtnRef}
                 onClick={() => setMenuOpen((v) => !v)}
                 className="flex items-center gap-2 pl-4 cursor-pointer transition-opacity"
-                style={{ borderLeft: '1px solid #F5D9C0' }}
+                style={{ borderLeft: '1px solid #E2E8F0' }}
                 onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
                 onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
               >
                 <UserAvatar user={user} />
                 <div className="flex flex-col">
-                  <span className="text-sm font-bold" style={{ color: '#3A2E26' }}>{user.nickname}</span>
+                  <span className="text-sm font-bold" style={{ color: '#162033' }}>{user.nickname}</span>
                 </div>
               </button>
               {menuOpen && (
@@ -543,7 +543,7 @@ export default function TopBar({ isCollapsed, setIsCollapsed }: TopBarProps) {
             <button
               onClick={() => navigate('/login')}
               className="text-sm font-medium hover:underline cursor-pointer"
-              style={{ color: '#E07338' }}
+              style={{ color: '#1D4ED8' }}
             >
               登录
             </button>
@@ -559,3 +559,5 @@ export default function TopBar({ isCollapsed, setIsCollapsed }: TopBarProps) {
 
   return headerContent;
 }
+
+

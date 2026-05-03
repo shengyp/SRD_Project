@@ -84,15 +84,15 @@ function getTypeColorClass(type?: string): { bg: string; text: string } {
     case '精神专科医院':
       return { bg: 'bg-red-100', text: 'text-red-600' };
     case '心理咨询中心':
-      return { bg: 'bg-purple-100', text: 'text-purple-600' };
+      return { bg: 'bg-blue-100', text: 'text-blue-600' };
     case '危机干预中心':
-      return { bg: 'bg-orange-100', text: 'text-orange-600' };
+      return { bg: 'bg-blue-100', text: 'text-blue-600' };
     case '综合医院':
       return { bg: 'bg-blue-100', text: 'text-blue-600' };
     case '三甲医院':
-      return { bg: 'bg-yellow-100', text: 'text-yellow-600' };
+      return { bg: 'bg-cyan-100', text: 'text-cyan-700' };
     default:
-      return { bg: 'bg-[#F4EBE1]', text: 'text-[#5C4D43]' };
+      return { bg: 'bg-[#F1F5FA]', text: 'text-[#415168]' };
   }
 }
 
@@ -207,7 +207,7 @@ function InstitutionDetailModal({
       case '综合医院': return 'bg-blue-100 text-blue-700 border border-blue-200';
       case '心理咨询中心': return 'bg-purple-100 text-purple-700 border border-purple-200';
       case '三甲医院': return 'bg-yellow-100 text-yellow-700 border border-yellow-200';
-      case '危机干预中心': return 'bg-orange-100 text-orange-700 border border-orange-200';
+      case '危机干预中心': return 'bg-[#E8F0FF] text-[#2F6BFF] border border-[#BFD3F2]';
       default: return 'bg-gray-100 text-gray-700 border border-gray-200';
     }
   };
@@ -215,8 +215,8 @@ function InstitutionDetailModal({
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden m-4 animate-scale-in border border-[#EADDD5]">
-        <div className="relative bg-gradient-to-r from-[#C19A83] to-[#A07D6B] p-6 text-white">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden m-4 animate-scale-in border border-[#E2E8F0]">
+        <div className="relative bg-gradient-to-r from-[#2F6BFF] to-[#5B8CFF] p-6 text-white">
           <button onClick={onClose} className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-full transition-colors">
             <X className="w-5 h-5" />
           </button>
@@ -239,66 +239,66 @@ function InstitutionDetailModal({
 
         <div className="p-6 space-y-4 max-h-[50vh] overflow-y-auto">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-[#FAF6F3] rounded-xl flex items-center justify-center shrink-0">
-              <MapPin className="w-5 h-5 text-[#C19A83]" />
+            <div className="w-10 h-10 bg-[#F7FAFD] rounded-xl flex items-center justify-center shrink-0">
+              <MapPin className="w-5 h-5 text-[#2F6BFF]" />
             </div>
             <div>
-              <p className="text-xs text-[#8C7A6B] mb-1">地址</p>
-              <p className="text-[#4A362C] font-medium text-sm">{institution.address || '暂无地址信息'}</p>
-              <p className="text-xs text-[#8C7A6B]">{institution.city}{institution.district ? ` · ${institution.district}` : ''}</p>
+              <p className="text-xs text-[#64748B] mb-1">地址</p>
+              <p className="text-[#162033] font-medium text-sm">{institution.address || '暂无地址信息'}</p>
+              <p className="text-xs text-[#64748B]">{institution.city}{institution.district ? ` · ${institution.district}` : ''}</p>
             </div>
           </div>
 
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-[#FAF6F3] rounded-xl flex items-center justify-center shrink-0">
-              <Phone className="w-5 h-5 text-[#C19A83]" />
+            <div className="w-10 h-10 bg-[#F7FAFD] rounded-xl flex items-center justify-center shrink-0">
+              <Phone className="w-5 h-5 text-[#2F6BFF]" />
             </div>
             <div>
-              <p className="text-xs text-[#8C7A6B] mb-1">联系电话</p>
+              <p className="text-xs text-[#64748B] mb-1">联系电话</p>
               {institution.phone ? (
-                <a href={`tel:${institution.phone}`} className="text-[#4A362C] font-bold text-lg hover:text-[#C19A83] transition-colors">
+                <a href={`tel:${institution.phone}`} className="text-[#162033] font-bold text-lg hover:text-[#2F6BFF] transition-colors">
                   {institution.phone}
                 </a>
               ) : (
-                <p className="text-[#8C7A6B]">暂无电话信息</p>
+                <p className="text-[#64748B]">暂无电话信息</p>
               )}
             </div>
           </div>
 
           {institution.rating !== undefined && (
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-[#FAF6F3] rounded-xl flex items-center justify-center shrink-0">
-                <Star className="w-5 h-5 text-[#C19A83]" />
+              <div className="w-10 h-10 bg-[#F7FAFD] rounded-xl flex items-center justify-center shrink-0">
+                <Star className="w-5 h-5 text-[#2F6BFF]" />
               </div>
               <div>
-                <p className="text-xs text-[#8C7A6B] mb-1">评分</p>
+                <p className="text-xs text-[#64748B] mb-1">评分</p>
                 <div className="flex items-center gap-1">
-                  <span className="text-[#4A362C] font-bold text-lg">{institution.rating}</span>
-                  <span className="text-[#8C7A6B] text-sm">/ 5.0</span>
+                  <span className="text-[#162033] font-bold text-lg">{institution.rating}</span>
+                  <span className="text-[#64748B] text-sm">/ 5.0</span>
                 </div>
               </div>
             </div>
           )}
 
           {institution._distance !== undefined && (
-            <div className="flex items-center gap-2 text-sm text-[#8C7A6B]">
+            <div className="flex items-center gap-2 text-sm text-[#64748B]">
               <Navigation className="w-4 h-4" />
               <span>距离您约 {formatDistance(institution._distance)}</span>
             </div>
           )}
 
           {institution.data_source && (
-            <div className="bg-[#FAF6F3] rounded-xl p-3 border border-[#EADDD5]">
-              <p className="text-xs text-[#8C7A6B] mb-1">数据来源</p>
-              <span className="px-2 py-0.5 bg-[#EADDD5] text-[#5C4D43] text-xs rounded-full">{institution.data_source}</span>
+            <div className="bg-[#F7FAFD] rounded-xl p-3 border border-[#E2E8F0]">
+              <p className="text-xs text-[#64748B] mb-1">数据来源</p>
+              <span className="px-2 py-0.5 bg-[#E8F0FF] text-[#2F6BFF] text-xs rounded-full">{institution.data_source}</span>
             </div>
           )}
         </div>
 
-        <div className="p-6 pt-4 border-t border-[#EADDD5] flex gap-3">
+        <div className="p-6 pt-4 border-t border-[#E2E8F0] flex gap-3">
           {institution.phone && (
             <a href={`tel:${institution.phone}`}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#C19A83] hover:bg-[#A07D6B] text-white rounded-xl transition-colors font-medium shadow-sm">
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#2F6BFF] hover:bg-[#2458D6] text-white rounded-xl transition-colors font-medium shadow-sm">
               <Phone className="w-5 h-5" />
               拨打电话
             </a>
@@ -308,14 +308,14 @@ function InstitutionDetailModal({
               href={`https://uri.amap.com/marker?position=${institution.longitude},${institution.latitude}&name=${encodeURIComponent(institution.name)}&src=vis4srd&nativeApp=false`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#F4EBE1] hover:bg-[#EADDD5] text-[#4A362C] rounded-xl transition-colors font-medium">
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#162033] rounded-xl transition-colors font-medium">
               <MapPin className="w-5 h-5" />
               高德导航
             </a>
           ) : (
             <button
               onClick={() => message.warning('该机构暂无坐标信息')}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#F4EBE1] text-[#8C7A6B] rounded-xl font-medium cursor-not-allowed opacity-60"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#F1F5FA] text-[#64748B] rounded-xl font-medium cursor-not-allowed opacity-60"
               disabled>
               <MapPin className="w-5 h-5" />
               暂无导航
@@ -333,20 +333,20 @@ function HotLineModal({ hotline, onClose }: { hotline: HotLine; onClose: () => v
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 m-4 animate-scale-in border border-[#EADDD5]">
-        <button onClick={onClose} className="absolute top-4 right-4 p-2 hover:bg-[#F4EBE1] rounded-full transition-colors">
-          <X className="w-5 h-5 text-[#8C7A6B]" />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 m-4 animate-scale-in border border-[#E2E8F0]">
+        <button onClick={onClose} className="absolute top-4 right-4 p-2 hover:bg-[#F1F5FA] rounded-full transition-colors">
+          <X className="w-5 h-5 text-[#64748B]" />
         </button>
         <div className="text-center">
           <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${
-            isEmergency ? 'bg-red-100 border-2 border-red-200' : 'bg-[#FAF6F3] border-2 border-[#EADDD5]'
+            isEmergency ? 'bg-red-100 border-2 border-red-200' : 'bg-[#F7FAFD] border-2 border-[#E2E8F0]'
           }`}>
-            {isEmergency ? <Siren className="w-8 h-8 text-red-500" /> : <Phone className="w-8 h-8 text-[#C19A83]" />}
+            {isEmergency ? <Siren className="w-8 h-8 text-red-500" /> : <Phone className="w-8 h-8 text-[#2F6BFF]" />}
           </div>
-          <h3 className="text-lg font-bold text-[#4A362C] mb-2">{hotline.name}</h3>
-          <p className="text-3xl font-bold text-[#4A362C] mb-2">{hotline.hotline}</p>
-          <p className="text-sm text-[#8C7A6B] mb-4">{hotline.description || '提供专业心理援助服务'}</p>
-          <div className="flex items-center justify-center gap-2 text-sm text-[#8C7A6B] mb-6">
+          <h3 className="text-lg font-bold text-[#162033] mb-2">{hotline.name}</h3>
+          <p className="text-3xl font-bold text-[#162033] mb-2">{hotline.hotline}</p>
+          <p className="text-sm text-[#64748B] mb-4">{hotline.description || '提供专业心理援助服务'}</p>
+          <div className="flex items-center justify-center gap-2 text-sm text-[#64748B] mb-6">
             <Clock className="w-4 h-4" />
             <span>{hotline.available || '24小时'}</span>
           </div>
@@ -354,7 +354,7 @@ function HotLineModal({ hotline, onClose }: { hotline: HotLine; onClose: () => v
             className={`block w-full py-3 rounded-xl text-center font-semibold transition-colors shadow-sm ${
               isEmergency
                 ? 'bg-red-500 hover:bg-red-600 text-white'
-                : 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white'
+                : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white'
             }`}>
             立即拨打
           </a>
@@ -653,7 +653,7 @@ export default function MapPage() {
         if (userMarkerRef.current) mapInstanceRef.current.remove(userMarkerRef.current);
         userMarkerRef.current = new (window as any).AMap.Marker({
           position: [lng, lat],
-          content: '<div style="width:16px;height:16px;background:#C19A83;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 6px rgba(193,154,131,0.3);"><div style="width:6px;height:6px;background:white;border-radius:50%;margin:3px;"></div></div>',
+          content: '<div style="width:16px;height:16px;background:#2F6BFF;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 6px rgba(47,107,255,0.18);"><div style="width:6px;height:6px;background:white;border-radius:50%;margin:3px;"></div></div>',
           offset: new (window as any).AMap.Pixel(-8, -8),
           zIndex: 200,
         });
@@ -668,9 +668,9 @@ export default function MapPage() {
           radiusCircleRef.current = new (window as any).AMap.Circle({
             center: [lng, lat],
             radius: accuracy,
-            strokeColor: '#C19A83',
+            strokeColor: '#2F6BFF',
             strokeWeight: 1,
-            fillColor: '#C19A83',
+            fillColor: '#2F6BFF',
             fillOpacity: 0.05,
             zIndex: 10,
           });
@@ -735,7 +735,7 @@ export default function MapPage() {
       if (userMarkerRef.current) mapInstanceRef.current.remove(userMarkerRef.current);
       userMarkerRef.current = new (window as any).AMap.Marker({
         position: [lng, lat],
-        content: '<div style="width:16px;height:16px;background:#C19A83;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 6px rgba(193,154,131,0.3);"><div style="width:6px;height:6px;background:white;border-radius:50%;margin:3px;"></div></div>',
+        content: '<div style="width:16px;height:16px;background:#2F6BFF;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 6px rgba(47,107,255,0.18);"><div style="width:6px;height:6px;background:white;border-radius:50%;margin:3px;"></div></div>',
         offset: new (window as any).AMap.Pixel(-8, -8),
         zIndex: 200,
       });
@@ -769,7 +769,7 @@ export default function MapPage() {
         if (userMarkerRef.current) mapInstanceRef.current.remove(userMarkerRef.current);
         userMarkerRef.current = new (window as any).AMap.Marker({
           position: [lng, lat],
-          content: '<div style="width:16px;height:16px;background:#C19A83;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 6px rgba(193,154,131,0.3);"><div style="width:6px;height:6px;background:white;border-radius:50%;margin:3px;"></div></div>',
+          content: '<div style="width:16px;height:16px;background:#2F6BFF;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 6px rgba(47,107,255,0.18);"><div style="width:6px;height:6px;background:white;border-radius:50%;margin:3px;"></div></div>',
           offset: new (window as any).AMap.Pixel(-8, -8),
           zIndex: 200,
         });
@@ -821,7 +821,7 @@ export default function MapPage() {
     if (userMarkerRef.current) mapInstanceRef.current.remove(userMarkerRef.current);
     userMarkerRef.current = new (window as any).AMap.Marker({
       position: guess.coords,
-      content: '<div style="width:16px;height:16px;background:#C19A83;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 6px rgba(193,154,131,0.3);"><div style="width:6px;height:6px;background:white;border-radius:50%;margin:3px;"></div></div>',
+      content: '<div style="width:16px;height:16px;background:#2F6BFF;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 6px rgba(47,107,255,0.18);"><div style="width:6px;height:6px;background:white;border-radius:50%;margin:3px;"></div></div>',
       offset: new (window as any).AMap.Pixel(-8, -8),
       zIndex: 200,
     });
@@ -839,7 +839,7 @@ export default function MapPage() {
       case '危机干预中心': return 'linear-gradient(135deg, #e67e22, #d35400)';
       case '综合医院': return 'linear-gradient(135deg, #3498db, #2980b9)';
       case '三甲医院': return 'linear-gradient(135deg, #f39c12, #e67e22)';
-      default: return 'linear-gradient(135deg, #C19A83, #A07D6B)';
+      default: return 'linear-gradient(135deg, #5B8CFF, #2F6BFF)';
     }
   };
 
@@ -885,13 +885,13 @@ export default function MapPage() {
     if (!mapInstanceRef.current || !infoWindowRef.current) return;
     const instId = String(inst.id);
     const content = `
-      <div style="padding:10px;min-width:220px;border-radius:12px;background:white;border:1px solid #EADDD5;">
-        <h4 style="margin:0 0 8px;color:#4A362C;font-size:14px;font-weight:600;">${inst.name}</h4>
-        <p style="margin:4px 0;color:#8C7A6B;font-size:12px;">🏥 ${inst.type || '未知类型'}</p>
-        <p style="margin:4px 0;color:#8C7A6B;font-size:12px;">📍 ${inst.address || '暂无地址'}</p>
-        <p style="margin:4px 0;color:#8C7A6B;font-size:12px;">📞 ${inst.phone || '暂无电话'}</p>
-        ${inst.rating ? `<p style="margin:4px 0;color:#C19A83;font-size:12px;">⭐ ${inst.rating}/5.0</p>` : ''}
-        <button id="__show_detail_btn_${instId}" style="margin-top:8px;padding:5px 14px;background:#C19A83;color:white;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;">查看详情</button>
+      <div style="padding:10px;min-width:220px;border-radius:12px;background:white;border:1px solid #DCE7F5;box-shadow:0 10px 24px rgba(15,23,42,0.08);">
+        <h4 style="margin:0 0 8px;color:#162033;font-size:14px;font-weight:600;">${inst.name}</h4>
+        <p style="margin:4px 0;color:#64748B;font-size:12px;">🏥 ${inst.type || '未知类型'}</p>
+        <p style="margin:4px 0;color:#64748B;font-size:12px;">📍 ${inst.address || '暂无地址'}</p>
+        <p style="margin:4px 0;color:#64748B;font-size:12px;">📞 ${inst.phone || '暂无电话'}</p>
+        ${inst.rating ? `<p style="margin:4px 0;color:#2F6BFF;font-size:12px;">⭐ ${inst.rating}/5.0</p>` : ''}
+        <button id="__show_detail_btn_${instId}" style="margin-top:8px;padding:5px 14px;background:#2F6BFF;color:white;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;">查看详情</button>
       </div>
     `;
     infoWindowRef.current.setContent(content);
@@ -1062,9 +1062,9 @@ export default function MapPage() {
       radiusCircleRef.current = new (window as any).AMap.Circle({
         center: [userLocation.lng, userLocation.lat],
         radius: searchRadius,
-        strokeColor: '#C19A83',
+        strokeColor: '#2F6BFF',
         strokeWeight: 2,
-        fillColor: '#C19A83',
+        fillColor: '#2F6BFF',
         fillOpacity: 0.08,
         zIndex: 10,
       });
@@ -1088,19 +1088,19 @@ export default function MapPage() {
       {/* 地图加载遮罩 */}
       {mapLoading && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm pointer-events-none">
-          <div className="w-14 h-14 border-4 border-[#EADDD5] border-t-[#C19A83] rounded-full animate-spin mb-4" />
-          <p className="text-[#8C7A6B] text-sm font-medium">地图加载中...</p>
+          <div className="w-14 h-14 border-4 border-[#DCE7F5] border-t-[#2F6BFF] rounded-full animate-spin mb-4" />
+          <p className="text-[#64748B] text-sm font-medium">地图加载中...</p>
         </div>
       )}
 
       {/* 地图错误遮罩 */}
       {mapError && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/95 backdrop-blur-sm">
-          <div className="w-20 h-20 bg-[#FAF6F3] rounded-full flex items-center justify-center mb-5 shadow-sm">
-            <MapPin className="w-10 h-10 text-[#C19A83]" />
+          <div className="w-20 h-20 bg-[#F7FAFD] rounded-full flex items-center justify-center mb-5 shadow-sm">
+            <MapPin className="w-10 h-10 text-[#2F6BFF]" />
           </div>
-          <p className="text-[#4A362C] font-semibold text-lg mb-2">{mapError}</p>
-          <div className="text-[#8C7A6B] text-sm mb-4 text-center max-w-md px-4">
+          <p className="text-[#162033] font-semibold text-lg mb-2">{mapError}</p>
+          <div className="text-[#64748B] text-sm mb-4 text-center max-w-md px-4">
             <p className="mb-2">可能原因：</p>
             <ul className="text-left list-disc pl-5 space-y-1">
               <li>网络连接不稳定</li>
@@ -1118,7 +1118,7 @@ export default function MapPage() {
                 amapLoadPromise = null;
                 initMap();
               }}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#C19A83] to-[#A07D6B] hover:from-[#A07D6B] hover:to-[#8B6B58] text-white rounded-xl text-sm transition-all shadow-sm"
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#2F6BFF] to-[#5B8CFF] hover:from-[#2458D6] hover:to-[#4A7AF0] text-white rounded-xl text-sm transition-all shadow-sm"
             >
               <RefreshCw className="w-4 h-4" />
               重试加载
@@ -1129,7 +1129,7 @@ export default function MapPage() {
                 setMapLoading(false);
                 message.info('部分功能可能受限，建议检查网络后刷新页面');
               }}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[#F4EBE1] hover:bg-[#EADDD5] text-[#5C4D43] rounded-xl text-sm transition-colors border border-[#EADDD5]"
+              className="flex items-center gap-2 px-5 py-2.5 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl text-sm transition-colors border border-[#E2E8F0]"
             >
               继续使用
             </button>
@@ -1144,9 +1144,9 @@ export default function MapPage() {
         className="absolute top-1/2 -translate-y-1/2 z-30 w-7 h-14 flex items-center justify-center rounded-r-xl shadow-lg transition-all duration-300"
         style={{
           left: leftOpen ? '280px' : '0px',
-          background: leftOpen ? '#C19A83' : 'white',
-          color: leftOpen ? 'white' : '#C19A83',
-          border: leftOpen ? 'none' : '1px solid #EADDD5',
+          background: leftOpen ? '#2F6BFF' : 'white',
+          color: leftOpen ? 'white' : '#2F6BFF',
+          border: leftOpen ? 'none' : '1px solid #E2E8F0',
         }}
       >
         {leftOpen
@@ -1162,19 +1162,19 @@ export default function MapPage() {
       >
         {leftOpen && (
           <div 
-            className="w-[280px] h-full flex flex-col bg-white overflow-hidden shadow-[2px_0_16px_rgba(0,0,0,0.08)] border-r border-[#EADDD5]"
+            className="w-[280px] h-full flex flex-col bg-white overflow-hidden shadow-[2px_0_16px_rgba(15,23,42,0.08)] border-r border-[#E2E8F0]"
             style={{ paddingBottom: '44px' }}
           >
             {/* 定位头部 */}
-            <div className="p-4 border-b border-[#EADDD5] bg-gradient-to-r from-[#F9F5F2] to-white">
-              <div className="flex items-center gap-2 text-[#8C7A6B] text-xs mb-3">
-                <Locate className="w-3.5 h-3.5 shrink-0 text-[#C19A83]" />
+            <div className="p-4 border-b border-[#E2E8F0] bg-gradient-to-r from-[#F7FAFD] to-white">
+              <div className="flex items-center gap-2 text-[#64748B] text-xs mb-3">
+                <Locate className="w-3.5 h-3.5 shrink-0 text-[#2F6BFF]" />
                 <span className="truncate">{userAddress || userCity || '点击定位获取当前位置'}</span>
               </div>
               <button
                 onClick={handleLocate}
                 disabled={locating}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#C19A83] to-[#A07D6B] hover:from-[#A07D6B] hover:to-[#8B6B58] text-white rounded-xl text-sm transition-all shadow-sm disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#2F6BFF] to-[#5B8CFF] hover:from-[#2458D6] hover:to-[#4A7AF0] text-white rounded-xl text-sm transition-all shadow-sm disabled:opacity-50"
               >
                 <RefreshCw className={`w-4 h-4 ${locating ? 'animate-spin' : ''}`} />
                 {locating ? '定位中...' : '重新定位'}
@@ -1185,7 +1185,7 @@ export default function MapPage() {
             <div className="flex-1 overflow-y-auto p-4 space-y-5">
               {/* 机构类型 */}
               <div>
-                <h4 className="text-xs font-semibold text-[#5C4D43] mb-3 uppercase tracking-wide">机构类型</h4>
+                <h4 className="text-xs font-semibold text-[#415168] mb-3 uppercase tracking-wide">机构类型</h4>
                 <div className="space-y-2">
                   {INSTITUTION_TYPES.map(type => (
                     <label key={type} className="flex items-center gap-2.5 cursor-pointer group" onClick={(e) => {
@@ -1197,8 +1197,8 @@ export default function MapPage() {
                     }}>
                       <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
                         selectedTypes.includes(type)
-                          ? 'bg-[#C19A83] border-[#C19A83]'
-                          : 'border-[#D7BFA6] group-hover:border-[#C19A83]'
+                          ? 'bg-[#2F6BFF] border-[#2F6BFF]'
+                          : 'border-[#CBD5E1] group-hover:border-[#2F6BFF]'
                       }`}>
                         {selectedTypes.includes(type) && (
                           <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -1206,7 +1206,7 @@ export default function MapPage() {
                           </svg>
                         )}
                       </div>
-                      <span className="text-sm text-[#5C4D43] group-hover:text-[#C19A83] transition-colors">{type}</span>
+                      <span className="text-sm text-[#415168] group-hover:text-[#2F6BFF] transition-colors">{type}</span>
                     </label>
                   ))}
                 </div>
@@ -1214,7 +1214,7 @@ export default function MapPage() {
 
               {/* 搜索半径 */}
               <div>
-                <h4 className="text-xs font-semibold text-[#5C4D43] mb-3 uppercase tracking-wide">搜索半径</h4>
+                <h4 className="text-xs font-semibold text-[#415168] mb-3 uppercase tracking-wide">搜索半径</h4>
                 <div className="grid grid-cols-2 gap-2">
                   {RADIUS_OPTIONS.map(opt => (
                     <button
@@ -1222,8 +1222,8 @@ export default function MapPage() {
                       onClick={() => setSearchRadius(opt.value)}
                       className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
                         searchRadius === opt.value
-                          ? 'bg-gradient-to-r from-[#C19A83] to-[#A07D6B] border-[#C19A83] text-white shadow-sm'
-                          : 'bg-[#FAF6F3] border-[#EADDD5] text-[#5C4D43] hover:bg-[#F4EBE1] hover:border-[#D7BFA6]'
+                          ? 'bg-gradient-to-r from-[#2F6BFF] to-[#5B8CFF] border-[#2F6BFF] text-white shadow-sm'
+                          : 'bg-[#F7F9FC] border-[#E2E8F0] text-[#415168] hover:bg-[#F1F5FA] hover:border-[#CBD5E1]'
                       }`}
                     >
                       {opt.label}
@@ -1234,7 +1234,7 @@ export default function MapPage() {
 
               {/* 排序方式 */}
               <div>
-                <h4 className="text-xs font-semibold text-[#5C4D43] mb-3 uppercase tracking-wide">排序方式</h4>
+                <h4 className="text-xs font-semibold text-[#415168] mb-3 uppercase tracking-wide">排序方式</h4>
                 <div className="space-y-1.5">
                   {SORT_OPTIONS.map(opt => (
                     <button
@@ -1242,8 +1242,8 @@ export default function MapPage() {
                       onClick={() => setSortBy(opt.value)}
                       className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium border transition-all ${
                         sortBy === opt.value
-                          ? 'bg-gradient-to-r from-[#C19A83] to-[#A07D6B] border-[#C19A83] text-white shadow-sm'
-                          : 'bg-[#FAF6F3] border-[#EADDD5] text-[#5C4D43] hover:bg-[#F4EBE1] hover:border-[#D7BFA6]'
+                          ? 'bg-gradient-to-r from-[#2F6BFF] to-[#5B8CFF] border-[#2F6BFF] text-white shadow-sm'
+                          : 'bg-[#F7F9FC] border-[#E2E8F0] text-[#415168] hover:bg-[#F1F5FA] hover:border-[#CBD5E1]'
                       }`}
                     >
                       {opt.label}
@@ -1263,9 +1263,9 @@ export default function MapPage() {
         className="absolute top-1/2 -translate-y-1/2 z-30 w-7 h-14 flex items-center justify-center rounded-l-xl shadow-lg transition-all duration-300"
         style={{
           right: rightOpen ? '400px' : '0px',
-          background: rightOpen ? '#C19A83' : 'white',
-          color: rightOpen ? 'white' : '#C19A83',
-          border: rightOpen ? 'none' : '1px solid #EADDD5',
+          background: rightOpen ? '#2F6BFF' : 'white',
+          color: rightOpen ? 'white' : '#2F6BFF',
+          border: rightOpen ? 'none' : '1px solid #E2E8F0',
         }}
         title={rightOpen ? '收起机构列表' : '展开机构列表'}
       >
@@ -1286,34 +1286,34 @@ export default function MapPage() {
         }}
       >
         {rightOpen && (
-          <div className="w-[400px] h-full flex flex-col bg-white overflow-hidden shadow-[-2px_0_16px_rgba(0,0,0,0.1)] border-l border-[#EADDD5]">
+          <div className="w-[400px] h-full flex flex-col bg-white overflow-hidden shadow-[-2px_0_16px_rgba(15,23,42,0.1)] border-l border-[#E2E8F0]">
             {/* 搜索头 */}
-            <div className="p-4 border-b border-[#EADDD5] bg-gradient-to-r from-[#F9F5F2] to-white shrink-0">
+            <div className="p-4 border-b border-[#E2E8F0] bg-gradient-to-r from-[#F7FAFD] to-white shrink-0">
               {/* 统计条 */}
-              <div className="flex border border-[#EADDD5] rounded-xl overflow-hidden mb-3">
+              <div className="flex border border-[#E2E8F0] rounded-xl overflow-hidden mb-3">
                 <div
-                  className="flex-1 p-3 text-center cursor-pointer hover:bg-[#FAF6F3] transition-colors"
+                  className="flex-1 p-3 text-center cursor-pointer hover:bg-[#F7FAFD] transition-colors"
                   onClick={() => setCityDialogVisible(true)}
                 >
-                  <p className="text-lg font-bold text-[#C19A83]">{allCitiesList.length}</p>
-                  <p className="text-[10px] text-[#8C7A6B]">覆盖城市</p>
+                  <p className="text-lg font-bold text-[#2F6BFF]">{allCitiesList.length}</p>
+                  <p className="text-[10px] text-[#64748B]">覆盖城市</p>
                 </div>
-                <div className="w-px bg-[#EADDD5]" />
+                <div className="w-px bg-[#E2E8F0]" />
                 <div className="flex-1 p-3 text-center">
-                  <p className="text-lg font-bold text-[#C19A83]">{filteredInstitutions.length}</p>
-                  <p className="text-[10px] text-[#8C7A6B]">机构总数</p>
+                  <p className="text-lg font-bold text-[#2F6BFF]">{filteredInstitutions.length}</p>
+                  <p className="text-[10px] text-[#64748B]">机构总数</p>
                 </div>
               </div>
 
               {/* 搜索框 */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A89F95]" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8]" />
                 <input
                   type="text"
                   placeholder="搜索机构名称..."
                   value={searchTerm}
                   onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                  className="w-full pl-10 pr-4 py-2.5 border border-[#EADDD5] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#D7BFA6] focus:border-[#C19A83] bg-white transition-all placeholder:text-[#A89F95]"
+                  className="w-full pl-10 pr-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-[#2F6BFF] bg-white transition-all placeholder:text-[#94A3B8]"
                 />
               </div>
 
@@ -1335,13 +1335,13 @@ export default function MapPage() {
             </div>
 
             {/* 机构列表 */}
-            <div className="flex-1 overflow-y-auto bg-[#F9F5F2]">
+            <div className="flex-1 overflow-y-auto bg-[#F7FAFD]">
               {paginatedInstitutions.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16">
-                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<span className="text-[#8C7A6B]">暂无符合条件的机构</span>} />
+                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<span className="text-[#64748B]">暂无符合条件的机构</span>} />
                 </div>
               ) : (
-                <div className="divide-y divide-[#EADDD5]">
+                <div className="divide-y divide-[#E2E8F0]">
                   {paginatedInstitutions.map((inst, idx) => {
                     const globalIdx = (currentPage - 1) * pageSize + idx + 1;
                     const typeColor = getTypeColorClass(inst.type);
@@ -1357,8 +1357,8 @@ export default function MapPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1.5">
-                              <h4 className="font-semibold text-[#4A362C] text-sm truncate pr-2">{inst.name}</h4>
-                              <ChevronRight className="w-4 h-4 text-[#A89F95] shrink-0" />
+                              <h4 className="font-semibold text-[#162033] text-sm truncate pr-2">{inst.name}</h4>
+                              <ChevronRight className="w-4 h-4 text-[#94A3B8] shrink-0" />
                             </div>
                             <div className="flex items-center gap-1.5 flex-wrap mb-2">
                               {inst.type && (
@@ -1368,7 +1368,7 @@ export default function MapPage() {
                                 <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">{inst.city}</span>
                               )}
                               {inst._distance !== undefined && (
-                                <span className="px-2 py-0.5 bg-[#F4EBE1] text-[#5C4D43] text-xs rounded-full flex items-center gap-0.5">
+                                <span className="px-2 py-0.5 bg-[#F1F5FA] text-[#415168] text-xs rounded-full flex items-center gap-0.5">
                                   <Navigation className="w-2.5 h-2.5" />
                                   {formatDistance(inst._distance)}
                                 </span>
@@ -1376,13 +1376,13 @@ export default function MapPage() {
                             </div>
                             <div className="space-y-0.5">
                               {inst.phone && (
-                                <p className="text-xs text-[#8C7A6B] flex items-center gap-1">
+                                <p className="text-xs text-[#64748B] flex items-center gap-1">
                                   <Phone className="w-3 h-3 shrink-0" />
                                   {inst.phone}
                                 </p>
                               )}
                               {inst.address && (
-                                <p className="text-xs text-[#8C7A6B] flex items-center gap-1 truncate">
+                                <p className="text-xs text-[#64748B] flex items-center gap-1 truncate">
                                   <MapPin className="w-3 h-3 shrink-0" />
                                   {inst.address}
                                 </p>
@@ -1399,13 +1399,13 @@ export default function MapPage() {
 
             {/* 分页 */}
             {filteredInstitutions.length > pageSize && (
-              <div className="shrink-0 flex items-center justify-between px-4 py-3 bg-white border-t border-[#EADDD5]">
-                <span className="text-xs text-[#8C7A6B]">共 {filteredInstitutions.length} 条</span>
+              <div className="shrink-0 flex items-center justify-between px-4 py-3 bg-white border-t border-[#E2E8F0]">
+                <span className="text-xs text-[#64748B]">共 {filteredInstitutions.length} 条</span>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className="px-2.5 py-1 text-xs rounded-lg text-[#5C4D43] hover:bg-[#F4EBE1] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="px-2.5 py-1 text-xs rounded-lg text-[#415168] hover:bg-[#F1F5FA] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >上一页</button>
                   {Array.from({ length: Math.min(5, Math.ceil(filteredInstitutions.length / pageSize)) }, (_, i) => {
                     const total = Math.ceil(filteredInstitutions.length / pageSize);
@@ -1414,14 +1414,14 @@ export default function MapPage() {
                     return (
                       <button key={page} onClick={() => setCurrentPage(page)}
                         className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
-                          currentPage === page ? 'bg-[#C19A83] text-white' : 'text-[#5C4D43] hover:bg-[#F4EBE1]'
+                          currentPage === page ? 'bg-[#2F6BFF] text-white' : 'text-[#415168] hover:bg-[#F1F5FA]'
                         }`}>{page}</button>
                     );
                   })}
                   <button
                     onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredInstitutions.length / pageSize), p + 1))}
                     disabled={currentPage === Math.ceil(filteredInstitutions.length / pageSize)}
-                    className="px-2.5 py-1 text-xs rounded-lg text-[#5C4D43] hover:bg-[#F4EBE1] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="px-2.5 py-1 text-xs rounded-lg text-[#415168] hover:bg-[#F1F5FA] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >下一页</button>
                 </div>
               </div>
@@ -1446,7 +1446,7 @@ export default function MapPage() {
           transform: bottomOpen ? 'translateY(0)' : 'translateY(calc(100% - 44px))',
         }}
       >
-        <div className="w-full bg-gradient-to-r from-[#E8956A] to-[#D4724E] shadow-[0_-4px_20px_rgba(212,114,78,0.25)]">
+        <div className="w-full bg-gradient-to-r from-[#2F6BFF] to-[#5B8CFF] shadow-[0_-4px_20px_rgba(47,107,255,0.24)]">
           {/* 标题行：左侧标题 + 右侧收起按钮（不遮挡热线内容） */}
           <div className="flex items-center justify-between gap-4 px-6 py-3 border-b border-white/20">
             <div className="flex items-center gap-2 min-w-0">
@@ -1502,7 +1502,7 @@ export default function MapPage() {
           <button
             onClick={() => { handleCityChange(''); setCityDialogVisible(false); }}
             className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
-              selectedCity === '' ? 'bg-[#C19A83] text-white border-[#C19A83] shadow-sm' : 'bg-[#F4EBE1] text-[#5C4D43] border-[#EADDD5] hover:bg-[#EADDD5]'
+              selectedCity === '' ? 'bg-[#2F6BFF] text-white border-[#2F6BFF] shadow-sm' : 'bg-[#F1F5FA] text-[#415168] border-[#E2E8F0] hover:bg-[#E2E8F0]'
             }`}
           >全国</button>
           {allCitiesList.map(city => (
@@ -1510,7 +1510,7 @@ export default function MapPage() {
               key={city}
               onClick={() => { handleCityChange(city); setCityDialogVisible(false); }}
               className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
-                selectedCity === city ? 'bg-[#C19A83] text-white border-[#C19A83] shadow-sm' : 'bg-[#F4EBE1] text-[#5C4D43] border-[#EADDD5] hover:bg-[#EADDD5]'
+                selectedCity === city ? 'bg-[#2F6BFF] text-white border-[#2F6BFF] shadow-sm' : 'bg-[#F1F5FA] text-[#415168] border-[#E2E8F0] hover:bg-[#E2E8F0]'
               }`}
             >
               {city}

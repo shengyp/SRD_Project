@@ -66,15 +66,15 @@ function ApiKeyConfigModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
       <div className="absolute inset-0 bg-black bg-opacity-40 pointer-events-auto" onClick={onClose} />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg m-4 animate-scale-in border border-[#EADDD5]">
-        <div className="flex items-center justify-between p-6 border-b border-[#EADDD5]">
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg m-4 animate-scale-in border border-[#E2E8F0]">
+        <div className="flex items-center justify-between p-6 border-b border-[#E2E8F0]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
-              <KeyRound className="w-5 h-5 text-orange-600" />
+            <div className="w-10 h-10 rounded-xl bg-[#E8F0FF] flex items-center justify-center">
+              <KeyRound className="w-5 h-5 text-[#2F6BFF]" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-[#4A3B32]">配置 API Key</h3>
-              <p className="text-xs text-[#8C7A6B]">{model.modelName}</p>
+              <h3 className="text-lg font-bold text-[#162033]">配置 API Key</h3>
+              <p className="text-xs text-[#64748B]">{model.modelName}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
@@ -82,15 +82,15 @@ function ApiKeyConfigModal({
           </button>
         </div>
         <div className="p-6 space-y-4">
-          <div className="bg-orange-50 rounded-xl p-4 border border-orange-100">
+          <div className="bg-[#F3F8FF] rounded-xl p-4 border border-[#DCE7F5]">
             <div className="flex items-start gap-3">
-              <AlertCircle className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
-              <div className="text-sm text-orange-700">
+              <AlertCircle className="w-4 h-4 text-[#2F6BFF] mt-0.5 shrink-0" />
+              <div className="text-sm text-[#415168]">
                 <p className="font-medium mb-1">此模型需要配置 API Key 才能使用</p>
-                <p className="text-orange-600 text-xs">请到 <strong>{label}</strong> 官网申请 API Key，并在下方填写。</p>
+                <p className="text-[#2F6BFF] text-xs">请到 <strong>{label}</strong> 官网申请 API Key，并在下方填写。</p>
                 {docLinks[model.provider || ''] && (
                   <a href={docLinks[model.provider || '']} target="_blank" rel="noopener noreferrer"
-                    className="mt-1 inline-block text-orange-600 underline text-xs hover:text-orange-800">
+                    className="mt-1 inline-block text-[#2F6BFF] underline text-xs hover:text-[#1D4ED8]">
                     获取 API Key →
                   </a>
                 )}
@@ -98,7 +98,7 @@ function ApiKeyConfigModal({
             </div>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-[#4A3B32] mb-2">
+            <label className="block text-sm font-semibold text-[#162033] mb-2">
               API Key <span className="text-red-500">*</span>
             </label>
             <input
@@ -106,22 +106,22 @@ function ApiKeyConfigModal({
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="sk-... 或对应的 API Key"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none text-sm font-mono"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#2F6BFF] focus:ring-2 focus:ring-blue-100 outline-none text-sm font-mono"
               autoComplete="off"
             />
-            <p className="mt-1.5 text-xs text-[#8C7A6B]">API Key 将安全存储，不会明文显示在日志中</p>
+            <p className="mt-1.5 text-xs text-[#64748B]">API Key 将安全存储，不会明文显示在日志中</p>
           </div>
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600">{error}</div>
           )}
         </div>
-        <div className="flex justify-end gap-3 p-5 border-t border-[#EADDD5] bg-[#FAF6F3]">
+        <div className="flex justify-end gap-3 p-5 border-t border-[#E2E8F0] bg-[#F7FAFD]">
           <button onClick={onClose}
-            className="px-5 py-2.5 rounded-xl bg-[#F4EBE1] hover:bg-[#EADDD5] text-[#5A4B42] text-sm font-medium transition-colors border border-[#EADDD5]">
+            className="px-5 py-2.5 rounded-xl bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] text-sm font-medium transition-colors border border-[#E2E8F0]">
             取消
           </button>
           <button onClick={handleSubmit} disabled={saving}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-sm font-medium transition-all shadow-sm disabled:opacity-50">
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-medium transition-all shadow-sm disabled:opacity-50">
             {saving ? '保存中...' : '确认配置'}
           </button>
         </div>
@@ -141,16 +141,16 @@ function ConfirmModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       <div className="absolute inset-0 bg-black bg-opacity-40" onClick={onClose}></div>
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md m-4 animate-scale-in overflow-hidden border border-[#EADDD5]">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md m-4 animate-scale-in overflow-hidden border border-[#E2E8F0]">
         <div className="p-6 text-center">
           <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4 border border-red-200">
             <Trash2 className="w-7 h-7 text-red-500" />
           </div>
-          <h3 className="text-xl font-bold text-[#4A3B32] mb-2">{title}</h3>
-          <p className="text-sm text-[#8C7A6B]">{message}</p>
+          <h3 className="text-xl font-bold text-[#162033] mb-2">{title}</h3>
+          <p className="text-sm text-[#64748B]">{message}</p>
         </div>
-        <div className="flex border-t border-[#EADDD5]">
-          <button onClick={onClose} className="flex-1 py-3 text-sm font-medium text-[#5A4B42] hover:bg-[#FAF6F3] transition-colors border-r border-[#EADDD5]">
+        <div className="flex border-t border-[#E2E8F0]">
+          <button onClick={onClose} className="flex-1 py-3 text-sm font-medium text-[#415168] hover:bg-[#F7FAFD] transition-colors border-r border-[#E2E8F0]">
             取消
           </button>
           <button onClick={onConfirm} disabled={loading}
@@ -284,22 +284,22 @@ function AddModelModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black bg-opacity-40" onClick={onClose}></div>
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4 animate-scale-in">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
-          <h3 className="text-xl font-bold text-[#4A3B32]">{editData ? '编辑模型' : '添加模型'}</h3>
+        <div className="flex items-center justify-between p-6 border-b border-[#E2E8F0]">
+          <h3 className="text-xl font-bold text-[#162033]">{editData ? '编辑模型' : '添加模型'}</h3>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X className="w-5 h-5 text-gray-500" /></button>
         </div>
         <div className="p-6 space-y-5">
           {/* API Key 未配置提示 */}
           {needsApiKeyHint && (
-            <div className="bg-orange-50 rounded-xl p-4 border border-orange-100">
+            <div className="bg-[#F3F8FF] rounded-xl p-4 border border-[#DCE7F5]">
               <div className="flex items-start gap-3">
-                <AlertCircle className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
-                <div className="text-sm text-orange-700">
+                <AlertCircle className="w-4 h-4 text-[#2F6BFF] mt-0.5 shrink-0" />
+                <div className="text-sm text-[#415168]">
                   <p className="font-medium mb-1">此模型需要配置 API Key 才能使用</p>
-                  <p className="text-orange-600 text-xs">请在下方填写 API Key，或到 {providerLabel[formData.provider] || formData.provider} 官网申请。</p>
+                  <p className="text-[#2F6BFF] text-xs">请在下方填写 API Key，或到 {providerLabel[formData.provider] || formData.provider} 官网申请。</p>
                   {docLinks[formData.provider] && (
                     <a href={docLinks[formData.provider]} target="_blank" rel="noopener noreferrer"
-                      className="mt-1 inline-block text-orange-600 underline text-xs hover:text-orange-800">
+                      className="mt-1 inline-block text-[#2F6BFF] underline text-xs hover:text-[#1D4ED8]">
                       获取 API Key →
                     </a>
                   )}
@@ -309,35 +309,35 @@ function AddModelModal({
           )}
 
           <div>
-            <label className="block text-sm font-semibold text-[#4A3B32] mb-2">模型类型</label>
+            <label className="block text-sm font-semibold text-[#162033] mb-2">模型类型</label>
             <div className="flex gap-3">
-              <label className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all ${modelType === 'api' ? 'border-orange-400 bg-orange-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                <input type="radio" name="mt" checked={modelType === 'api'} onChange={() => setModelType('api')} className="w-4 h-4 text-orange-500" />
+              <label className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all ${modelType === 'api' ? 'border-[#2F6BFF] bg-[#F3F8FF]' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="mt" checked={modelType === 'api'} onChange={() => setModelType('api')} className="w-4 h-4 text-[#2F6BFF]" />
                 <Cloud className="w-4 h-4 text-gray-500" /><span className="font-medium text-sm">API 模型</span>
               </label>
-              <label className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all ${modelType === 'local' ? 'border-orange-400 bg-orange-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                <input type="radio" name="mt" checked={modelType === 'local'} onChange={() => setModelType('local')} className="w-4 h-4 text-orange-500" />
+              <label className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all ${modelType === 'local' ? 'border-[#2F6BFF] bg-[#F3F8FF]' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="mt" checked={modelType === 'local'} onChange={() => setModelType('local')} className="w-4 h-4 text-[#2F6BFF]" />
                 <Server className="w-4 h-4 text-gray-500" /><span className="font-medium text-sm">本地模型</span>
               </label>
             </div>
           </div>
           <div className="border-t border-gray-100 pt-4 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-[#4A3B32] mb-1.5">模型名称 <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-medium text-[#162033] mb-1.5">模型名称 <span className="text-red-500">*</span></label>
               <input type="text" value={formData.modelName} onChange={(e) => setFormData({...formData, modelName: e.target.value})} placeholder="请输入模型名称"
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none transition-all text-sm" />
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#2F6BFF] focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#4A3B32] mb-1.5">模型描述</label>
+              <label className="block text-sm font-medium text-[#162033] mb-1.5">模型描述</label>
               <textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} placeholder="请输入模型描述（可选）" rows={2}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-orange-400 outline-none transition-all text-sm resize-none" />
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#2F6BFF] outline-none transition-all text-sm resize-none" />
             </div>
             {modelType === 'api' ? (
-              <div className="space-y-3 pl-3 border-l-2 border-orange-100">
+              <div className="space-y-3 pl-3 border-l-2 border-[#DCE7F5]">
                 <div>
-                  <label className="block text-sm font-medium text-[#4A3B32] mb-1.5">配置模板</label>
+                  <label className="block text-sm font-medium text-[#162033] mb-1.5">配置模板</label>
                     <select value={formData.configTemplate} onChange={(e) => setFormData({...formData, configTemplate: e.target.value})}
-                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-orange-400 outline-none text-sm bg-white">
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#2F6BFF] outline-none text-sm bg-white">
                     <option value="">自定义</option>
                     <option value="openai">OpenAI</option>
                     <option value="zhipu">智谱 GLM</option>
@@ -349,65 +349,65 @@ function AddModelModal({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#4A3B32] mb-1.5">Base URL</label>
+                  <label className="block text-sm font-medium text-[#162033] mb-1.5">Base URL</label>
                   <input type="text" value={formData.baseUrl} onChange={(e) => setFormData({...formData, baseUrl: e.target.value})} placeholder="https://api.example.com/v1"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-orange-400 outline-none text-sm" />
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#2F6BFF] outline-none text-sm" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#4A3B32] mb-1.5">API Key</label>
+                  <label className="block text-sm font-medium text-[#162033] mb-1.5">API Key</label>
                   <input type="password" value={formData.apiKey} onChange={(e) => setFormData({...formData, apiKey: e.target.value})} placeholder="sk-..."
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-orange-400 outline-none text-sm" />
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#2F6BFF] outline-none text-sm" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#4A3B32] mb-1.5">API 提供商</label>
+                  <label className="block text-sm font-medium text-[#162033] mb-1.5">API 提供商</label>
                   <input type="text" value={formData.provider} onChange={(e) => setFormData({...formData, provider: e.target.value})} placeholder="例如：OpenAI、通义千问"
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-orange-400 outline-none text-sm" />
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#2F6BFF] outline-none text-sm" />
                 </div>
               </div>
             ) : (
-              <div className="space-y-3 pl-3 border-l-2 border-orange-100">
+              <div className="space-y-3 pl-3 border-l-2 border-[#DCE7F5]">
                 <div>
-                  <label className="block text-sm font-semibold text-[#4A3B32] mb-2">本地模型类型</label>
+                  <label className="block text-sm font-semibold text-[#162033] mb-2">本地模型类型</label>
                   <div className="flex gap-3">
-                    <label className={`flex-1 flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all ${localModelSubType === 'llm' ? 'border-orange-400 bg-orange-50' : 'border-gray-200'}`}>
-                      <input type="radio" name="lmt" checked={localModelSubType === 'llm'} onChange={() => setLocalModelSubType('llm')} className="w-4 h-4 text-orange-500" />
+                    <label className={`flex-1 flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all ${localModelSubType === 'llm' ? 'border-[#2F6BFF] bg-[#F3F8FF]' : 'border-gray-200'}`}>
+                      <input type="radio" name="lmt" checked={localModelSubType === 'llm'} onChange={() => setLocalModelSubType('llm')} className="w-4 h-4 text-[#2F6BFF]" />
                       <Bot className="w-4 h-4 text-gray-500" /><span className="text-sm font-medium">LLM</span>
                     </label>
-                    <label className={`flex-1 flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all ${localModelSubType === 'detection' ? 'border-orange-400 bg-orange-50' : 'border-gray-200'}`}>
-                      <input type="radio" name="lmt" checked={localModelSubType === 'detection'} onChange={() => setLocalModelSubType('detection')} className="w-4 h-4 text-orange-500" />
+                    <label className={`flex-1 flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all ${localModelSubType === 'detection' ? 'border-[#2F6BFF] bg-[#F3F8FF]' : 'border-gray-200'}`}>
+                      <input type="radio" name="lmt" checked={localModelSubType === 'detection'} onChange={() => setLocalModelSubType('detection')} className="w-4 h-4 text-[#2F6BFF]" />
                       <Brain className="w-4 h-4 text-gray-500" /><span className="text-sm font-medium">检测模型</span>
                     </label>
                   </div>
                 </div>
                 {localModelSubType === 'llm' && (
-                  <div className="space-y-3 pl-3 border-l-2 border-orange-100">
+                  <div className="space-y-3 pl-3 border-l-2 border-[#DCE7F5]">
                     <div>
-                      <label className="block text-sm font-medium text-[#4A3B32] mb-1.5">Ollama 模型名称</label>
+                      <label className="block text-sm font-medium text-[#162033] mb-1.5">Ollama 模型名称</label>
                       <input type="text" value={formData.ollamaModelName} onChange={(e) => setFormData({...formData, ollamaModelName: e.target.value})}
                         placeholder="如 llama2:7b-chat"
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-orange-400 outline-none text-sm" />
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#2F6BFF] outline-none text-sm" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-[#4A3B32] mb-1.5">服务地址</label>
+                      <label className="block text-sm font-medium text-[#162033] mb-1.5">服务地址</label>
                       <input type="text" value="http://localhost:11434" readOnly
                         className="w-full px-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50 text-sm text-gray-400" />
                     </div>
                   </div>
                 )}
                 {localModelSubType === 'detection' && (
-                  <div className="space-y-3 pl-3 border-l-2 border-orange-100">
+                  <div className="space-y-3 pl-3 border-l-2 border-[#DCE7F5]">
                     <div>
-                      <label className="block text-sm font-medium text-[#4A3B32] mb-1.5">模型类型</label>
+                      <label className="block text-sm font-medium text-[#162033] mb-1.5">模型类型</label>
                       <select value={detectionModelType} onChange={(e) => setDetectionModelType(e.target.value as 'emoji')}
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-orange-400 focus:outline-none text-sm bg-white">
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#2F6BFF] focus:outline-none text-sm bg-white">
                         <option value="emoji">情绪表情模型</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-[#4A3B32] mb-1.5">模型路径（.pkl / .onnx）</label>
+                      <label className="block text-sm font-medium text-[#162033] mb-1.5">模型路径（.pkl / .onnx）</label>
                       <input type="text" value={formData.modelPath} onChange={(e) => setFormData({...formData, modelPath: e.target.value})}
                         placeholder="/models/emoji_model/reddit.pkl"
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-orange-400 focus:outline-none text-sm" />
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#2F6BFF] focus:outline-none text-sm" />
                     </div>
                   </div>
                 )}
@@ -415,8 +415,8 @@ function AddModelModal({
             )}
             <div className="flex items-center gap-3 pt-1">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={formData.enabled} onChange={(e) => setFormData({...formData, enabled: e.target.checked})} className="w-4 h-4 text-orange-500 rounded" />
-                <span className="text-sm font-medium text-[#4A3B32]">启用</span>
+                <input type="checkbox" checked={formData.enabled} onChange={(e) => setFormData({...formData, enabled: e.target.checked})} className="w-4 h-4 text-[#2F6BFF] rounded" />
+                <span className="text-sm font-medium text-[#162033]">启用</span>
               </label>
             </div>
           </div>
@@ -427,7 +427,7 @@ function AddModelModal({
         <div className="flex justify-end gap-3 p-5 border-t border-gray-100">
           <button onClick={onClose} className="px-5 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">取消</button>
           <button onClick={handleSubmit} disabled={saving}
-            className="px-5 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 text-white text-sm font-medium hover:from-orange-600 hover:to-orange-700 transition-all shadow-sm disabled:opacity-50">
+            className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm disabled:opacity-50">
             {saving ? '保存中...' : '确认'}
           </button>
         </div>
@@ -487,20 +487,20 @@ function TemplateModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black bg-opacity-40" onClick={onClose}></div>
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4 animate-scale-in">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
-          <h3 className="text-xl font-bold text-[#4A3B32]">{editData ? '编辑指令模板' : '创建指令模板'}</h3>
+        <div className="flex items-center justify-between p-6 border-b border-[#E2E8F0]">
+          <h3 className="text-xl font-bold text-[#162033]">{editData ? '编辑指令模板' : '创建指令模板'}</h3>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X className="w-5 h-5 text-gray-500" /></button>
         </div>
         <div className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[#4A3B32] mb-1.5">模板名称 <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-[#162033] mb-1.5">模板名称 <span className="text-red-500">*</span></label>
             <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} placeholder="请输入模板名称"
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none text-sm" />
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#2F6BFF] focus:ring-2 focus:ring-blue-100 outline-none text-sm" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#4A3B32] mb-1.5">任务类型 <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-[#162033] mb-1.5">任务类型 <span className="text-red-500">*</span></label>
             <select value={formData.taskType} onChange={(e) => setFormData({...formData, taskType: e.target.value})}
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-orange-400 outline-none text-sm bg-white">
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#2F6BFF] outline-none text-sm bg-white">
               <option value="">请选择任务类型</option>
               <option value="自杀风险检测">自杀风险检测</option><option value="抑郁筛查">抑郁筛查</option>
               <option value="焦虑检测">焦虑检测</option><option value="压力评估">压力评估</option>
@@ -508,16 +508,16 @@ function TemplateModal({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#4A3B32] mb-1.5">检测类型/说明</label>
+            <label className="block text-sm font-medium text-[#162033] mb-1.5">检测类型/说明</label>
             <input type="text" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} placeholder="如：文本风险检测、多模态联合检测等"
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-orange-400 outline-none text-sm" />
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#2F6BFF] outline-none text-sm" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#4A3B32] mb-1.5">提示词内容 <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-[#162033] mb-1.5">提示词内容 <span className="text-red-500">*</span></label>
             <textarea value={formData.promptContent} onChange={(e) => setFormData({...formData, promptContent: e.target.value})}
               placeholder="支持变量占位符如 &#123;&#123;user_input&#125;&#125;、&#123;&#123;context&#125;&#125;，用于调用大模型时的 system/user 模板"
               rows={7}
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-orange-400 outline-none text-sm resize-none font-mono" />
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#2F6BFF] outline-none text-sm resize-none font-mono" />
           </div>
           {saveError && (
             <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600">{saveError}</div>
@@ -526,7 +526,7 @@ function TemplateModal({
         <div className="flex justify-end gap-3 p-5 border-t border-gray-100">
           <button onClick={onClose} className="px-5 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">取消</button>
           <button onClick={handleSubmit} disabled={saving}
-            className="px-5 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 text-white text-sm font-medium hover:from-orange-600 hover:to-orange-700 transition-all shadow-sm disabled:opacity-50">
+            className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm disabled:opacity-50">
             {saving ? '保存中...' : '保存'}
           </button>
         </div>
@@ -547,47 +547,47 @@ function TemplateDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black bg-opacity-40" onClick={onClose} />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col m-4 animate-scale-in border border-[#EADDD5]">
-        <div className="flex items-center justify-between p-5 border-b border-[#EADDD5] shrink-0">
-          <h3 className="text-lg font-bold text-[#4A3B32]">模板详情</h3>
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col m-4 animate-scale-in border border-[#E2E8F0]">
+        <div className="flex items-center justify-between p-5 border-b border-[#E2E8F0] shrink-0">
+          <h3 className="text-lg font-bold text-[#162033]">模板详情</h3>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X className="w-5 h-5 text-gray-500" /></button>
         </div>
         <div className="p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
           <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-[#8C7A6B]">模板名称</label>
-            <p className="font-semibold text-[#4A3B32]">{template.name}</p>
+            <label className="text-sm font-medium text-[#64748B]">模板名称</label>
+            <p className="font-semibold text-[#162033]">{template.name}</p>
           </div>
           <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-[#8C7A6B]">任务类型</label>
-            <span className="px-2.5 py-1 bg-orange-100 text-orange-700 text-xs font-medium rounded-lg">{template.taskType}</span>
+            <label className="text-sm font-medium text-[#64748B]">任务类型</label>
+            <span className="px-2.5 py-1 bg-[#E8F0FF] text-[#2F6BFF] text-xs font-medium rounded-lg">{template.taskType}</span>
           </div>
           {template.description && (
             <div>
-              <label className="block text-sm font-medium text-[#8C7A6B] mb-1">说明</label>
-              <p className="text-sm text-[#5C4D43]">{template.description}</p>
+              <label className="block text-sm font-medium text-[#64748B] mb-1">说明</label>
+              <p className="text-sm text-[#415168]">{template.description}</p>
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-[#8C7A6B] mb-1">提示词内容</label>
-            <div className="bg-[#F9F5F2] rounded-xl p-4 border border-[#EADDD5] max-h-64 overflow-y-auto custom-scrollbar">
-              <pre className="whitespace-pre-wrap text-[#5C4D43] text-sm font-mono leading-relaxed">{content}</pre>
+            <label className="block text-sm font-medium text-[#64748B] mb-1">提示词内容</label>
+            <div className="bg-[#F7FAFD] rounded-xl p-4 border border-[#E2E8F0] max-h-64 overflow-y-auto custom-scrollbar">
+              <pre className="whitespace-pre-wrap text-[#415168] text-sm font-mono leading-relaxed">{content}</pre>
             </div>
           </div>
           {template.usageCount !== undefined && (
             <div className="flex items-center gap-3">
-              <label className="text-sm font-medium text-[#8C7A6B]">使用次数</label>
-              <p className="text-sm text-[#5C4D43]">{template.usageCount}</p>
+              <label className="text-sm font-medium text-[#64748B]">使用次数</label>
+              <p className="text-sm text-[#415168]">{template.usageCount}</p>
             </div>
           )}
           {template.createdAt && (
             <div className="flex items-center gap-3">
-              <label className="text-sm font-medium text-[#8C7A6B]">创建时间</label>
-              <p className="text-sm text-[#5C4D43]">{formatDateTime(template.createdAt)}</p>
+              <label className="text-sm font-medium text-[#64748B]">创建时间</label>
+              <p className="text-sm text-[#415168]">{formatDateTime(template.createdAt)}</p>
             </div>
           )}
         </div>
-        <div className="flex justify-end p-4 border-t border-[#EADDD5] shrink-0">
-          <button onClick={onClose} className="px-5 py-2 rounded-xl bg-[#F4EBE1] hover:bg-[#EADDD5] text-[#5A4B42] text-sm font-medium transition-colors border border-[#EADDD5]">
+        <div className="flex justify-end p-4 border-t border-[#E2E8F0] shrink-0">
+          <button onClick={onClose} className="px-5 py-2 rounded-xl bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] text-sm font-medium transition-colors border border-[#E2E8F0]">
             关闭
           </button>
         </div>
@@ -607,15 +607,15 @@ function ModelDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
       <div className="absolute inset-0 bg-black bg-opacity-40 pointer-events-auto" onClick={onClose} />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4 animate-scale-in border border-[#EADDD5]">
-        <div className="flex items-center justify-between p-6 border-b border-[#EADDD5]">
-          <h3 className="text-xl font-bold text-[#4A3B32]">模型详情</h3>
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4 animate-scale-in border border-[#E2E8F0]">
+        <div className="flex items-center justify-between p-6 border-b border-[#E2E8F0]">
+          <h3 className="text-xl font-bold text-[#162033]">模型详情</h3>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X className="w-5 h-5 text-gray-500" /></button>
         </div>
         <div className="p-6 space-y-4 text-sm">
-          <div className="flex items-center gap-3"><span className="text-[#8C7A6B] font-medium w-20">模型名称</span><span className="font-semibold text-[#4A3B32]">{m.modelName}</span></div>
+          <div className="flex items-center gap-3"><span className="text-[#64748B] font-medium w-20">模型名称</span><span className="font-semibold text-[#162033]">{m.modelName}</span></div>
           <div className="flex items-center gap-3">
-            <span className="text-[#8C7A6B] font-medium w-20">类型</span>
+            <span className="text-[#64748B] font-medium w-20">类型</span>
             {m.modelType === 'emoji'
               ? <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">Emocc 情绪检测</span>
               : m.modelCategory === 'api'
@@ -623,39 +623,39 @@ function ModelDetailModal({
               : <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-xs font-medium">本地 LLM</span>}
           </div>
           {m.isBuiltin && (
-            <div className="flex items-center gap-3"><span className="text-[#8C7A6B] font-medium w-20">预置</span>
+            <div className="flex items-center gap-3"><span className="text-[#64748B] font-medium w-20">预置</span>
               <span className="px-2 py-0.5 bg-teal-50 border border-teal-200 text-teal-600 rounded text-xs font-medium">系统预置模型，禁止删除</span>
             </div>
           )}
           {m.provider && (
-            <div className="flex items-center gap-3"><span className="text-[#8C7A6B] font-medium w-20">提供商</span><span className="text-[#5C4D43]">{m.provider}</span></div>
+            <div className="flex items-center gap-3"><span className="text-[#64748B] font-medium w-20">提供商</span><span className="text-[#415168]">{m.provider}</span></div>
           )}
           {m.ollamaModelName && (
-            <div className="flex items-center gap-3"><span className="text-[#8C7A6B] font-medium w-20">Ollama名称</span><span className="text-[#5C4D43] font-mono text-xs">{m.ollamaModelName}</span></div>
+            <div className="flex items-center gap-3"><span className="text-[#64748B] font-medium w-20">Ollama名称</span><span className="text-[#415168] font-mono text-xs">{m.ollamaModelName}</span></div>
           )}
           {m.modelFilePath && (
-            <div className="flex items-center gap-3"><span className="text-[#8C7A6B] font-medium w-20">模型路径</span><span className="text-[#5C4D43] font-mono text-xs break-all">{m.modelFilePath}</span></div>
+            <div className="flex items-center gap-3"><span className="text-[#64748B] font-medium w-20">模型路径</span><span className="text-[#415168] font-mono text-xs break-all">{m.modelFilePath}</span></div>
           )}
           {m.embeddingFilePath && (
-            <div className="flex items-center gap-3"><span className="text-[#8C7A6B] font-medium w-20">嵌入文件</span><span className="text-[#5C4D43] font-mono text-xs break-all">{m.embeddingFilePath}</span></div>
+            <div className="flex items-center gap-3"><span className="text-[#64748B] font-medium w-20">嵌入文件</span><span className="text-[#415168] font-mono text-xs break-all">{m.embeddingFilePath}</span></div>
           )}
           {m.description && (
-            <div className="flex items-start gap-3"><span className="text-[#8C7A6B] font-medium w-20 shrink-0">描述</span><span className="text-[#5C4D43]">{m.description}</span></div>
+            <div className="flex items-start gap-3"><span className="text-[#64748B] font-medium w-20 shrink-0">描述</span><span className="text-[#415168]">{m.description}</span></div>
           )}
           {m.performanceMetrics && (
             <div>
-              <span className="text-[#8C7A6B] font-medium w-20 float-left mr-2">性能指标</span>
+              <span className="text-[#64748B] font-medium w-20 float-left mr-2">性能指标</span>
               <div className="ml-20 grid grid-cols-5 gap-2">
                 {Object.entries(m.performanceMetrics).map(([k, v]) => (
-                  <div key={k} className="bg-[#F9F5F2] rounded-lg p-2 text-center">
-                    <p className="text-[10px] text-[#8C7A6B]">{k}</p>
-                    <p className="text-sm font-bold text-[#4A3B32]">{typeof v === 'number' ? v.toFixed(3) : v}</p>
+                  <div key={k} className="bg-[#F7FAFD] rounded-lg p-2 text-center">
+                    <p className="text-[10px] text-[#64748B]">{k}</p>
+                    <p className="text-sm font-bold text-[#162033]">{typeof v === 'number' ? v.toFixed(3) : v}</p>
                   </div>
                 ))}
               </div>
             </div>
           )}
-          <div className="flex items-center gap-3"><span className="text-[#8C7A6B] font-medium w-20">状态</span>
+          <div className="flex items-center gap-3"><span className="text-[#64748B] font-medium w-20">状态</span>
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
               m.status === 'active' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-500'
             }`}>
@@ -665,11 +665,11 @@ function ModelDetailModal({
             </span>
           </div>
           {m.createdAt && (
-            <div className="flex items-center gap-3"><span className="text-[#8C7A6B] font-medium w-20">创建时间</span><span className="text-[#5C4D43]">{formatDateTime(m.createdAt)}</span></div>
+            <div className="flex items-center gap-3"><span className="text-[#64748B] font-medium w-20">创建时间</span><span className="text-[#415168]">{formatDateTime(m.createdAt)}</span></div>
           )}
         </div>
-        <div className="flex justify-end p-5 border-t border-[#EADDD5]">
-          <button onClick={onClose} className="px-5 py-2 rounded-xl bg-[#F4EBE1] hover:bg-[#EADDD5] text-[#5A4B42] text-sm font-medium transition-colors border border-[#EADDD5]">
+        <div className="flex justify-end p-5 border-t border-[#E2E8F0]">
+          <button onClick={onClose} className="px-5 py-2 rounded-xl bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] text-sm font-medium transition-colors border border-[#E2E8F0]">
             关闭
           </button>
         </div>
@@ -767,7 +767,7 @@ export default function ModelCenterPage() {
     const apiNeedsKey = needsApiKey(m);
 
     return (
-      <div className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#FAF6F3] transition-colors border-b border-[#EADDD5] last:border-0">
+      <div className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#F7FAFD] transition-colors border-b border-[#E2E8F0] last:border-0">
         {/* 模型图标 */}
         <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
           m.modelType === 'emoji' || m.modelType === 'fealearner' ? 'bg-purple-100' :
@@ -781,14 +781,14 @@ export default function ModelCenterPage() {
         {/* 模型信息 */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <p className="font-semibold text-sm text-[#4A3B32] truncate">{m.modelName}</p>
+            <p className="font-semibold text-sm text-[#162033] truncate">{m.modelName}</p>
             {isBuiltin && (
               <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-50 border border-teal-200 text-teal-600">
                 <Shield className="w-2.5 h-2.5" />预置
               </span>
             )}
             {apiNeedsKey && (
-              <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-50 border border-orange-200 text-orange-600">
+              <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#E8F0FF] border border-[#BFD3F2] text-[#2F6BFF]">
                 <KeyRound className="w-2.5 h-2.5" />待配置
               </span>
             )}
@@ -820,7 +820,7 @@ export default function ModelCenterPage() {
           {/* 详情 */}
           <button type="button"
             onClick={() => requestAnimationFrame(() => handleViewModel(m))}
-            className="px-3 py-1.5 bg-gradient-to-r from-orange-50 to-orange-100 hover:from-orange-100 hover:to-orange-200 text-orange-600 rounded-full text-xs font-medium border border-orange-200 transition-all flex items-center gap-1">
+            className="px-3 py-1.5 bg-gradient-to-r from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-200 text-slate-600 rounded-full text-xs font-medium border border-slate-200 transition-all flex items-center gap-1">
             <Eye className="w-3 h-3" />
             详情
           </button>
@@ -840,9 +840,9 @@ export default function ModelCenterPage() {
 
   const TemplateRow = ({ template }: { template: PromptTemplate }) => {
     return (
-      <tr className="hover:bg-[#FAF6F3] transition-colors border-b border-[#EADDD5] last:border-0">
-        <td className="px-4 py-3.5"><span className="font-medium text-sm text-[#4A3B32]">{template.name}</span></td>
-        <td className="px-4 py-3.5"><span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-medium rounded-lg">{template.taskType}</span></td>
+      <tr className="hover:bg-[#F7FAFD] transition-colors border-b border-[#E2E8F0] last:border-0">
+        <td className="px-4 py-3.5"><span className="font-medium text-sm text-[#162033]">{template.name}</span></td>
+        <td className="px-4 py-3.5"><span className="px-2 py-0.5 bg-[#E8F0FF] text-[#2F6BFF] text-xs font-medium rounded-lg">{template.taskType}</span></td>
         <td className="px-4 py-3.5 text-sm text-gray-500 max-w-xs truncate">{template.description || '—'}</td>
         <td className="px-4 py-3.5 text-xs text-gray-400">{formatDate(template.createdAt)}</td>
         <td className="px-4 py-3.5">
@@ -852,7 +852,7 @@ export default function ModelCenterPage() {
               <Edit className="w-3.5 h-3.5 inline" />
             </button>
             <button onClick={() => handleViewTemplate(template)}
-              className="px-2.5 py-1.5 bg-gradient-to-r from-orange-50 to-orange-100 hover:from-orange-100 hover:to-orange-200 text-orange-600 rounded-lg text-xs font-medium border border-orange-200 transition-all">
+              className="px-2.5 py-1.5 bg-gradient-to-r from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-200 text-slate-600 rounded-lg text-xs font-medium border border-slate-200 transition-all">
               <Eye className="w-3.5 h-3.5 inline" />
             </button>
             <button onClick={() => setDeleteId({ type: 'template', id: template.id })}
@@ -868,16 +868,16 @@ export default function ModelCenterPage() {
   return (
     <div className="flex flex-1 flex-col min-h-0 w-full gap-4 md:gap-5 animate-fade-in">
       {/* 选项卡 */}
-      <div className="shrink-0 bg-white rounded-2xl shadow-sm border border-[#F2E8E0] p-1.5 inline-flex self-start">
+      <div className="shrink-0 bg-white rounded-2xl shadow-sm border border-[#E2E8F0] p-1.5 inline-flex self-start">
         <button onClick={() => handleTabChange('model')}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-all ${
-            activeTab === 'model' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
+            activeTab === 'model' ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
           }`}>
           <Settings className="w-4 h-4" />模型管理
         </button>
         <button onClick={() => handleTabChange('template')}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-all ${
-            activeTab === 'template' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
+            activeTab === 'template' ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
           }`}>
           <FileCode className="w-4 h-4" />指令模板管理
         </button>
@@ -887,65 +887,65 @@ export default function ModelCenterPage() {
         {activeTab === 'model' ? (
           <div className="space-y-4">
             {/* 添加工具栏 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-[#F2E8E0] p-4 flex items-center justify-between">
+            <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] p-4 flex items-center justify-between">
               <button onClick={() => { setEditingModel(null); setShowAddModelModal(true); }}
-                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl text-sm font-medium hover:from-orange-600 hover:to-orange-700 transition-all shadow-sm">
+                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl text-sm font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm">
                 <Plus className="w-4 h-4" />添加模型
               </button>
-              <span className="text-sm text-[#8C7A6B]">
+              <span className="text-sm text-[#64748B]">
                 {modelsLoading ? '加载中...' : `${apiModels.length + localModels.length + detectionModels.length} 个模型`}
               </span>
             </div>
 
             {/* API 模型 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-[#F2E8E0] overflow-hidden">
-              <div className="flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r from-orange-50 to-orange-100/50 border-b border-orange-100">
-                <Cloud className="w-4 h-4 text-orange-600" />
-                <span className="font-semibold text-sm text-[#4A3B32]">API 模型</span>
-                <span className="ml-auto px-2 py-0.5 bg-orange-200 text-orange-700 text-xs font-medium rounded-full">
+            <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r from-[#F3F8FF] to-[#EDF4FF] border-b border-[#DCE7F5]">
+                <Cloud className="w-4 h-4 text-[#2F6BFF]" />
+                <span className="font-semibold text-sm text-[#162033]">API 模型</span>
+                <span className="ml-auto px-2 py-0.5 bg-[#E8F0FF] text-[#2F6BFF] text-xs font-medium rounded-full">
                   {modelsLoading ? '...' : apiModels.length}
                 </span>
               </div>
               {modelsLoading ? (
-                <div className="p-8 text-center text-sm text-[#8C7A6B]">加载中...</div>
+                <div className="p-8 text-center text-sm text-[#64748B]">加载中...</div>
               ) : apiModels.length === 0 ? (
-                <div className="p-8 text-center text-sm text-[#8C7A6B]">暂无 API 模型，点击上方按钮添加</div>
+                <div className="p-8 text-center text-sm text-[#64748B]">暂无 API 模型，点击上方按钮添加</div>
               ) : (
                 apiModels.map((m) => <ModelRow key={m.id} model={m} />)
               )}
             </div>
 
             {/* 本地 LLM 模型 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-[#F2E8E0] overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
               <div className="flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r from-teal-50 to-teal-100/50 border-b border-teal-100">
                 <Server className="w-4 h-4 text-teal-600" />
-                <span className="font-semibold text-sm text-[#4A3B32]">本地 LLM 模型</span>
+                <span className="font-semibold text-sm text-[#162033]">本地 LLM 模型</span>
                 <span className="ml-auto px-2 py-0.5 bg-teal-200 text-teal-700 text-xs font-medium rounded-full">
                   {modelsLoading ? '...' : localModels.length}
                 </span>
               </div>
               {modelsLoading ? (
-                <div className="p-8 text-center text-sm text-[#8C7A6B]">加载中...</div>
+                <div className="p-8 text-center text-sm text-[#64748B]">加载中...</div>
               ) : localModels.length === 0 ? (
-                <div className="p-8 text-center text-sm text-[#8C7A6B]">暂无本地模型，点击上方按钮添加</div>
+                <div className="p-8 text-center text-sm text-[#64748B]">暂无本地模型，点击上方按钮添加</div>
               ) : (
                 localModels.map((m) => <ModelRow key={m.id} model={m} />)
               )}
             </div>
 
             {/* 检测模型 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-[#F2E8E0] overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
               <div className="flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r from-purple-50 to-purple-100/50 border-b border-purple-100">
                 <Brain className="w-4 h-4 text-purple-600" />
-                <span className="font-semibold text-sm text-[#4A3B32]">检测模型</span>
+                <span className="font-semibold text-sm text-[#162033]">检测模型</span>
                 <span className="ml-auto px-2 py-0.5 bg-purple-200 text-purple-700 text-xs font-medium rounded-full">
                   {modelsLoading ? '...' : detectionModels.length}
                 </span>
               </div>
               {modelsLoading ? (
-                <div className="p-8 text-center text-sm text-[#8C7A6B]">加载中...</div>
+                <div className="p-8 text-center text-sm text-[#64748B]">加载中...</div>
               ) : detectionModels.length === 0 ? (
-                <div className="p-8 text-center text-sm text-[#8C7A6B]">暂无可用的检测模型，点击上方按钮添加</div>
+                <div className="p-8 text-center text-sm text-[#64748B]">暂无可用的检测模型，点击上方按钮添加</div>
               ) : (
                 detectionModels.map((m) => <ModelRow key={m.id} model={m} />)
               )}
@@ -954,33 +954,33 @@ export default function ModelCenterPage() {
         ) : (
           <div className="space-y-4">
             {/* 模板工具栏 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-[#F2E8E0] p-4 flex items-center justify-between">
+            <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] p-4 flex items-center justify-between">
               <button onClick={() => { setEditingTemplate(null); setShowTemplateModal(true); }}
-                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl text-sm font-medium hover:from-orange-600 hover:to-orange-700 transition-all shadow-sm">
+                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl text-sm font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm">
                 <Plus className="w-4 h-4" />创建模板
               </button>
-              <span className="text-sm text-[#8C7A6B]">
+              <span className="text-sm text-[#64748B]">
                 {templatesLoading ? '加载中...' : `共 ${allTemplates.length} 个模板`}
               </span>
             </div>
 
             {/* 模板表格 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-[#F2E8E0] overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-gradient-to-r from-[#F9F5F2] to-[#FDF9F6]">
-                    <th className="text-left px-4 py-3.5 text-xs font-semibold text-[#5C4D43]">模板名称</th>
-                    <th className="text-left px-4 py-3.5 text-xs font-semibold text-[#5C4D43]">任务类型</th>
-                    <th className="text-left px-4 py-3.5 text-xs font-semibold text-[#5C4D43]">说明</th>
-                    <th className="text-left px-4 py-3.5 text-xs font-semibold text-[#5C4D43]">创建时间</th>
-                    <th className="text-center px-4 py-3.5 text-xs font-semibold text-[#5C4D43]">操作</th>
+                  <tr className="bg-gradient-to-r from-[#F7FAFD] to-[#F3F8FF]">
+                    <th className="text-left px-4 py-3.5 text-xs font-semibold text-[#415168]">模板名称</th>
+                    <th className="text-left px-4 py-3.5 text-xs font-semibold text-[#415168]">任务类型</th>
+                    <th className="text-left px-4 py-3.5 text-xs font-semibold text-[#415168]">说明</th>
+                    <th className="text-left px-4 py-3.5 text-xs font-semibold text-[#415168]">创建时间</th>
+                    <th className="text-center px-4 py-3.5 text-xs font-semibold text-[#415168]">操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   {templatesLoading ? (
-                    <tr><td colSpan={5} className="text-center py-10 text-sm text-[#8C7A6B]">加载中...</td></tr>
+                    <tr><td colSpan={5} className="text-center py-10 text-sm text-[#64748B]">加载中...</td></tr>
                   ) : paginatedTemplates.length === 0 ? (
-                    <tr><td colSpan={5} className="text-center py-10 text-sm text-[#8C7A6B]">暂无模板，点击上方按钮创建</td></tr>
+                    <tr><td colSpan={5} className="text-center py-10 text-sm text-[#64748B]">暂无模板，点击上方按钮创建</td></tr>
                   ) : (
                     paginatedTemplates.map((t) => <TemplateRow key={t.id} template={t} />)
                   )}
@@ -989,8 +989,8 @@ export default function ModelCenterPage() {
 
               {/* 分页 */}
               {totalTemplatePages > 1 && (
-                <div className="flex items-center justify-between px-5 py-3.5 bg-gradient-to-r from-[#F9F5F2] to-white border-t border-[#EADDD5]">
-                  <span className="text-xs text-[#8C7A6B]">
+                <div className="flex items-center justify-between px-5 py-3.5 bg-gradient-to-r from-[#F7FAFD] to-white border-t border-[#E2E8F0]">
+                  <span className="text-xs text-[#64748B]">
                     显示 {(templatePage - 1) * templatesPerPage + 1}–{Math.min(templatePage * templatesPerPage, allTemplates.length)}，共 {allTemplates.length}
                   </span>
                   <div className="flex items-center gap-1">
@@ -1007,7 +1007,7 @@ export default function ModelCenterPage() {
                       return (
                         <button key={page} onClick={() => setTemplatePage(page)}
                           className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
-                            templatePage === page ? 'bg-orange-500 text-white' : 'hover:bg-gray-50 text-gray-600'
+                            templatePage === page ? 'bg-[#2F6BFF] text-white' : 'hover:bg-gray-50 text-gray-600'
                           }`}>
                           {page}
                         </button>

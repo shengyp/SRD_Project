@@ -179,6 +179,16 @@ class ChatSessionCreate(BaseModel):
     context_type: Optional[str] = Field("general", alias="contextType")
 
 
+class ChatSessionUpdate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    title: Optional[str] = None
+    ai_mode: Optional[str] = Field(None, alias="aiMode")
+    context_type: Optional[str] = Field(None, alias="contextType")
+    status: Optional[str] = None
+    is_pinned: Optional[bool] = Field(None, alias="isPinned")
+
+
 class ChatMessageSend(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
@@ -373,6 +383,7 @@ def _session_row_to_response(row: dict) -> dict:
         "sessionCode": row.get("session_code"),
         "userId": str(row.get("user_id")) if row.get("user_id") else None,
         "userHash": row.get("user_hash"),
+        "title": row.get("title"),
         "archiveId": str(row.get("archive_id")) if row.get("archive_id") else None,
         "dataSource": row.get("data_source"),
         "aiMode": row.get("ai_mode"),
@@ -430,6 +441,7 @@ async def create_chat_session(session: ChatSessionCreate = Body(...), request: R
     norm_mode = _normalize_ai_mode(session.ai_mode)
     session_data = {
         "user_hash": session.user_hash,
+        "title": session.title,
         "data_source": None,
         "ai_mode": norm_mode,
         "context_type": session.context_type or "general",
@@ -439,6 +451,53 @@ async def create_chat_session(session: ChatSessionCreate = Body(...), request: R
     created = await chat_svc.get_session_by_id(session_id)
 
     return {"success": True, "data": _session_row_to_response(created)}
+
+
+@router.put("/api/chat/sessions/{session_id}")
+async def update_chat_session(
+    session_id: str,
+    body: ChatSessionUpdate = Body(...),
+    request: Request = None,
+):
+    """更新会话信息：标题、置顶、归档状态等。"""
+    chat_svc = _get_chat_service(request)
+
+    try:
+        session_int = int(session_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    session = await chat_svc.get_session_by_id(session_int)
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    update_data: Dict[str, Any] = {}
+    if body.title is not None:
+        title = body.title.strip()
+        if len(title) > 255:
+            raise HTTPException(status_code=400, detail="会话标题长度不能超过255个字符")
+        update_data["title"] = title or None
+    if body.ai_mode is not None:
+        update_data["ai_mode"] = _normalize_ai_mode(body.ai_mode)
+    if body.context_type is not None:
+        update_data["context_type"] = body.context_type
+    if body.status is not None:
+        if body.status not in ("active", "archived", "deleted"):
+            raise HTTPException(status_code=400, detail="非法会话状态")
+        update_data["status"] = body.status
+    if body.is_pinned is not None:
+        update_data["is_pinned"] = body.is_pinned
+
+    if not update_data:
+        fresh = await chat_svc.get_session_by_id(session_int)
+        return {"success": True, "data": _session_row_to_response(fresh)}
+
+    updated = await chat_svc.update_session(session_int, update_data)
+    if not updated:
+        raise HTTPException(status_code=400, detail="会话更新失败")
+
+    fresh = await chat_svc.get_session_by_id(session_int)
+    return {"success": True, "data": _session_row_to_response(fresh)}
 
 
 @router.get("/api/chat/sessions/{session_id}")

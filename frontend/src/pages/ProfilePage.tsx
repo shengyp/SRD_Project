@@ -51,28 +51,28 @@ export default function ProfilePage() {
       {/* 返回按钮 */}
       <button
         onClick={() => navigate(-1)}
-        className="flex items-center gap-1.5 text-gray-500 hover:text-gray-700 mb-6 text-sm transition-colors"
+        className="flex items-center gap-1.5 text-[#64748B] hover:text-[#162033] mb-6 text-sm transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
         返回
       </button>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-[28px] shadow-[0_10px_28px_rgba(15,23,42,0.04)] border border-[#E2E8F0] overflow-hidden">
         {/* 卡片头 */}
-        <div className="bg-gradient-to-r from-[#C19A83] to-[#A07D6B] px-6 py-5 flex items-center gap-4">
+        <div className="bg-gradient-to-r from-[#2F6BFF] to-[#5B8CFF] px-6 py-5 flex items-center gap-4">
           <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm border border-white/30">
             <User className="w-6 h-6 text-white" />
           </div>
           <div>
             <h2 className="text-lg font-bold text-white">个人资料</h2>
-            <p className="text-white/70 text-sm mt-0.5">修改您的个人信息</p>
+            <p className="text-white/75 text-sm mt-0.5">维护论文演示系统中的个人展示信息</p>
           </div>
         </div>
 
         <div className="px-6 py-6 space-y-5">
           {/* 用户名（只读） */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">用户名</label>
+            <label className="block text-sm font-medium text-[#415168] mb-1.5">用户名</label>
             <input
               type="text"
               value={user?.username ?? ''}
@@ -80,19 +80,19 @@ export default function ProfilePage() {
               disabled
               className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-400 cursor-not-allowed"
             />
-            <p className="text-xs text-gray-400 mt-1">用户名注册后无法修改</p>
+            <p className="text-xs text-[#94A3B8] mt-1">用户名注册后无法修改</p>
           </div>
 
           {/* 昵称 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">昵称</label>
+            <label className="block text-sm font-medium text-[#415168] mb-1.5">昵称</label>
             <input
               type="text"
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
               placeholder="请输入昵称"
               maxLength={100}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C19A83]/40 focus:border-[#C19A83] transition-colors bg-white"
+              className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-[#2F6BFF] transition-colors bg-white"
             />
           </div>
 
@@ -113,7 +113,7 @@ export default function ProfilePage() {
           <button
             onClick={handleSave}
             disabled={loading || fetching}
-            className="w-full py-2.5 bg-gradient-to-r from-[#C19A83] to-[#A07D6B] text-white rounded-xl font-medium text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+            className="w-full py-2.5 bg-gradient-to-r from-[#2F6BFF] to-[#5B8CFF] text-white rounded-xl font-medium text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {loading ? (
               <>

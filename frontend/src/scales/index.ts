@@ -267,7 +267,7 @@ const FALLBACK_SCALES_META: ScaleMeta[] = [
   { code: 'C-SSRS', name: 'C-SSRS', full_name: '哥伦比亚自杀严重程度评定量表（筛查版）', category: 'suicide', questionCount: 6, maxScore: 6, threshold: 3, estimatedTime: '约4分钟', color: 'bg-red-100 text-red-700', bgColor: 'bg-red-500', description: '专项自杀风险评定（国际临床金标准）' },
   { code: 'GAD-7', name: 'GAD-7', full_name: '广泛性焦虑障碍量表', category: 'anxiety', questionCount: 7, maxScore: 21, threshold: 10, estimatedTime: '约3分钟', color: 'bg-blue-100 text-blue-700', bgColor: 'bg-blue-500', description: '焦虑筛查（与抑郁共病评估，自杀风险调节因素）' },
   { code: 'DASS-21', name: 'DASS-21', full_name: '抑郁焦虑压力量表-21', category: 'depression', questionCount: 21, maxScore: 63, threshold: 21, estimatedTime: '约6分钟', color: 'bg-pink-100 text-pink-700', bgColor: 'bg-pink-500', description: '抑郁/焦虑/压力三维独立评估' },
-  { code: 'SDS', name: 'SDS', full_name: 'Zung抑郁自评量表', category: 'depression', questionCount: 20, maxScore: 80, threshold: 53, estimatedTime: '约6分钟', color: 'bg-orange-100 text-orange-700', bgColor: 'bg-orange-500', description: '抑郁自评（国内经典量表）' },
+  { code: 'SDS', name: 'SDS', full_name: 'Zung抑郁自评量表', category: 'depression', questionCount: 20, maxScore: 80, threshold: 53, estimatedTime: '约6分钟', color: 'bg-blue-100 text-blue-700', bgColor: 'bg-blue-500', description: '抑郁自评（国内经典量表）' },
   { code: 'BHS', name: 'BHS', full_name: '贝克绝望量表', category: 'hopelessness', questionCount: 20, maxScore: 20, threshold: 9, estimatedTime: '约5分钟', color: 'bg-indigo-100 text-indigo-700', bgColor: 'bg-indigo-500', description: '绝望感评估（自杀意念与行为的独立预测因子）' },
 ];
 

@@ -1,0 +1,9 @@
+{
+  "session_id": "session_00001",
+  "turn": 0,
+  "timestamp": "2026-04-13_15-38-06_746",
+  "error_context": "process_message",
+  "error_message": "'function' object has no attribute 'update_mind_map'",
+  "traceback": "Traceback (most recent call last):\n  File \"E:\\HW\\实验室\\SIGIR\\Agent\\SuiAgent-main\\agent.py\", line 718, in process_message\n    updated_mind_map=self.rag_skill_tool.update_mind_map(cur_mind_map, rela_text)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAttributeError: 'function' object has no attribute 'update_mind_map'\n",
+  "agent_name": "suicide_intervention_agent"
+}

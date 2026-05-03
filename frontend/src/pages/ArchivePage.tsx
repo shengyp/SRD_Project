@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { fetchDatasets, fetchCSVArchives, fetchHomeStats, uploadArchiveCSV, confirmArchiveImport, type DatasetProfile } from '../api';
 import { formatDateTime } from '../utils/dateFormat';
+import PaperStatCard from '../components/PaperStatCard';
 
 // ==================== 类型定义 ====================
 
@@ -65,7 +66,7 @@ const DATA_SOURCE_LABELS: Record<string, string> = {
 };
 
 const DATA_SOURCE_COLORS: Record<string, string> = {
-  reddit: 'bg-orange-100 text-orange-700',
+  reddit: 'bg-[#E8F0FF] text-[#2F6BFF]',
 };
 
 const RISK_COLORS = {
@@ -690,40 +691,40 @@ function ImportWizardModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose}></div>
-      <div className="relative bg-[#FAF6F3] rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden animate-scale-in border border-[#EADDD5]">
+      <div className="relative bg-[#F7FAFD] rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden animate-scale-in border border-[#E2E8F0]">
         {/* 头部 */}
-        <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-[#EADDD5]">
+        <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-[#E2E8F0]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-orange-500 flex items-center justify-center shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
               <Database className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-[#4A362C]">导入心理档案数据</h3>
-              <p className="text-xs text-[#8C7A6B]">支持多数据源导入，自动识别风险级别</p>
+              <h3 className="text-lg font-bold text-[#162033]">导入心理档案数据</h3>
+              <p className="text-xs text-[#64748B]">支持多数据源导入，自动识别风险级别</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-[#F4EBE1] rounded-xl transition-colors">
-            <X className="w-5 h-5 text-[#8C7A6B]" />
+          <button onClick={onClose} className="p-2 hover:bg-[#F1F5FA] rounded-xl transition-colors">
+            <X className="w-5 h-5 text-[#64748B]" />
           </button>
         </div>
 
         <div className="flex min-h-[480px]">
           {/* 左侧步骤条 */}
-          <div className="w-52 bg-[#F9F5F2] p-5 border-r border-[#EADDD5]">
+          <div className="w-52 bg-[#F7FAFD] p-5 border-r border-[#E2E8F0]">
             <div className="sticky top-5">
-              <h4 className="text-xs font-semibold text-[#8C7A6B] uppercase tracking-wider mb-4">导入步骤</h4>
+              <h4 className="text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-4">导入步骤</h4>
               {steps.map((step) => (
                 <div key={step.id} className="flex items-center mb-5 last:mb-0">
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold mr-3 shadow-sm transition-all ${
                     step.status === 'completed' ? 'bg-green-500 text-white' :
-                    step.status === 'active' ? 'bg-orange-500 text-white' :
-                    'bg-[#EADDD5] text-[#8C7A6B]'
+                    step.status === 'active' ? 'bg-blue-600 text-white' :
+                    'bg-[#E2E8F0] text-[#64748B]'
                   }`}>
                     {step.status === 'completed' ? <Check className="w-4 h-4" /> : step.id}
                   </div>
                   <div>
                     <span className={`text-sm font-medium block ${
-                      step.status === 'active' ? 'text-[#4A362C]' : step.status === 'completed' ? 'text-green-600' : 'text-[#8C7A6B]'
+                      step.status === 'active' ? 'text-[#162033]' : step.status === 'completed' ? 'text-green-600' : 'text-[#64748B]'
                     }`}>{step.label}</span>
                     {step.id === 1 && <span className="text-xs text-[#A89B8E]">选择并上传</span>}
                     {step.id === 2 && <span className="text-xs text-[#A89B8E]">审核确认</span>}
@@ -735,25 +736,25 @@ function ImportWizardModal({
           </div>
 
           {/* 右侧内容 */}
-          <div className="flex-1 p-6 overflow-y-auto bg-[#FAF6F3]">
+          <div className="flex-1 p-6 overflow-y-auto bg-[#F7FAFD]">
             {currentStep === 1 && (
               <div className="space-y-5">
-                <div className="bg-white rounded-2xl p-5 border border-[#EADDD5] shadow-sm">
+                <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-sm">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-base font-bold text-[#4A362C] flex items-center gap-2">
-                      <FileStack className="w-5 h-5 text-[#C19A83]" />
+                    <h4 className="text-base font-bold text-[#162033] flex items-center gap-2">
+                      <FileStack className="w-5 h-5 text-[#2F6BFF]" />
                       步骤 1：上传文件
                     </h4>
                   </div>
 
                   {/* 下载模板区域 - 包含类型选择和温馨提示 */}
-                  <div className="mb-5 p-4 bg-orange-50 rounded-xl border border-orange-100">
+                  <div className="mb-5 p-4 bg-[#F3F8FF] rounded-xl border border-[#DCE7F5]">
                     <div className="flex items-center justify-between flex-wrap gap-3">
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-[#5A4B42]">下载模板格式：</span>
+                        <span className="text-sm font-medium text-[#415168]">下载模板格式：</span>
                         <div className="flex gap-2">
                           <label className={`flex items-center gap-2 px-4 py-2 rounded-xl cursor-pointer transition-all ${
-                            templateType === 'excel' ? 'bg-orange-500 text-white shadow-sm' : 'bg-white border border-[#EADDD5] text-[#5A4B42] hover:border-orange-300'
+                            templateType === 'excel' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-[#E2E8F0] text-[#415168] hover:border-blue-300'
                           }`}>
                             <input type="radio" name="templateType" value="excel" checked={templateType === 'excel'}
                               onChange={() => setTemplateType('excel')} className="sr-only" />
@@ -761,7 +762,7 @@ function ImportWizardModal({
                             <span className="text-sm font-medium">Excel (.xlsx)</span>
                           </label>
                           <label className={`flex items-center gap-2 px-4 py-2 rounded-xl cursor-pointer transition-all ${
-                            templateType === 'txt' ? 'bg-orange-500 text-white shadow-sm' : 'bg-white border border-[#EADDD5] text-[#5A4B42] hover:border-orange-300'
+                            templateType === 'txt' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-[#E2E8F0] text-[#415168] hover:border-blue-300'
                           }`}>
                             <input type="radio" name="templateType" value="txt" checked={templateType === 'txt'}
                               onChange={() => setTemplateType('txt')} className="sr-only" />
@@ -777,10 +778,10 @@ function ImportWizardModal({
                       </a>
                     </div>
                     <div className="mt-3 flex items-start gap-2">
-                      <Info className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                      <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
                       <div>
-                        <p className="text-xs font-medium text-orange-700 mb-0.5">温馨提示</p>
-                        <p className="text-xs text-orange-600 leading-relaxed">
+                        <p className="text-xs font-medium text-blue-700 mb-0.5">导入提示</p>
+                        <p className="text-xs text-blue-600 leading-relaxed">
                           请{templateType === 'excel' ? '下载 Excel 模板' : '下载 TXT 模板'}，按照格式要求填写数据后再上传。
                           字段说明：user_id（用户ID）、created_utc（时间戳）、post_sequence（贴文序列）、emjio_sequence（微表情序列）、suicide_risk（自杀风险）。
                         </p>
@@ -790,18 +791,18 @@ function ImportWizardModal({
 
                   {/* 数据源选择 */}
                   <div className="mb-5">
-                    <label className="block text-sm font-semibold text-[#5A4B42] mb-3">选择数据源 <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-semibold text-[#415168] mb-3">选择数据源 <span className="text-red-500">*</span></label>
                     <div className="grid grid-cols-2 gap-3">
                       {dataSourceOptions.slice(1).map((source) => (
                         <label key={source.value} className={`flex items-center gap-2 p-3 border rounded-xl cursor-pointer transition-all ${
-                          selectedSource === source.value ? 'border-orange-500 bg-orange-50 shadow-sm' : 'border-[#EADDD5] hover:border-orange-300 bg-white'
+                          selectedSource === source.value ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-[#E2E8F0] hover:border-blue-300 bg-white'
                         }`}>
                           <input type="radio" name="source" value={source.value} checked={selectedSource === source.value}
                             onChange={(e) => setSelectedSource(e.target.value)} className="sr-only" />
                           <span className={`w-3 h-3 rounded-full flex-shrink-0 ${
-                            selectedSource === source.value ? 'bg-orange-500' : 'bg-[#D7BFA6]'
+                            selectedSource === source.value ? 'bg-blue-500' : 'bg-[#CBD5E1]'
                           }`}></span>
-                          <span className="text-sm font-medium text-[#5A4B42]">{source.label}</span>
+                          <span className="text-sm font-medium text-[#415168]">{source.label}</span>
                         </label>
                       ))}
                     </div>
@@ -809,11 +810,11 @@ function ImportWizardModal({
 
                   {/* 文件上传 */}
                   <div>
-                    <label className="block text-sm font-semibold text-[#5A4B42] mb-3">上传数据文件 <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-semibold text-[#415168] mb-3">上传数据文件 <span className="text-red-500">*</span></label>
                     <div 
                       className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer ${
-                        isDragOver ? 'border-orange-400 bg-orange-50' :
-                        dataFile ? 'border-green-400 bg-green-50' : 'border-[#D7BFA6] hover:border-orange-400 hover:bg-orange-50'
+                        isDragOver ? 'border-blue-400 bg-blue-50' :
+                        dataFile ? 'border-green-400 bg-green-50' : 'border-[#CBD5E1] hover:border-blue-400 hover:bg-blue-50'
                       }`}
                       onDragOver={handleDragOver}
                       onDragLeave={handleDragLeave}
@@ -824,8 +825,8 @@ function ImportWizardModal({
                         <div className="flex items-center justify-center gap-3">
                           <FileText className="w-10 h-10 text-green-500" />
                           <div className="text-left">
-                            <p className="font-semibold text-[#4A362C]">{dataFile.name}</p>
-                            <p className="text-sm text-[#8C7A6B]">{(dataFile.size / 1024).toFixed(1)} KB</p>
+                            <p className="font-semibold text-[#162033]">{dataFile.name}</p>
+                            <p className="text-sm text-[#64748B]">{(dataFile.size / 1024).toFixed(1)} KB</p>
                           </div>
                           <button onClick={(e) => { e.stopPropagation(); setDataFile(null); setImportedData([]); }} className="ml-4 p-1 hover:bg-green-100 rounded-lg">
                             <X className="w-4 h-4 text-green-600" />
@@ -833,8 +834,8 @@ function ImportWizardModal({
                         </div>
                       ) : (
                         <>
-                          <Upload className="w-12 h-12 text-[#C19A83] mx-auto mb-3" />
-                          <p className="text-[#5A4B42] font-medium mb-1">拖拽文件到此处 或 点击选择文件</p>
+                          <Upload className="w-12 h-12 text-[#2F6BFF] mx-auto mb-3" />
+                          <p className="text-[#415168] font-medium mb-1">拖拽文件到此处 或 点击选择文件</p>
                           <p className="text-xs text-[#A89B8E]">支持格式：.csv / .txt / .xls / .xlsx，不超过 20M</p>
                         </>
                       )}
@@ -852,12 +853,12 @@ function ImportWizardModal({
                   {isUploading && (
                     <div className="mt-4">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-[#5A4B42]">正在上传...</span>
-                        <span className="text-sm font-medium text-orange-500">{uploadProgress}%</span>
+                        <span className="text-sm text-[#415168]">正在上传...</span>
+                        <span className="text-sm font-medium text-blue-500">{uploadProgress}%</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div 
-                          className="bg-gradient-to-r from-orange-400 to-orange-500 h-2 rounded-full transition-all duration-300"
+                          className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-300"
                           style={{ width: `${uploadProgress}%` }}
                         ></div>
                       </div>
@@ -879,34 +880,34 @@ function ImportWizardModal({
 
             {currentStep === 2 && (
               <div className="space-y-5">
-                <div className="bg-white rounded-2xl p-5 border border-[#EADDD5] shadow-sm">
-                  <h4 className="text-base font-bold text-[#4A362C] flex items-center gap-2 mb-4">
-                    <Activity className="w-5 h-5 text-[#C19A83]" />
+                <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-sm">
+                  <h4 className="text-base font-bold text-[#162033] flex items-center gap-2 mb-4">
+                    <Activity className="w-5 h-5 text-[#2F6BFF]" />
                     步骤 2：检查数据
                   </h4>
-                  <p className="text-sm text-[#8C7A6B] mb-4">上传完毕后自动解析并展示统计信息与逐条数据，请仔细检查并筛选。</p>
+                  <p className="text-sm text-[#64748B] mb-4">上传完毕后自动解析并展示统计信息与逐条数据，请仔细检查并筛选。</p>
 
                   {/* 统计信息 */}
-                  <div className="bg-gradient-to-r from-[#F9F5F2] to-[#FDF9F6] rounded-xl p-4 mb-5 border border-[#EADDD5]">
-                    <h5 className="font-semibold text-sm text-[#4A362C] mb-3 flex items-center gap-2">
-                      <BarChart3 className="w-4 h-4 text-[#C19A83]" />
+                  <div className="bg-gradient-to-r from-[#F7FAFD] to-[#F3F8FF] rounded-xl p-4 mb-5 border border-[#DCE7F5]">
+                    <h5 className="font-semibold text-sm text-[#162033] mb-3 flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4 text-[#2F6BFF]" />
                       数据集统计信息
                     </h5>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div className="bg-white rounded-lg p-3 border border-[#EADDD5]">
-                        <p className="text-xs text-[#8C7A6B]">数据来源</p>
-                        <p className="font-bold text-[#4A362C]">{dataSourceLabels[selectedSource] || '-'}</p>
+                      <div className="bg-white rounded-lg p-3 border border-[#E2E8F0]">
+                        <p className="text-xs text-[#64748B]">数据来源</p>
+                        <p className="font-bold text-[#162033]">{dataSourceLabels[selectedSource] || '-'}</p>
                       </div>
-                      <div className="bg-white rounded-lg p-3 border border-[#EADDD5]">
-                        <p className="text-xs text-[#8C7A6B]">用户数 <span className="text-green-500 text-[10px]">(自动)</span></p>
-                        <p className="font-bold text-[#4A362C]">{uniqueUserCount}</p>
+                      <div className="bg-white rounded-lg p-3 border border-[#E2E8F0]">
+                        <p className="text-xs text-[#64748B]">用户数 <span className="text-green-500 text-[10px]">(自动)</span></p>
+                        <p className="font-bold text-[#162033]">{uniqueUserCount}</p>
                       </div>
-                      <div className="bg-white rounded-lg p-3 border border-[#EADDD5]">
-                        <p className="text-xs text-[#8C7A6B]">帖子数 <span className="text-green-500 text-[10px]">(自动)</span></p>
-                        <p className="font-bold text-[#4A362C]">{importedData.length}</p>
+                      <div className="bg-white rounded-lg p-3 border border-[#E2E8F0]">
+                        <p className="text-xs text-[#64748B]">帖子数 <span className="text-green-500 text-[10px]">(自动)</span></p>
+                        <p className="font-bold text-[#162033]">{importedData.length}</p>
                       </div>
-                      <div className="bg-white rounded-lg p-3 border border-[#EADDD5]">
-                        <p className="text-xs text-[#8C7A6B]">风险分布 <span className="text-green-500 text-[10px]">(自动)</span></p>
+                      <div className="bg-white rounded-lg p-3 border border-[#E2E8F0]">
+                        <p className="text-xs text-[#64748B]">风险分布 <span className="text-green-500 text-[10px]">(自动)</span></p>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {Object.entries(riskDistribution).map(([label, count]) => {
                             const coarseLevel = getCoarseRiskLevel(label, selectedSource, coarseRiskMap);
@@ -919,32 +920,32 @@ function ImportWizardModal({
                           })}
                         </div>
                       </div>
-                      <div className="bg-white rounded-lg p-3 border border-[#EADDD5]">
-                        <p className="text-xs text-[#8C7A6B]">细粒度风险等级 <span className="text-green-500 text-[10px]">(自动)</span></p>
-                        <p className="font-bold text-[#4A362C]">{fineRiskCount}分类</p>
+                      <div className="bg-white rounded-lg p-3 border border-[#E2E8F0]">
+                        <p className="text-xs text-[#64748B]">细粒度风险等级 <span className="text-green-500 text-[10px]">(自动)</span></p>
+                        <p className="font-bold text-[#162033]">{fineRiskCount}分类</p>
                       </div>
-                      <div className="bg-white rounded-lg p-3 border border-[#EADDD5]">
-                        <p className="text-xs text-[#8C7A6B]">是否手工标注 <span className="text-orange-500 text-[10px]">(人工填写)</span></p>
+                      <div className="bg-white rounded-lg p-3 border border-[#E2E8F0]">
+                        <p className="text-xs text-[#64748B]">是否手工标注 <span className="text-[#2F6BFF] text-[10px]">(人工填写)</span></p>
                         <label className="flex items-center gap-2 mt-1">
                           <input 
                             type="checkbox" 
                             checked={isManualAnnotation}
                             onChange={(e) => setIsManualAnnotation(e.target.checked)}
-                            className="w-4 h-4 rounded border-[#D7BFA6] text-orange-500"
+                            className="w-4 h-4 rounded border-[#BFD3F2] text-[#2F6BFF]"
                           />
-                          <span className="text-xs text-[#5A4B42]">{isManualAnnotation ? '是' : '否'}</span>
+                          <span className="text-xs text-[#415168]">{isManualAnnotation ? '是' : '否'}</span>
                         </label>
                       </div>
                     </div>
                   </div>
 
                   {/* 字段筛选区域 */}
-                  <div className="bg-white rounded-xl p-4 mb-5 border border-[#EADDD5]">
-                    <h5 className="font-semibold text-sm text-[#4A362C] mb-3 flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-[#C19A83]" />
+                  <div className="bg-white rounded-xl p-4 mb-5 border border-[#E2E8F0]">
+                    <h5 className="font-semibold text-sm text-[#162033] mb-3 flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-[#2F6BFF]" />
                       字段筛选
                     </h5>
-                    <p className="text-xs text-[#8C7A6B] mb-3">勾选要显示的字段（user_id、post_sequence、suicide_risk 必选，其他可选）</p>
+                    <p className="text-xs text-[#64748B] mb-3">勾选要显示的字段（user_id、post_sequence、suicide_risk 必选，其他可选）</p>
                     <div className="flex flex-wrap gap-3">
                       {['user_id', 'post_sequence', 'created_utc', 'emjio_sequence', 'suicide_risk'].map(field => {
                         const isRequired = ['user_id', 'post_sequence', 'suicide_risk'].includes(field);
@@ -952,7 +953,7 @@ function ImportWizardModal({
                         return (
                           <label key={field} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all ${
                             isRequired ? 'bg-gray-50 border-gray-200 cursor-not-allowed opacity-70' :
-                            isChecked ? 'bg-orange-50 border-orange-300' : 'bg-white border-[#EADDD5] hover:border-orange-300'
+                            isChecked ? 'bg-[#F3F8FF] border-[#8FB4FF]' : 'bg-white border-[#E2E8F0] hover:border-[#8FB4FF]'
                           }`}>
                             <input 
                               type="checkbox" 
@@ -966,9 +967,9 @@ function ImportWizardModal({
                                     : [...prev, field]
                                 );
                               }}
-                              className="w-4 h-4 rounded border-[#D7BFA6] text-orange-500"
+                              className="w-4 h-4 rounded border-[#BFD3F2] text-[#2F6BFF]"
                             />
-                            <span className="text-xs font-medium text-[#5A4B42]">
+                            <span className="text-xs font-medium text-[#415168]">
                               {field === 'user_id' && '用户ID'}
                               {field === 'post_sequence' && '帖子序号'}
                               {field === 'created_utc' && '时间戳'}
@@ -983,9 +984,9 @@ function ImportWizardModal({
                   </div>
 
                   {/* 数据检查表格 */}
-                  <div className="bg-white border border-[#EADDD5] rounded-xl overflow-hidden">
-                    <div className="flex items-center justify-between p-3 bg-gradient-to-r from-[#F9F5F2] to-white border-b border-[#EADDD5]">
-                      <h5 className="font-semibold text-sm text-[#4A362C]">数据检查列表 <span className="text-xs font-normal text-[#8C7A6B]">（共 {importedData.length} 条）</span></h5>
+                  <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between p-3 bg-gradient-to-r from-[#F7FAFD] to-white border-b border-[#E2E8F0]">
+                      <h5 className="font-semibold text-sm text-[#162033]">数据检查列表 <span className="text-xs font-normal text-[#64748B]">（共 {importedData.length} 条）</span></h5>
                       <div className="flex gap-2">
                         <button
                           onClick={handleAcceptAll}
@@ -1001,55 +1002,55 @@ function ImportWizardModal({
                     </div>
                     <div className="overflow-x-auto max-h-72">
                       <table className="w-full">
-                        <thead className="bg-[#F9F5F2] sticky top-0">
+                        <thead className="bg-[#F7FAFD] sticky top-0">
                           <tr>
-                            <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#5A4B42] w-10">
+                            <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168] w-10">
                               <input 
                                 type="checkbox"
                                 checked={importedData.length > 0 && importedData.every(d => selectedRowIds[d.id])}
                                 onChange={toggleSelectAll}
-                                className="w-4 h-4 rounded border-[#D7BFA6] text-orange-500 cursor-pointer"
+                                className="w-4 h-4 rounded border-[#BFD3F2] text-[#2F6BFF] cursor-pointer"
                                 title="全选/取消全选"
                               />
                             </th>
-                            {selectedFields.includes('user_id') && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#5A4B42]">user_id</th>}
-                            {selectedFields.includes('created_utc') && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#5A4B42]">时间戳</th>}
-                            {selectedFields.includes('post_sequence') && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#5A4B42]">帖子序列</th>}
-                            {selectedFields.includes('emjio_sequence') && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#5A4B42]">表情序列</th>}
-                            {selectedFields.includes('suicide_risk') && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#5A4B42]">风险等级</th>}
-                            <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#5A4B42]">检查状态</th>
-                            <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#5A4B42]">操作</th>
+                            {selectedFields.includes('user_id') && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">user_id</th>}
+                            {selectedFields.includes('created_utc') && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">时间戳</th>}
+                            {selectedFields.includes('post_sequence') && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">帖子序列</th>}
+                            {selectedFields.includes('emjio_sequence') && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">表情序列</th>}
+                            {selectedFields.includes('suicide_risk') && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">风险等级</th>}
+                            <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">检查状态</th>
+                            <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">操作</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#F0EAE5]">
+                        <tbody className="divide-y divide-[#EAF0F6]">
                           {importedData.map((data) => {
                             const rc = RISK_COLORS[data.riskLevel];
                             return (
-                              <tr key={data.id} className={`hover:bg-[#FAF6F3] transition-colors ${data.isMissing ? 'bg-orange-50' : data.isAnomaly ? 'bg-red-50' : ''}`}>
+                              <tr key={data.id} className={`hover:bg-[#F7FAFD] transition-colors ${data.isMissing ? 'bg-amber-50' : data.isAnomaly ? 'bg-red-50' : ''}`}>
                                 <td className="px-3 py-2.5">
                                   <input 
                                     type="checkbox"
                                     checked={!!selectedRowIds[data.id]}
                                     onChange={() => toggleRowSelected(data.id)}
-                                    className="w-4 h-4 rounded border-[#D7BFA6] text-orange-500 cursor-pointer"
+                                    className="w-4 h-4 rounded border-[#BFD3F2] text-[#2F6BFF] cursor-pointer"
                                     title="选中该行"
                                   />
                                 </td>
                                 {selectedFields.includes('user_id') && (
-                                  <td className="px-3 py-2.5 text-xs text-[#5A4B42] font-mono">{data.userId}</td>
+                                  <td className="px-3 py-2.5 text-xs text-[#415168] font-mono">{data.userId}</td>
                                 )}
                                 {selectedFields.includes('created_utc') && (
-                                  <td className="px-3 py-2.5 text-xs text-[#5A4B42]">
-                                    {data.hasTimestamp ? data.timestamp : <span className="text-orange-400 italic">缺失</span>}
+                                  <td className="px-3 py-2.5 text-xs text-[#415168]">
+                                    {data.hasTimestamp ? data.timestamp : <span className="text-amber-500 italic">缺失</span>}
                                   </td>
                                 )}
                                 {selectedFields.includes('post_sequence') && (
-                                  <td className="px-3 py-2.5 text-xs text-[#5A4B42] max-w-[200px] truncate" title={data.content}>
+                                  <td className="px-3 py-2.5 text-xs text-[#415168] max-w-[200px] truncate" title={data.content}>
                                     {data.content || <span className="text-gray-300 italic">无内容</span>}
                                   </td>
                                 )}
                                 {selectedFields.includes('emjio_sequence') && (
-                                  <td className="px-3 py-2.5 text-xs text-[#5A4B42] max-w-[120px] truncate">
+                                  <td className="px-3 py-2.5 text-xs text-[#415168] max-w-[120px] truncate">
                                     {data.emjioSequence || <span className="text-gray-300 italic">无</span>}
                                   </td>
                                 )}
@@ -1108,30 +1109,30 @@ function ImportWizardModal({
                 <div className="w-24 h-24 bg-gradient-to-br from-green-100 to-green-200 rounded-full flex items-center justify-center mb-6 shadow-lg">
                   <CheckCircle className="w-14 h-14 text-green-500" />
                 </div>
-                <h4 className="text-2xl font-bold text-[#4A362C] mb-3">导入完成！</h4>
-                <p className="text-[#8C7A6B] mb-2 text-center">
+                <h4 className="text-2xl font-bold text-[#162033] mb-3">导入完成！</h4>
+                <p className="text-[#64748B] mb-2 text-center">
                   已成功导入 <span className="font-bold text-green-600">{importedData.filter(d => postStatuses[d.id] === 'accepted').length}</span> 条数据
                 </p>
-                <p className="text-sm text-[#A89B8E] mb-6">档案已进入心理档案室列表</p>
+                <p className="text-sm text-[#94A3B8] mb-6">档案已进入心理档案室列表</p>
                 
-                <div className="bg-white rounded-2xl p-5 border border-[#EADDD5] shadow-sm w-full max-w-sm">
-                  <h5 className="font-semibold text-sm text-[#4A362C] mb-3">导入摘要</h5>
+                <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-sm w-full max-w-sm">
+                  <h5 className="font-semibold text-sm text-[#162033] mb-3">导入摘要</h5>
                   <div className="space-y-2">
-                    <div className="flex justify-between items-center py-2 border-b border-[#F0EAE5]">
-                      <span className="text-sm text-[#8C7A6B]">数据来源</span>
-                      <span className="text-sm font-medium text-[#4A362C]">{dataSourceLabels[selectedSource]}</span>
+                    <div className="flex justify-between items-center py-2 border-b border-[#EAF0F6]">
+                      <span className="text-sm text-[#64748B]">数据来源</span>
+                      <span className="text-sm font-medium text-[#162033]">{dataSourceLabels[selectedSource]}</span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-[#F0EAE5]">
-                      <span className="text-sm text-[#8C7A6B]">接受记录</span>
+                    <div className="flex justify-between items-center py-2 border-b border-[#EAF0F6]">
+                      <span className="text-sm text-[#64748B]">接受记录</span>
                       <span className="text-sm font-medium text-green-600">{importedData.filter(d => postStatuses[d.id] === 'accepted').length} 条</span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-[#F0EAE5]">
-                      <span className="text-sm text-[#8C7A6B]">拒绝记录</span>
+                    <div className="flex justify-between items-center py-2 border-b border-[#EAF0F6]">
+                      <span className="text-sm text-[#64748B]">拒绝记录</span>
                       <span className="text-sm font-medium text-red-600">{importedData.filter(d => postStatuses[d.id] === 'rejected').length} 条</span>
                     </div>
                     <div className="flex justify-between items-center py-2">
-                      <span className="text-sm text-[#8C7A6B]">导入时间</span>
-                      <span className="text-sm font-medium text-[#4A362C]">{formatDateTime(new Date().toISOString())}</span>
+                      <span className="text-sm text-[#64748B]">导入时间</span>
+                      <span className="text-sm font-medium text-[#162033]">{formatDateTime(new Date().toISOString())}</span>
                     </div>
                   </div>
                 </div>
@@ -1141,15 +1142,15 @@ function ImportWizardModal({
         </div>
 
         {/* 底部按钮 */}
-        <div className="flex justify-between items-center p-5 bg-white border-t border-[#EADDD5]">
+        <div className="flex justify-between items-center p-5 bg-white border-t border-[#E2E8F0]">
           <button onClick={() => currentStep > 1 && setCurrentStep(s => s - 1)}
             disabled={currentStep === 1}
-            className="flex items-center gap-2 px-5 py-2.5 text-[#5A4B42] hover:bg-[#F4EBE1] rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium">
+            className="flex items-center gap-2 px-5 py-2.5 text-[#415168] hover:bg-[#F1F5FA] rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium">
             <ChevronLeft className="w-4 h-4" /> 上一步
           </button>
           <div className="flex items-center gap-3">
             <button onClick={onClose}
-              className="px-5 py-2.5 text-[#8C7A6B] hover:bg-[#F4EBE1] rounded-xl transition-colors font-medium">
+              className="px-5 py-2.5 text-[#64748B] hover:bg-[#F1F5FA] rounded-xl transition-colors font-medium">
               取消
             </button>
             <button onClick={() => {
@@ -1162,7 +1163,7 @@ function ImportWizardModal({
               }
             }}
               disabled={(currentStep === 1 && (!selectedSource || !dataFile || isUploading)) || (currentStep === 2 && isConfirming)}
-              className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl transition-all font-semibold shadow-sm">
+              className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl transition-all font-semibold shadow-sm">
               {currentStep === 1 ? (
                 isUploading ? (
                   <>上传中... <Activity className="w-4 h-4 animate-spin" /></>
@@ -1321,7 +1322,7 @@ export default function ArchivePage() {
           const dynamicCoarse: Record<string, Record<number, 'low' | 'medium' | 'high'>> = {};
           datasets.forEach((ds: DatasetProfile) => {
             labels[ds.datasetKey] = ds.displayName;
-            colors[ds.datasetKey] = ds.color || 'bg-orange-100 text-orange-700';
+            colors[ds.datasetKey] = ds.color || 'bg-[#E8F0FF] text-[#2F6BFF]';
             if (ds.fineLabels) {
               const parsedFine: Record<number, string> = {};
               Object.entries(ds.fineLabels).forEach(([k, v]) => {
@@ -1488,111 +1489,58 @@ export default function ArchivePage() {
   const totalUsers = homeStats?.totalArchives ?? archiveStats.total;
   const totalPosts = homeStats?.totalPosts ?? archives.reduce((sum, a) => sum + a.postCount, 0);
   const highRiskCount = homeStats?.riskDistribution.high.count ?? archiveStats.highRisk;
-  const mediumRiskCount = homeStats?.riskDistribution.medium.count ?? archiveStats.mediumRisk;
   const lowRiskCount = homeStats?.riskDistribution.low.count ?? archiveStats.lowRisk;
+  const archiveStatCards = [
+    { label: '档案总数', value: totalUsers, note: '已纳入样本库并支持后续问答与检测联动的用户档案数量', icon: FileStack, tone: 'blue' as const },
+    { label: '帖子总数', value: totalPosts, note: '覆盖档案用户全部贴文记录与时间序列行为数据', icon: FileText, tone: 'slate' as const },
+    { label: '低风险档案', value: lowRiskCount, note: '当前整体风险水平较低、可常规跟踪的档案数量', icon: CheckCircle, tone: 'green' as const },
+    { label: '高风险档案', value: highRiskCount, note: '需优先复核、转介和持续监测的高风险档案数量', icon: AlertTriangle, tone: 'red' as const },
+  ];
 
   return (
     <div className="flex flex-1 flex-col min-h-0 w-full gap-4 md:gap-5 animate-fade-in">
-      {/* 统计概览卡片 - 统一风格：圆形图标 + 白色卡片 + 主题色背景 */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 shrink-0">
-        {/* 档案总数 */}
-        <div className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-[#EADDD5]">
-          <div className="w-12 h-12 rounded-xl bg-[#C19A83] flex items-center justify-center shadow-sm shrink-0">
-            <FileStack className="w-6 h-6 text-white" />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-xs text-[#8C7A6B] whitespace-nowrap">档案总数</span>
-            <span className="text-2xl font-bold text-[#4A362C]">{totalUsers}</span>
-          </div>
-        </div>
-
-        {/* 帖子总数 */}
-        <div className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-[#EADDD5]">
-          <div className="w-12 h-12 rounded-xl bg-gray-400 flex items-center justify-center shadow-sm shrink-0">
-            <FileText className="w-6 h-6 text-white" />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-xs text-[#8C7A6B] whitespace-nowrap">帖子总数</span>
-            <span className="text-2xl font-bold text-[#4A362C]">{totalPosts}</span>
-          </div>
-        </div>
-
-        {/* 风险分布 */}
-        <div className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-[#EADDD5]">
-          <div className="w-12 h-12 rounded-xl bg-blue-500 flex items-center justify-center shadow-sm shrink-0">
-            <BarChart3 className="w-6 h-6 text-white" />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-xs text-[#8C7A6B] whitespace-nowrap">风险分布</span>
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-bold text-red-500">{highRiskCount}</span>
-              <span className="text-lg font-bold text-yellow-600">{mediumRiskCount}</span>
-              <span className="text-lg font-bold text-green-500">{lowRiskCount}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 低风险档案 */}
-        <div className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-[#EADDD5]">
-          <div className="w-12 h-12 rounded-xl bg-green-500 flex items-center justify-center shadow-sm shrink-0">
-            <CheckCircle className="w-6 h-6 text-white" />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-xs text-[#8C7A6B] whitespace-nowrap">低风险档案</span>
-            <span className="text-2xl font-bold text-[#4A362C]">{lowRiskCount}</span>
-          </div>
-        </div>
-
-        {/* 高风险档案 - 强调 */}
-        <div className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-red-200">
-          <div className="w-12 h-12 rounded-xl bg-red-500 flex items-center justify-center shadow-sm shrink-0">
-            <AlertTriangle className="w-6 h-6 text-white" />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-xs text-red-600 whitespace-nowrap">高风险档案</span>
-            <span className="text-2xl font-bold text-red-500">{highRiskCount}</span>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 gap-3 shrink-0 md:grid-cols-2 xl:grid-cols-4">
+        {archiveStatCards.map((card) => (
+          <PaperStatCard key={card.label} label={card.label} value={card.value} note={card.note} icon={card.icon} tone={card.tone} />
+        ))}
       </div>
 
-      {/* 快捷操作区 - 统一风格：橙色主题按钮 */}
-      <div className="shrink-0 bg-white rounded-2xl p-5 shadow-sm border border-[#EADDD5]">
+      <div className="shrink-0 bg-white rounded-[28px] p-5 shadow-[0_10px_28px_rgba(15,23,42,0.04)] border border-[#E2E8F0]">
         <div className="flex flex-wrap items-center gap-4">
-          <span className="text-sm font-medium text-[#5A4B42]">快捷操作：</span>
+          <span className="text-sm font-medium text-[#334155]">快捷操作：</span>
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl text-sm font-medium transition-all shadow-sm"
+            className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white rounded-xl text-sm font-medium transition-all shadow-sm"
           >
             <Plus className="w-4 h-4" /> 导入数据
           </button>
           <button
             onClick={() => { setIsBatchMode(true); setIsBatchPanelOpen(true); }}
-            className="flex items-center gap-2 px-5 py-2 bg-[#F4EBE1] hover:bg-[#EADDD5] text-[#5A4B42] rounded-xl text-sm font-medium transition-colors border border-[#EADDD5]"
+            className="flex items-center gap-2 px-5 py-2 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl text-sm font-medium transition-colors border border-[#E2E8F0]"
           >
             <Layers className="w-4 h-4" /> 批量管理
           </button>
         </div>
       </div>
 
-      {/* 筛选工具栏 - 模仿农业文档风格 */}
-      <div className="shrink-0 bg-white rounded-2xl p-5 shadow-sm border border-[#EADDD5]">
+      <div className="shrink-0 bg-white rounded-[28px] p-5 shadow-[0_10px_28px_rgba(15,23,42,0.04)] border border-[#E2E8F0]">
         <div className="flex flex-wrap gap-4">
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-[#5A4B42]">关键词：</label>
+            <label className="text-sm font-medium text-[#415168]">关键词：</label>
             <input type="text" placeholder="输入用户ID关键词"
-              className="px-3 py-2 border border-[#EADDD5] rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 text-sm w-40 bg-[#FAF6F3]"
+              className="px-3 py-2 border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 text-sm w-40 bg-[#F7F9FC]"
               value={filters.keyword} onChange={(e) => setFilters({ ...filters, keyword: e.target.value })} onKeyDown={handleKeywordKeyDown} />
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-[#5A4B42]">数据来源：</label>
-            <select className="px-3 py-2 border border-[#EADDD5] rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 text-sm bg-[#FAF6F3]"
+            <label className="text-sm font-medium text-[#415168]">数据来源：</label>
+            <select className="px-3 py-2 border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 text-sm bg-[#F7F9FC]"
               value={filters.dataSource} onChange={(e) => setFilters({ ...filters, dataSource: e.target.value })}>
               {dataSourceOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-[#5A4B42]">状态：</label>
-            <select className="px-3 py-2 border border-[#EADDD5] rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 text-sm bg-[#FAF6F3]"
+            <label className="text-sm font-medium text-[#415168]">状态：</label>
+            <select className="px-3 py-2 border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 text-sm bg-[#F7F9FC]"
               value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
               <option value="">全部状态</option>
               <option value="ready">已就绪</option>
@@ -1601,20 +1549,20 @@ export default function ArchivePage() {
             </select>
           </div>
           <button onClick={handleFilterAndReload}
-            className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl transition-all text-sm font-medium shadow-sm">
+            className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white rounded-xl transition-all text-sm font-medium shadow-sm">
             <Search className="w-4 h-4" /> 筛选
           </button>
           <button onClick={handleReset}
-            className="flex items-center gap-2 px-5 py-2 bg-[#F4EBE1] hover:bg-[#EADDD5] text-[#5C4D43] rounded-xl transition-colors text-sm font-medium">
+            className="flex items-center gap-2 px-5 py-2 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl transition-colors text-sm font-medium">
             <RefreshCw className="w-4 h-4" /> 重置
           </button>
           
           {/* 已应用筛选条件提示 */}
           {appliedFilters.keyword || appliedFilters.dataSource || appliedFilters.status ? (
-            <div className="flex items-center gap-2 text-sm text-[#8C7A6B] ml-auto">
+            <div className="flex items-center gap-2 text-sm text-[#64748B] ml-auto">
               <Filter className="w-4 h-4" />
               <span>当前筛选：</span>
-              {appliedFilters.keyword && <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs">关键词: {appliedFilters.keyword}</span>}
+              {appliedFilters.keyword && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">关键词: {appliedFilters.keyword}</span>}
               {appliedFilters.dataSource && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">{dataSourceLabels[appliedFilters.dataSource]}</span>}
               {appliedFilters.status && <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs">{appliedFilters.status === 'ready' ? '已就绪' : appliedFilters.status === 'importing' ? '导入中' : '分析中'}</span>}
             </div>
@@ -1623,13 +1571,13 @@ export default function ArchivePage() {
       </div>
 
       {/* 档案列表 */}
-      <div className="flex-1 min-h-0 bg-white rounded-2xl shadow-sm border border-[#EADDD5] overflow-hidden flex flex-col">
+      <div className="flex-1 min-h-0 bg-white rounded-[28px] shadow-[0_10px_28px_rgba(15,23,42,0.04)] border border-[#E2E8F0] overflow-hidden flex flex-col">
         <div className="overflow-x-auto flex-1">
           <table className="w-full">
-            <thead className="bg-gradient-to-r from-[#F9F5F2] to-[#FDF9F6] sticky top-0 z-10">
+            <thead className="bg-gradient-to-r from-[#F7FAFD] to-white sticky top-0 z-10">
               <tr>
                 {isBatchMode && (
-                  <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32] w-12">
+                  <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155] w-12">
                     <input
                       type="checkbox"
                       checked={paginatedArchives.length > 0 && paginatedArchives.every(a => selectedArchives.has(a.id))}
@@ -1648,24 +1596,24 @@ export default function ArchivePage() {
                           });
                         }
                       }}
-                      className="w-4 h-4 rounded border-[#D7BFA6] text-orange-500 cursor-pointer"
+                      className="w-4 h-4 rounded border-[#CBD5E1] text-blue-500 cursor-pointer"
                     />
                   </th>
                 )}
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">用户ID</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">数据来源</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">贴文数</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">风险等级</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">导入时间</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">操作</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">用户ID</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">数据来源</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">贴文数</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">风险等级</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">导入时间</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#F0EAE5]">
+            <tbody className="divide-y divide-[#EAF0F6]">
               {paginatedArchives.map((archive) => {
                 const riskKey = archive.riskOverview === '高风险' ? 'high' : archive.riskOverview === '中风险' ? 'medium' : 'low';
                 const isSelected = selectedArchives.has(archive.id);
                 return (
-                  <tr key={archive.id} className={`hover:bg-[#FAF6F3] transition-colors ${isSelected ? 'bg-orange-50' : ''}`}>
+                  <tr key={archive.id} className={`hover:bg-[#F7F9FC] transition-colors ${isSelected ? 'bg-blue-50' : ''}`}>
                     {isBatchMode && (
                       <td className="px-4 py-3.5">
                         <input
@@ -1682,16 +1630,16 @@ export default function ArchivePage() {
                               return newSet;
                             });
                           }}
-                          className="w-4 h-4 rounded border-[#D7BFA6] text-orange-500 cursor-pointer"
+                          className="w-4 h-4 rounded border-[#CBD5E1] text-blue-500 cursor-pointer"
                         />
                       </td>
                     )}
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-50 to-rose-100 flex items-center justify-center">
-                          <User className="w-5 h-5 text-rose-400" />
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+                          <User className="w-5 h-5 text-blue-500" />
                         </div>
-                        <span className="text-sm font-medium text-[#4A3B32]">{archive.userId}</span>
+                        <span className="text-sm font-medium text-[#162033]">{archive.userId}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3.5">
@@ -1701,8 +1649,8 @@ export default function ArchivePage() {
                     </td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-[#A89B8E]" />
-                        <span className="text-sm text-[#5A4B42]">{archive.postCount}</span>
+                        <FileText className="w-4 h-4 text-[#94A3B8]" />
+                        <span className="text-sm text-[#415168]">{archive.postCount}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3.5">
@@ -1714,7 +1662,7 @@ export default function ArchivePage() {
                       </div>
                     </td>
                     <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-1.5 text-sm text-[#8C7A6B]">
+                      <div className="flex items-center gap-1.5 text-sm text-[#64748B]">
                         <Clock className="w-3.5 h-3.5" />
                         {formatDateTime(archive.importTime)}
                       </div>
@@ -1750,14 +1698,14 @@ export default function ArchivePage() {
 
         {/* 批量操作面板 */}
         {isBatchMode && isBatchPanelOpen && (
-          <div className="shrink-0 flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-50 to-orange-100 border-t border-orange-200">
+          <div className="shrink-0 flex items-center justify-between px-6 py-4 bg-gradient-to-r from-blue-50 to-[#F7FAFD] border-t border-[#DCE7F5]">
             <div className="flex items-center gap-4">
-              <span className="text-sm text-[#5A4B42]">
-                已选择 <strong className="text-orange-600">{selectedArchives.size}</strong> 项
+              <span className="text-sm text-[#415168]">
+                已选择 <strong className="text-blue-600">{selectedArchives.size}</strong> 项
               </span>
               <button
                 onClick={() => { setSelectedArchives(new Set()); setIsBatchMode(false); setIsBatchPanelOpen(false); }}
-                className="text-sm text-[#8C7A6B] hover:text-[#5A4B42] transition-colors"
+                className="text-sm text-[#64748B] hover:text-[#415168] transition-colors"
               >
                 取消选择
               </button>
@@ -1779,7 +1727,7 @@ export default function ArchivePage() {
               </button>
               <button
                 onClick={() => { setIsBatchMode(false); setIsBatchPanelOpen(false); }}
-                className="flex items-center gap-2 px-4 py-2 bg-[#F4EBE1] hover:bg-[#EADDD5] text-[#5C4D43] rounded-xl text-sm font-medium transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl text-sm font-medium transition-colors"
               >
                 <X className="w-4 h-4" /> 关闭
               </button>
@@ -1788,37 +1736,37 @@ export default function ArchivePage() {
         )}
 
         {/* 分页 - 模仿农业文档风格 */}
-        <div className="shrink-0 flex items-center justify-between p-4 border-t border-[#EADDD5] bg-gradient-to-r from-[#F9F5F2] to-white">
+        <div className="shrink-0 flex items-center justify-between p-4 border-t border-[#E2E8F0] bg-gradient-to-r from-[#F7FAFD] to-white">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-[#8C7A6B]">每页显示：</span>
+            <span className="text-sm text-[#64748B]">每页显示：</span>
             <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-              className="px-3 py-1.5 border border-[#EADDD5] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-300">
+              className="px-3 py-1.5 border border-[#E2E8F0] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-200">
               <option value="10">10条</option>
               <option value="20">20条</option>
               <option value="50">50条</option>
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-[#8C7A6B]">共 <strong className="text-[#4A362C]">{filteredArchives.length}</strong> 条，第 <strong className="text-[#4A362C]">{currentPage}</strong>/<strong className="text-[#4A362C]">{totalPages || 1}</strong> 页</span>
+            <span className="text-sm text-[#64748B]">共 <strong className="text-[#162033]">{filteredArchives.length}</strong> 条，第 <strong className="text-[#162033]">{currentPage}</strong>/<strong className="text-[#162033]">{totalPages || 1}</strong> 页</span>
             <div className="flex items-center gap-1 ml-2">
               <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1}
                 className="p-2 hover:bg-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                <ChevronLeft className="w-4 h-4 text-[#5A4B42]" />
+                <ChevronLeft className="w-4 h-4 text-[#415168]" />
               </button>
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                className="px-3 py-1.5 bg-white border border-[#EADDD5] rounded-lg text-sm hover:bg-[#F4EBE1] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                className="px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-sm hover:bg-[#F1F5FA] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 上一页
               </button>
-              <span className="px-4 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg text-sm font-semibold shadow-sm">
+              <span className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg text-sm font-semibold shadow-sm">
                 {currentPage}
               </span>
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                className="px-3 py-1.5 bg-white border border-[#EADDD5] rounded-lg text-sm hover:bg-[#F4EBE1] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                className="px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-sm hover:bg-[#F1F5FA] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 下一页
               </button>
               <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}
                 className="p-2 hover:bg-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                <ChevronRight className="w-4 h-4 text-[#5A4B42]" />
+                <ChevronRight className="w-4 h-4 text-[#415168]" />
               </button>
             </div>
           </div>

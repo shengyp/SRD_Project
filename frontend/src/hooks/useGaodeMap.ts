@@ -346,7 +346,7 @@ export function useGaodeMap(
             if (userMarkerRef.current) mapRef.current.remove(userMarkerRef.current);
             userMarkerRef.current = new window.AMap.Marker({
               position: [lng, lat],
-              content: '<div style="width:14px;height:14px;background:#C19A83;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 5px rgba(193,154,131,0.25)"></div>',
+              content: '<div style="width:14px;height:14px;background:#2F6BFF;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 5px rgba(47,107,255,0.18)"></div>',
               offset: new window.AMap.Pixel(-7, -7),
               zIndex: 200,
             });
@@ -372,15 +372,15 @@ export function useGaodeMap(
   const showMarkerInfo = useCallback((inst: { longitude?: number; latitude?: number; name: string; type?: string; address?: string; phone?: string; rating?: number; id?: string }) => {
     if (!mapRef.current || !infoWindowRef.current) return;
     const content = `
-      <div style="padding:10px;min-width:200px;border-radius:12px;">
-        <h4 style="margin:0 0 8px;color:#4A362C;font-size:14px;font-weight:600;">${inst.name}</h4>
-        <p style="margin:4px 0;color:#8C7A6B;font-size:12px;">🏥 ${inst.type || '未知类型'}</p>
-        <p style="margin:4px 0;color:#8C7A6B;font-size:12px;">📍 ${inst.address || '暂无地址'}</p>
-        <p style="margin:4px 0;color:#8C7A6B;font-size:12px;">📞 ${inst.phone || '暂无电话'}</p>
-        ${inst.rating ? `<p style="margin:4px 0;color:#C19A83;font-size:12px;">⭐ ${inst.rating}/5.0</p>` : ''}
+      <div style="padding:10px;min-width:200px;border-radius:12px;border:1px solid #DCE7F5;background:white;box-shadow:0 10px 24px rgba(15,23,42,0.08);">
+        <h4 style="margin:0 0 8px;color:#162033;font-size:14px;font-weight:600;">${inst.name}</h4>
+        <p style="margin:4px 0;color:#64748B;font-size:12px;">🏥 ${inst.type || '未知类型'}</p>
+        <p style="margin:4px 0;color:#64748B;font-size:12px;">📍 ${inst.address || '暂无地址'}</p>
+        <p style="margin:4px 0;color:#64748B;font-size:12px;">📞 ${inst.phone || '暂无电话'}</p>
+        ${inst.rating ? `<p style="margin:4px 0;color:#2F6BFF;font-size:12px;">⭐ ${inst.rating}/5.0</p>` : ''}
         <button
           onclick="window.showInstitutionDetail('${inst.id}')"
-          style="margin-top:8px;padding:4px 12px;background:#C19A83;color:white;border:none;border-radius:8px;cursor:pointer;font-size:12px;"
+          style="margin-top:8px;padding:4px 12px;background:#2F6BFF;color:white;border:none;border-radius:8px;cursor:pointer;font-size:12px;"
         >查看详情</button>
       </div>
     `;
@@ -421,10 +421,10 @@ export function useGaodeMap(
       style.textContent = `
         .custom-marker { cursor: pointer; }
         .marker-icon {
-          width:32px;height:32px;background:linear-gradient(135deg,#C19A83,#A07D6B);
+          width:32px;height:32px;background:linear-gradient(135deg,#5B8CFF,#2F6BFF);
           border-radius:50% 50% 50% 0;transform:rotate(-45deg);
           display:flex;align-items:center;justify-content:center;
-          box-shadow:0 2px 8px rgba(193,154,131,0.4);transition:all 0.3s;
+          box-shadow:0 2px 8px rgba(47,107,255,0.28);transition:all 0.3s;
         }
         .marker-icon:hover { transform:rotate(-45deg) scale(1.1); }
         .marker-icon span { transform:rotate(45deg);font-size:14px; }
@@ -486,10 +486,10 @@ export function useGaodeMap(
     radiusCircleRef.current = new window.AMap.Circle({
       center: [userLocation.lng, userLocation.lat],
       radius: radiusMeters,
-      strokeColor: '#C19A83',
+      strokeColor: '#2F6BFF',
       strokeWeight: 2,
       strokeOpacity: 0.8,
-      fillColor: '#C19A83',
+      fillColor: '#2F6BFF',
       fillOpacity: 0.08,
       zIndex: 10,
     });

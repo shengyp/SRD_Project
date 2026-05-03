@@ -6,6 +6,7 @@ import {
   User, Search,
   Plus, Play, Eye, Clock, Target, Award, TrendingUp, Loader, TrendingDown
 } from 'lucide-react';
+import PaperStatCard from '../components/PaperStatCard';
 import {
   fetchScaleTasks,
   createScaleTask,
@@ -95,22 +96,6 @@ const DATA_SOURCE_LABELS: Record<string, string> = {
   reddit: 'Reddit',
 };
 
-// ==================== 统计卡片组件 ====================
-
-function StatCard({ icon: Icon, label, value, colorClass }: { icon: any; label: string; value: number | string; colorClass: string }) {
-  return (
-    <div className="bg-white rounded-xl border border-[#EADDD5] p-4 flex items-center gap-4 shadow-sm">
-      <div className={`w-12 h-12 rounded-xl ${colorClass} flex items-center justify-center`}>
-        <Icon className="w-6 h-6 text-white" />
-      </div>
-      <div className="flex flex-col">
-        <span className="text-sm text-[#8C7A6B]">{label}</span>
-        <span className="text-2xl font-bold text-[#4A362C]">{value}</span>
-      </div>
-    </div>
-  );
-}
-
 // ==================== 创建任务模态框 ====================
 
 function CreateTaskModal({
@@ -185,9 +170,9 @@ function CreateTaskModal({
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-white rounded-2xl w-[700px] max-h-[85vh] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
         {/* 模态框头部 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#EADDD5] bg-[#FAF6F3]">
-          <h3 className="text-lg font-bold text-[#4A362C] flex items-center gap-2">
-            <Plus className="w-5 h-5 text-[#C19A83]" />
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0] bg-[#F7FAFD]">
+          <h3 className="text-lg font-bold text-[#162033] flex items-center gap-2">
+            <Plus className="w-5 h-5 text-[#2F6BFF]" />
             创建量表评估任务
           </h3>
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
@@ -199,30 +184,30 @@ function CreateTaskModal({
         <div className="p-6 overflow-y-auto max-h-[calc(85vh-140px)] space-y-5">
           {/* 任务名称 */}
           <div>
-            <label className="block text-sm font-medium text-[#5C4D43] mb-2">任务名称（选填）</label>
+            <label className="block text-sm font-medium text-[#415168] mb-2">任务名称（选填）</label>
             <input
               type="text"
               value={taskName}
               onChange={e => setTaskName(e.target.value)}
               placeholder="留空将自动生成"
-              className="w-full px-4 py-2.5 border border-[#EADDD5] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#D7BFA6] focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-transparent"
             />
           </div>
 
           {/* 选择数据源 */}
           <div>
-            <label className="block text-sm font-medium text-[#5C4D43] mb-2">步骤1：选择数据源</label>
+            <label className="block text-sm font-medium text-[#415168] mb-2">步骤1：选择数据源</label>
             <div className="grid grid-cols-4 gap-2">
               {Object.entries(DATA_SOURCE_LABELS).map(([value, label]) => (
                 <label key={value} className={`flex flex-col items-center gap-1 p-3 border-2 rounded-xl cursor-pointer transition-all ${
-                  selectedDataSource === value ? 'border-[#C19A83] bg-[#FAF6F3]' : 'border-[#EADDD5] hover:border-[#D7BFA6]'
+                  selectedDataSource === value ? 'border-[#2F6BFF] bg-[#F3F8FF]' : 'border-[#E2E8F0] hover:border-[#8FB4FF]'
                 }`}>
                   <input type="radio" name="datasource" value={value} checked={selectedDataSource === value}
                     onChange={(e) => { setSelectedDataSource(e.target.value); setSelectedUser(null); }} className="sr-only" />
                   <span className="text-lg">
                     {value === 'reddit' && '🌐'}
                   </span>
-                  <span className="text-xs text-[#5C4D43]">{label}</span>
+                  <span className="text-xs text-[#415168]">{label}</span>
                 </label>
               ))}
             </div>
@@ -230,42 +215,42 @@ function CreateTaskModal({
 
           {/* 选择用户 */}
           <div>
-            <label className="block text-sm font-medium text-[#5C4D43] mb-2">步骤2：选择评估用户</label>
+            <label className="block text-sm font-medium text-[#415168] mb-2">步骤2：选择评估用户</label>
             <div className="flex gap-3 mb-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input type="text" placeholder="搜索用户ID..." value={searchKeyword}
                   onChange={e => setSearchKeyword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-[#EADDD5] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#D7BFA6]" />
+                  className="w-full pl-10 pr-4 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
               </div>
             </div>
-            <div className="border border-[#EADDD5] rounded-xl overflow-hidden max-h-36 overflow-y-auto">
+            <div className="border border-[#E2E8F0] rounded-xl overflow-hidden max-h-36 overflow-y-auto">
               {usersLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader className="w-5 h-5 text-[#C19A83] animate-spin" />
-                  <span className="ml-2 text-sm text-[#8C7A6B]">加载用户...</span>
+                  <Loader className="w-5 h-5 text-[#2F6BFF] animate-spin" />
+                  <span className="ml-2 text-sm text-[#64748B]">加载用户...</span>
                 </div>
               ) : filteredUsers.length === 0 ? (
-                <div className="py-8 text-center text-sm text-[#A89F95]">
+                <div className="py-8 text-center text-sm text-[#94A3B8]">
                   {users.length === 0 ? '暂无可用用户' : '无匹配用户'}
                 </div>
               ) : (
                 <table className="w-full">
-                  <thead className="bg-[#F4EBE1] sticky top-0">
+                  <thead className="bg-[#F7FAFD] sticky top-0">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-[#5C4D43] w-10">选择</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-[#5C4D43]">用户ID</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-[#5C4D43]">风险</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-[#415168] w-10">选择</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-[#415168]">用户ID</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-[#415168]">风险</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#EADDD5]">
+                  <tbody className="divide-y divide-[#E2E8F0]">
                     {filteredUsers.map((user) => (
-                      <tr key={user.id} className="hover:bg-[#FAF6F3]">
+                      <tr key={user.id} className="hover:bg-[#F7FAFD]">
                         <td className="px-3 py-2">
                           <input type="radio" name="user" checked={selectedUser?.id === user.id}
-                            onChange={() => setSelectedUser(user)} className="accent-[#C19A83]" />
+                            onChange={() => setSelectedUser(user)} className="accent-[#2F6BFF]" />
                         </td>
-                        <td className="px-3 py-2 text-sm text-[#5C4D43]">{user.userId}</td>
+                        <td className="px-3 py-2 text-sm text-[#415168]">{user.userId}</td>
                         <td className="px-3 py-2">
                           <span className={`px-2 py-0.5 ${RISK_COLORS[user.riskLevel]?.bg || 'bg-gray-100'} ${RISK_COLORS[user.riskLevel]?.text || 'text-gray-700'} text-xs rounded-full`}>
                             {RISK_LABELS[user.riskLevel] || user.riskLevel}
@@ -281,12 +266,12 @@ function CreateTaskModal({
 
           {/* 选择量表 */}
           <div>
-            <label className="block text-sm font-medium text-[#5C4D43] mb-2">步骤3：选择量表</label>
+            <label className="block text-sm font-medium text-[#415168] mb-2">步骤3：选择量表</label>
             <div className="grid grid-cols-2 gap-3">
               {scales.map((scale) => (
                 <div key={scale.code} onClick={() => setSelectedScale(scale)}
                   className={`relative p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                    selectedScale?.code === scale.code ? 'border-[#C19A83] bg-[#FAF6F3]' : 'border-[#EADDD5] hover:border-[#D7BFA6]'
+                    selectedScale?.code === scale.code ? 'border-[#2F6BFF] bg-[#F3F8FF]' : 'border-[#E2E8F0] hover:border-[#8FB4FF]'
                   }`}>
                   <div className="flex items-start gap-3">
                     <div className={`w-10 h-10 rounded-lg ${scale.bgColor} flex items-center justify-center shrink-0`}>
@@ -296,13 +281,13 @@ function CreateTaskModal({
                       {scale.category === 'hopelessness' && <TrendingDown className="w-5 h-5 text-white" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-[#4A362C] text-sm">{scale.name}</h4>
-                      <p className="text-xs text-[#8C7A6B] truncate">{scale.full_name}</p>
-                      <p className="text-xs text-[#A89F95] mt-1">{scale.questionCount}题 · {scale.estimatedTime}</p>
+                      <h4 className="font-bold text-[#162033] text-sm">{scale.name}</h4>
+                      <p className="text-xs text-[#64748B] truncate">{scale.full_name}</p>
+                      <p className="text-xs text-[#94A3B8] mt-1">{scale.questionCount}题 · {scale.estimatedTime}</p>
                     </div>
                   </div>
                   {selectedScale?.code === scale.code && (
-                    <div className="absolute top-2 right-2 w-5 h-5 bg-[#C19A83] rounded-full flex items-center justify-center">
+                    <div className="absolute top-2 right-2 w-5 h-5 bg-[#2F6BFF] rounded-full flex items-center justify-center">
                       <Check className="w-3 h-3 text-white" />
                     </div>
                   )}
@@ -313,13 +298,13 @@ function CreateTaskModal({
         </div>
 
         {/* 模态框底部 */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#EADDD5] bg-[#FAF6F3]">
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E2E8F0] bg-[#F7FAFD]">
           <button onClick={onClose}
-            className="px-5 py-2.5 border border-[#EADDD5] rounded-xl text-[#5C4D43] hover:bg-[#F4EBE1] transition-colors font-medium">
+            className="px-5 py-2.5 border border-[#E2E8F0] rounded-xl text-[#415168] hover:bg-[#F1F5FA] transition-colors font-medium">
             取消
           </button>
           <button onClick={handleCreate} disabled={!selectedDataSource || !selectedUser || !selectedScale}
-            className="px-5 py-2.5 bg-[#C19A83] hover:bg-[#A07D6B] disabled:bg-gray-300 text-white rounded-xl transition-colors font-medium disabled:cursor-not-allowed">
+            className="px-5 py-2.5 bg-[#2F6BFF] hover:bg-[#2458D6] disabled:bg-gray-300 text-white rounded-xl transition-colors font-medium disabled:cursor-not-allowed">
             创建任务
           </button>
         </div>
@@ -379,6 +364,37 @@ export default function ScalePage() {
     completed: tasks.filter(t => t.status === 'completed').length,
   };
 
+  const statCards = [
+    {
+      label: '任务总数',
+      value: stats.total,
+      note: '当前量表任务池中的全部评估任务数量，覆盖待评估、进行中与已完成状态。',
+      icon: Target,
+      tone: 'blue' as const,
+    },
+    {
+      label: '待评估',
+      value: stats.pending,
+      note: '尚未开始作答或等待进入评估流程的量表任务数量。',
+      icon: Clock,
+      tone: 'slate' as const,
+    },
+    {
+      label: '答题中',
+      value: stats.inProgress,
+      note: '当前处于量表填写过程中的任务数量，可继续进入问卷作答。',
+      icon: TrendingUp,
+      tone: 'cyan' as const,
+    },
+    {
+      label: '已完成',
+      value: stats.completed,
+      note: '已经完成量表评分与结果输出的任务数量，可直接查看评估结果。',
+      icon: Award,
+      tone: 'green' as const,
+    },
+  ];
+
   // 创建任务
   const handleCreateTask = async (taskData: CreateTaskInput) => {
     try {
@@ -431,20 +447,26 @@ export default function ScalePage() {
     <div className="flex flex-1 flex-col min-h-0 w-full animate-fade-in space-y-5">
       {/* 统计卡片区域 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Target} label="任务总数" value={stats.total} colorClass="bg-[#C19A83]" />
-        <StatCard icon={Clock} label="待评估" value={stats.pending} colorClass="bg-gray-400" />
-        <StatCard icon={TrendingUp} label="答题中" value={stats.inProgress} colorClass="bg-blue-500" />
-        <StatCard icon={Award} label="已完成" value={stats.completed} colorClass="bg-green-500" />
+        {statCards.map((card) => (
+          <PaperStatCard
+            key={card.label}
+            label={card.label}
+            value={card.value}
+            note={card.note}
+            icon={card.icon}
+            tone={card.tone}
+          />
+        ))}
       </div>
 
       {/* 任务列表区域 */}
-      <div className="bg-white rounded-2xl border border-[#EADDD5] shadow-sm flex-1 flex flex-col min-h-0">
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm flex-1 flex flex-col min-h-0">
         {/* 列表头部 */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#EADDD5]">
-          <h3 className="text-base font-bold text-[#4A362C]">量表评估任务列表</h3>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E2E8F0]">
+          <h3 className="text-base font-bold text-[#162033]">量表评估任务列表</h3>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#C19A83] hover:bg-[#A07D6B] text-white rounded-xl transition-colors font-medium text-sm">
+            className="flex items-center gap-2 px-4 py-2 bg-[#2F6BFF] hover:bg-[#2458D6] text-white rounded-xl transition-colors font-medium text-sm">
             <Plus className="w-4 h-4" />
             创建任务
           </button>
@@ -454,45 +476,45 @@ export default function ScalePage() {
         <div className="flex-1 overflow-auto">
           {tasksLoading ? (
             <div className="flex flex-col items-center justify-center py-16">
-              <Loader className="w-8 h-8 text-[#C19A83] animate-spin mb-4" />
-              <p className="text-[#8C7A6B]">加载中...</p>
+              <Loader className="w-8 h-8 text-[#2F6BFF] animate-spin mb-4" />
+              <p className="text-[#64748B]">加载中...</p>
             </div>
           ) : tasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
-              <FileText className="w-12 h-12 text-[#D7BFA6] mb-4" />
-              <p className="text-[#8C7A6B]">暂无评估任务</p>
-              <p className="text-sm text-[#A89F95] mt-1">点击上方「创建任务」按钮开始您的第一次量表评估</p>
+              <FileText className="w-12 h-12 text-[#BFD3F2] mb-4" />
+              <p className="text-[#64748B]">暂无评估任务</p>
+              <p className="text-sm text-[#94A3B8] mt-1">点击上方「创建任务」按钮开始您的第一次量表评估</p>
             </div>
           ) : (
             <table className="w-full">
-              <thead className="bg-gradient-to-r from-[#F9F5F2] to-[#FDF9F6] sticky top-0">
+              <thead className="bg-gradient-to-r from-[#F7FAFD] to-[#F3F8FF] sticky top-0">
                 <tr>
-                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#5C4D43]">任务名称</th>
-                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#5C4D43]">数据来源</th>
-                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#5C4D43]">评估用户</th>
-                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#5C4D43]">量表类型</th>
-                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#5C4D43]">状态</th>
-                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#5C4D43]">进度</th>
-                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#5C4D43]">创建时间</th>
-                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#5C4D43]">操作</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#415168]">任务名称</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#415168]">数据来源</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#415168]">评估用户</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#415168]">量表类型</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#415168]">状态</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#415168]">进度</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#415168]">创建时间</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#415168]">操作</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#EADDD5]">
+              <tbody className="divide-y divide-[#E2E8F0]">
                 {tasks.map((task) => {
                   const scaleColor = getScaleColor(task.scaleCode);
                   const statusStyle = STATUS_COLORS[task.status] || STATUS_COLORS.pending;
                   return (
-                    <tr key={task.id} className="hover:bg-[#FAF6F3] transition-colors">
+                    <tr key={task.id} className="hover:bg-[#F7FAFD] transition-colors">
                       <td className="px-4 py-3">
-                        <span className="text-sm font-medium text-[#4A362C]">{task.taskName}</span>
+                        <span className="text-sm font-medium text-[#162033]">{task.taskName}</span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-sm text-[#5C4D43]">{task.dataSourceLabel || DATA_SOURCE_LABELS[task.dataSource as keyof typeof DATA_SOURCE_LABELS] || '-'}</span>
+                        <span className="text-sm text-[#415168]">{task.dataSourceLabel || DATA_SOURCE_LABELS[task.dataSource as keyof typeof DATA_SOURCE_LABELS] || '-'}</span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <User className="w-4 h-4 text-[#A89F95]" />
-                          <span className="text-sm text-[#5C4D43]">{task.userName}</span>
+                          <User className="w-4 h-4 text-[#94A3B8]" />
+                          <span className="text-sm text-[#415168]">{task.userName}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -509,17 +531,17 @@ export default function ScalePage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-20 h-1.5 bg-[#EADDD5] rounded-full overflow-hidden">
+                          <div className="w-20 h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
                             <div className={`h-full rounded-full transition-all ${
                               task.status === 'completed' ? 'bg-green-500' :
                               task.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-300'
                             }`} style={{ width: `${task.progress}%` }}></div>
                           </div>
-                          <span className="text-xs text-[#8C7A6B]">{task.progress}%</span>
+                          <span className="text-xs text-[#64748B]">{task.progress}%</span>
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-sm text-[#8C7A6B]">{formatTime(task.createdAt)}</span>
+                        <span className="text-sm text-[#64748B]">{formatTime(task.createdAt)}</span>
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2">

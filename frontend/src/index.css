@@ -2,54 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ============ 暖橙 · 桃粉 · 安抚蓝 主题（暖色调心理学） ============ */
+/* ============ Demo Paper · 白灰蓝科研系统主题 ============ */
 :root {
-  /* 主背景 */
-  --bg:           #FFF7EE;   /* 主背景 晨光白 */
-  --bg-soft:      #FCE8D5;   /* 柔和背景 */
-  --bg-card:      #FFFFFF;   /* 卡片背景 */
-  --bg-hover:     #FDF1E2;  /* 悬停背景 */
+  --bg: #f6f8fb;
+  --bg-soft: #eef4fa;
+  --bg-card: #ffffff;
+  --bg-hover: #f1f5f9;
 
-  /* 主色系 - 暖橙 */
-  --primary:       #F2935A;   /* 主色 暖橙 = 希望与温暖 */
-  --primary-2:    #E07338;   /* 强调橙 = 引导行动 */
-  --primary-soft:  #FBD9BE;  /* 浅橙 柔和过渡 */
-  --primary-bg:    #FDEEDC;   /* 主色背景 */
+  --primary: #2f6bff;
+  --primary-2: #1d4ed8;
+  --primary-soft: #dce7f5;
+  --primary-bg: #eef5fd;
 
-  /* 辅助色系 */
-  --accent-warm:   #E8853A;   /* 中橙 = 行动指引 */
-  --accent-warm-bg: #FCE4D0;  /* 暖橙背景 */
-  --accent-pink:   #F2B5A0;   /* 桃粉 = 关怀 */
-  --accent-pink-bg: #FCE4D0;  /* 桃粉背景 */
-  --accent-green:  #7EB88E;   /* 草绿 = 低风险/安全 */
-  --accent-green-bg: #E2F0E6; /* 草绿背景 */
-  --accent-blue:   #9DBDD9;   /* 安抚蓝 = 信任 */
-  --accent-blue-bg: #DDE8F2;  /* 安抚蓝背景 */
-  --accent-yellow: #E8853A;   /* 提示色 */
-  --accent-yellow-bg: #FCE4D0;
-  --accent-lavender: #F9B98A; /* 薰衣草橙 */
+  --accent-warm: #3b82f6;
+  --accent-warm-bg: #eaf3ff;
+  --accent-pink: #89a9e6;
+  --accent-pink-bg: #e9f1fb;
+  --accent-green: #1f9d72;
+  --accent-green-bg: #eaf8f2;
+  --accent-blue: #95b8e8;
+  --accent-blue-bg: #e8f1fb;
+  --accent-yellow: #f59e0b;
+  --accent-yellow-bg: #fff7e8;
+  --accent-lavender: #7fa8ff;
 
-  /* 风险等级 */
-  --risk-low:      #7EB88E;   /* 低风险 草绿 */
-  --risk-low-bg:   #E2F0E6;   /* 低风险背景 */
-  --risk-mid:      #F2935A;   /* 中风险 暖橙 */
-  --risk-mid-bg:   #FCE4D0;   /* 中风险背景 */
-  --risk-high:     #D9533A;   /* 高风险 红色 */
-  --risk-high-bg:  #FBDDD3;   /* 高风险背景 */
+  --risk-low: #1f9d72;
+  --risk-low-bg: #eaf8f2;
+  --risk-mid: #f59e0b;
+  --risk-mid-bg: #fff7e8;
+  --risk-high: #dc2626;
+  --risk-high-bg: #fef0f0;
 
-  /* 文字颜色 */
-  --text-1:        #3A2E26;   /* 主文字 深棕色 */
-  --text-2:        #6B5A4E;   /* 次要文字 */
-  --text-3:        #B5A89C;   /* 辅助文字 */
+  --text-1: #162033;
+  --text-2: #516276;
+  --text-3: #94a3b8;
 
-  /* 分割线 */
-  --line:          #F5D9C0;   /* 分割线 */
-  --line-soft:     #F8E2CB;   /* 柔和分割线 */
+  --line: #e2e8f0;
+  --line-soft: #edf2f7;
 
-  /* 阴影 */
-  --shadow:        0 6px 20px rgba(200,120,60,.10);
-  --shadow-hover:  0 10px 24px rgba(200,120,60,.18);
-  --shadow-soft:  0 2px 12px rgba(200,120,60,.06);
+  --shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+  --shadow-hover: 0 16px 34px rgba(15, 23, 42, 0.1);
+  --shadow-soft: 0 4px 16px rgba(15, 23, 42, 0.05);
 }
 
 /* 基础样式 */
@@ -63,6 +56,7 @@ body {
   color: var(--text-1);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  text-wrap: pretty;
 }
 
 /* 美化滚动条 */
@@ -74,16 +68,16 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #FBD9BE;
+  background: #d5e0ef;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #F2935A;
+  background: #9cb4d3;
 }
 
 ::selection {
-  background: #FCE4D0;
-  color: #3A2E26;
+  background: #dbeafe;
+  color: #0f172a;
 }
 
 /* 通用动画 */

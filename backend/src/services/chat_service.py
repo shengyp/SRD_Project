@@ -21,6 +21,32 @@ class ChatService:
     def __init__(self, mysql_pool):
         self.mysql_pool = mysql_pool
 
+    async def ensure_chat_session_title_column(self) -> None:
+        """为历史数据库补齐会话标题字段，避免手工迁移。"""
+        async with self.mysql_pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute("SET NAMES utf8mb4")
+                await cursor.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'chat_sessions'
+                      AND COLUMN_NAME = 'title'
+                    """
+                )
+                row = await cursor.fetchone()
+                exists = bool(row and row[0])
+                if not exists:
+                    await cursor.execute(
+                        """
+                        ALTER TABLE chat_sessions
+                        ADD COLUMN title varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '会话标题'
+                        AFTER user_hash
+                        """
+                    )
+                    await conn.commit()
+
     async def get_sessions(
             self,
             user_hash: Optional[str] = None,
@@ -68,10 +94,10 @@ class ChatService:
             async with conn.cursor(aiomysql.DictCursor) as cursor:
                 await cursor.execute("SET NAMES utf8mb4")
                 await cursor.execute(
-                    f"""SELECT id, session_code, user_id, user_hash, archive_id,
+                    f"""SELECT id, session_code, user_id, user_hash, title, archive_id,
                               data_source, ai_mode, context_type, message_count,
                               total_tokens, status, is_pinned, last_message_at,
-                              last_ai_response_at, created_at
+                              last_ai_response_at, created_at, updated_at
                        FROM chat_sessions
                        WHERE {where_clause}
                        ORDER BY is_pinned DESC, {order_field} DESC
@@ -142,13 +168,14 @@ class ChatService:
                 await cursor.execute("SET NAMES utf8mb4")
                 await cursor.execute(
                     """INSERT INTO chat_sessions
-                       (session_code, user_id, user_hash, archive_id, data_source,
+                       (session_code, user_id, user_hash, title, archive_id, data_source,
                         ai_mode, context_type, knowledge_sources, rag_keywords)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                     (
                         session_code,
                         session_data.get("user_id"),
                         session_data.get("user_hash"),
+                        session_data.get("title"),
                         session_data.get("archive_id"),
                         session_data.get("data_source"),
                         session_data.get("ai_mode", "deep_think"),
@@ -171,7 +198,7 @@ class ChatService:
         params = []
 
         for key, value in update_data.items():
-            if key in ["ai_mode", "context_type", "status", "is_pinned"]:
+            if key in ["ai_mode", "context_type", "status", "is_pinned", "title"]:
                 set_clauses.append(f"{key} = %s")
                 params.append(value)
             elif key in ["knowledge_sources", "rag_keywords"]:

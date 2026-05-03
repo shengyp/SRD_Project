@@ -1068,6 +1068,7 @@ export interface ChatSession {
   sessionCode?: string;
   userId?: number;
   userHash?: string;
+  title?: string | null;
   archiveId?: number;
   dataSource?: string;
   aiMode: 'deep_think' | 'risk_assessment' | 'intervention' | 'scale_interpret';
@@ -1080,6 +1081,7 @@ export interface ChatSession {
   isPinned: boolean;
   lastMessageAt?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface ChatMessage {
@@ -1197,6 +1199,7 @@ export async function createChatSession(session: {
   userHash?: string;
   archiveId?: number;
   dataSource?: string;
+  title?: string;
   aiMode: string;
   contextType?: string;
 }): Promise<ChatSession> {
@@ -1207,6 +1210,23 @@ export async function createChatSession(session: {
     body: JSON.stringify(session),
   });
   return data;
+}
+
+export async function updateChatSession(
+  sessionId: number,
+  session: {
+    title?: string | null;
+    aiMode?: string;
+    contextType?: string;
+    status?: 'active' | 'archived' | 'deleted';
+    isPinned?: boolean;
+  },
+): Promise<ChatSession> {
+  const endpoint = `/api/chat/sessions/${sessionId}`;
+  return request<ChatSession>(endpoint, {
+    method: 'PUT',
+    body: JSON.stringify(session),
+  });
 }
 
 export async function deleteChatSession(sessionId: number): Promise<void> {
@@ -2371,6 +2391,7 @@ export const api = {
   // 智能问答
   fetchChatSessions,
   createChatSession,
+  updateChatSession,
   deleteChatSession,
   fetchChatMessages,
   sendChatMessage,

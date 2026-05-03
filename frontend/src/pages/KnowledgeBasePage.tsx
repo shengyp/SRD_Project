@@ -15,6 +15,9 @@ import {
   Activity,
   Loader,
   Edit,
+  Database,
+  FolderTree,
+  Tags,
 } from 'lucide-react';
 import { formatDateTimeShort } from '../utils/dateFormat';
 import {
@@ -31,6 +34,7 @@ import {
   type KnowledgeDocument as ApiKnowledgeDocument,
 } from '../api';
 import { useAuthStore } from '../store/authStore';
+import PaperStatCard from '../components/PaperStatCard';
 
 // ==================== 类型定义 ====================
 
@@ -301,7 +305,7 @@ function UploadModal({
       <div className="absolute inset-0 bg-black bg-opacity-40" onClick={onClose}></div>
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4 animate-scale-in">
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
-          <h3 className="text-xl font-bold text-[#4A3B32]">上传知识文档</h3>
+          <h3 className="text-xl font-bold text-[#162033]">上传知识文档</h3>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
             <X className="w-5 h-5 text-gray-500" />
           </button>
@@ -309,10 +313,10 @@ function UploadModal({
 
         <div className="p-6 space-y-6">
           <div>
-            <label className="block text-sm font-semibold text-[#4A3B32] mb-2">文档标题 *</label>
+            <label className="block text-sm font-semibold text-[#162033] mb-2">文档标题 *</label>
             <input
               type="text"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-transparent"
               placeholder="请输入文档标题"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -321,9 +325,9 @@ function UploadModal({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-[#4A3B32] mb-2">主题 *</label>
+              <label className="block text-sm font-semibold text-[#162033] mb-2">主题 *</label>
               <select
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-transparent"
                 value={formData.topic}
                 onChange={(e) => setFormData({ ...formData, topic: e.target.value, subTopic: '' })}
               >
@@ -333,9 +337,9 @@ function UploadModal({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-[#4A3B32] mb-2">子主题 *</label>
+              <label className="block text-sm font-semibold text-[#162033] mb-2">子主题 *</label>
               <select
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-transparent"
                 value={formData.subTopic}
                 onChange={(e) => setFormData({ ...formData, subTopic: e.target.value })}
                 disabled={!formData.topic}
@@ -348,10 +352,10 @@ function UploadModal({
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-[#4A3B32] mb-2">关键词（用逗号分隔）</label>
+            <label className="block text-sm font-semibold text-[#162033] mb-2">关键词（用逗号分隔）</label>
             <input
               type="text"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-transparent"
               placeholder="如：高危信号、预警、遗书"
               value={formData.keywords}
               onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
@@ -359,9 +363,9 @@ function UploadModal({
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-[#4A3B32] mb-2">文档描述</label>
+            <label className="block text-sm font-semibold text-[#162033] mb-2">文档描述</label>
             <textarea
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-transparent"
               rows={3}
               placeholder="请输入文档简要描述"
               value={formData.description}
@@ -370,12 +374,12 @@ function UploadModal({
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-[#4A3B32] mb-2">文件上传 *</label>
+            <label className="block text-sm font-semibold text-[#162033] mb-2">文件上传 *</label>
             <div
               className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
-                isDragOver ? 'border-orange-400 bg-orange-50' :
+                isDragOver ? 'border-blue-500 bg-blue-50' :
                 selectedFile ? 'border-green-400 bg-green-50' :
-                'border-gray-300 hover:border-orange-400 hover:bg-orange-50'
+                'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
               }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -386,8 +390,8 @@ function UploadModal({
                 <div className="flex items-center justify-center gap-3">
                   <FileText className="w-8 h-8 text-green-500" />
                   <div className="text-left">
-                    <p className="font-semibold text-[#4A3B32]">{selectedFile.name}</p>
-                    <p className="text-sm text-[#8C7A6B]">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+                    <p className="font-semibold text-[#162033]">{selectedFile.name}</p>
+                    <p className="text-sm text-[#64748B]">{(selectedFile.size / 1024).toFixed(1)} KB</p>
                   </div>
                   <button onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }} className="ml-4 p-1 hover:bg-green-100 rounded-lg">
                     <X className="w-4 h-4 text-green-600" />
@@ -413,11 +417,11 @@ function UploadModal({
           {isUploading && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-[#5A4B42]">正在上传...</span>
-                <span className="text-sm font-medium text-orange-500">{uploadProgress}%</span>
+                <span className="text-sm text-[#415168]">正在上传...</span>
+                <span className="text-sm font-medium text-blue-600">{uploadProgress}%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-gradient-to-r from-orange-400 to-orange-500 h-2 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
               </div>
             </div>
           )}
@@ -439,7 +443,7 @@ function UploadModal({
           <button
             onClick={handleSubmit}
             disabled={isUploading}
-            className="px-6 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl transition-colors font-semibold flex items-center gap-2"
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl transition-colors font-semibold flex items-center gap-2"
           >
             {isUploading ? (<>上传中... <Activity className="w-4 h-4 animate-spin" /></>) : '上传文档'}
           </button>
@@ -532,8 +536,8 @@ function EditModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black bg-opacity-40" onClick={onClose}></div>
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4 animate-scale-in">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
-          <h3 className="text-xl font-bold text-[#4A3B32]">编辑知识文档</h3>
+        <div className="flex items-center justify-between p-6 border-b border-[#E2E8F0]">
+          <h3 className="text-xl font-bold text-[#162033]">编辑知识文档</h3>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
             <X className="w-5 h-5 text-gray-500" />
           </button>
@@ -541,10 +545,10 @@ function EditModal({
 
         <div className="p-6 space-y-6">
           <div>
-            <label className="block text-sm font-semibold text-[#4A3B32] mb-2">文档标题 *</label>
+            <label className="block text-sm font-semibold text-[#162033] mb-2">文档标题 *</label>
             <input
               type="text"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-transparent"
               placeholder="请输入文档标题"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -553,9 +557,9 @@ function EditModal({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-[#4A3B32] mb-2">主题 *</label>
+              <label className="block text-sm font-semibold text-[#162033] mb-2">主题 *</label>
               <select
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-transparent"
                 value={formData.topic}
                 onChange={(e) => setFormData({ ...formData, topic: e.target.value, subTopic: '' })}
               >
@@ -565,9 +569,9 @@ function EditModal({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-[#4A3B32] mb-2">子主题</label>
+              <label className="block text-sm font-semibold text-[#162033] mb-2">子主题</label>
               <select
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-transparent"
                 value={formData.subTopic}
                 onChange={(e) => setFormData({ ...formData, subTopic: e.target.value })}
                 disabled={!formData.topic}
@@ -580,10 +584,10 @@ function EditModal({
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-[#4A3B32] mb-2">关键词（用逗号分隔）</label>
+            <label className="block text-sm font-semibold text-[#162033] mb-2">关键词（用逗号分隔）</label>
             <input
               type="text"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-transparent"
               placeholder="如：高危信号、预警、遗书"
               value={formData.keywords}
               onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
@@ -591,9 +595,9 @@ function EditModal({
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-[#4A3B32] mb-2">文档描述</label>
+            <label className="block text-sm font-semibold text-[#162033] mb-2">文档描述</label>
             <textarea
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-transparent"
               rows={3}
               placeholder="请输入文档简要描述"
               value={formData.description}
@@ -618,7 +622,7 @@ function EditModal({
           <button
             onClick={handleSubmit}
             disabled={isSaving}
-            className="px-6 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl transition-colors font-semibold flex items-center gap-2"
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl transition-colors font-semibold flex items-center gap-2"
           >
             {isSaving ? (<>保存中... <Activity className="w-4 h-4 animate-spin" /></>) : '保存修改'}
           </button>
@@ -821,6 +825,39 @@ export default function KnowledgeBasePage() {
   });
 
   const totalPages = Math.ceil(totalDocs / pageSize);
+  const activeFilterCount = [appliedFilters.topic, appliedFilters.subTopic, appliedFilters.status, appliedFilters.format]
+    .filter(Boolean).length + appliedKeywords.length;
+  const uploadedCount = documents.filter((doc) => doc.uploadStatus === 'uploaded').length;
+  const knowledgeStats = [
+    {
+      label: '知识文档',
+      value: totalDocs,
+      note: '当前知识库纳入检索与问答增强的文档总量',
+      icon: Database,
+      tone: 'blue' as const,
+    },
+    {
+      label: '主题结构',
+      value: Math.max(0, topics.length - 1),
+      note: '按主题与子主题组织危机识别、干预与量表知识',
+      icon: FolderTree,
+      tone: 'cyan' as const,
+    },
+    {
+      label: '已上传文档',
+      value: uploadedCount,
+      note: '当前页已完成入库处理并可直接参与检索的文档',
+      icon: Upload,
+      tone: 'green' as const,
+    },
+    {
+      label: '激活筛选',
+      value: activeFilterCount,
+      note: '按关键词、主题、格式和状态快速收束证据范围',
+      icon: Tags,
+      tone: 'slate' as const,
+    },
+  ];
 
   const getFormatBadge = (format: string) => {
     const config: Record<string, { bg: string; text: string }> = {
@@ -844,14 +881,27 @@ export default function KnowledgeBasePage() {
 
   return (
     <div className="flex flex-1 flex-col min-h-0 w-full gap-4 md:gap-6 animate-fade-in">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {knowledgeStats.map((stat) => (
+          <PaperStatCard
+            key={stat.label}
+            label={stat.label}
+            value={stat.value}
+            note={stat.note}
+            icon={stat.icon}
+            tone={stat.tone}
+          />
+        ))}
+      </div>
+
       {/* 筛选工具栏 */}
-      <div className="shrink-0 bg-white rounded-2xl p-5 shadow-sm border border-[#EADDD5]">
+      <div className="shrink-0 bg-white rounded-[28px] p-5 shadow-[0_10px_28px_rgba(15,23,42,0.04)] border border-[#E2E8F0]">
         <div className="flex flex-wrap gap-4">
           {/* 主题筛选 */}
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-[#5A4B42] whitespace-nowrap">主题：</label>
+            <label className="text-sm font-medium text-[#415168] whitespace-nowrap">主题：</label>
             <select
-              className="px-3 py-2 border border-[#EADDD5] rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 text-sm bg-[#FAF6F3] min-w-[140px]"
+              className="px-3 py-2 border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 text-sm bg-[#F7F9FC] min-w-[140px]"
               value={filters.topic}
               onChange={(e) => handleFilterChange('topic', e.target.value)}
             >
@@ -861,9 +911,9 @@ export default function KnowledgeBasePage() {
 
           {/* 子主题筛选 */}
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-[#5A4B42] whitespace-nowrap">子主题：</label>
+            <label className="text-sm font-medium text-[#415168] whitespace-nowrap">子主题：</label>
             <select
-              className="px-3 py-2 border border-[#EADDD5] rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 text-sm bg-[#FAF6F3] min-w-[140px]"
+              className="px-3 py-2 border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 text-sm bg-[#F7F9FC] min-w-[140px]"
               value={filters.subTopic}
               onChange={(e) => handleFilterChange('subTopic', e.target.value)}
               disabled={!filters.topic}
@@ -874,9 +924,9 @@ export default function KnowledgeBasePage() {
 
           {/* 状态筛选 */}
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-[#5A4B42] whitespace-nowrap">状态：</label>
+            <label className="text-sm font-medium text-[#415168] whitespace-nowrap">状态：</label>
             <select
-              className="px-3 py-2 border border-[#EADDD5] rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 text-sm bg-[#FAF6F3]"
+              className="px-3 py-2 border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 text-sm bg-[#F7F9FC]"
               value={filters.status}
               onChange={(e) => handleFilterChange('status', e.target.value)}
             >
@@ -889,9 +939,9 @@ export default function KnowledgeBasePage() {
 
           {/* 格式筛选 */}
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-[#5A4B42] whitespace-nowrap">格式：</label>
+            <label className="text-sm font-medium text-[#415168] whitespace-nowrap">格式：</label>
             <select
-              className="px-3 py-2 border border-[#EADDD5] rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400 text-sm bg-[#FAF6F3]"
+              className="px-3 py-2 border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 text-sm bg-[#F7F9FC]"
               value={filters.format}
               onChange={(e) => handleFilterChange('format', e.target.value)}
             >
@@ -905,17 +955,17 @@ export default function KnowledgeBasePage() {
         </div>
 
         {/* 关键词筛选 */}
-        <div className="mt-4 pt-4 border-t border-[#EADDD5]">
+        <div className="mt-4 pt-4 border-t border-[#E2E8F0]">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-[#5A4B42]">关键词：</span>
+            <span className="text-sm font-medium text-[#415168]">关键词：</span>
             {keywords.map((kw) => (
               <button
                 key={kw}
                 onClick={() => handleKeywordToggle(kw)}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
                   selectedKeywords.includes(kw)
-                    ? 'bg-orange-500 text-white'
-                    : 'bg-[#FAF6F3] text-[#5A4B42] hover:bg-orange-100 hover:text-orange-700 border border-[#EADDD5]'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-[#F7F9FC] text-[#415168] hover:bg-blue-50 hover:text-blue-700 border border-[#E2E8F0]'
                 }`}
               >
                 {kw}
@@ -928,14 +978,14 @@ export default function KnowledgeBasePage() {
         <div className="mt-4 flex items-center gap-3">
           <button
             onClick={handleApplyFilter}
-            className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl transition-all text-sm font-medium shadow-sm"
+            className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white rounded-xl transition-all text-sm font-medium shadow-sm"
           >
             <Search className="w-4 h-4" />
             筛选
           </button>
           <button
             onClick={handleReset}
-            className="flex items-center gap-2 px-5 py-2 bg-[#F4EBE1] hover:bg-[#EADDD5] text-[#5C4D43] rounded-xl transition-colors text-sm font-medium"
+            className="flex items-center gap-2 px-5 py-2 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl transition-colors text-sm font-medium"
           >
             <RefreshCw className="w-4 h-4" />
             重置
@@ -944,7 +994,7 @@ export default function KnowledgeBasePage() {
             <div className="flex items-center gap-2 ml-auto">
               <button
                 onClick={() => setIsUploadModalOpen(true)}
-                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl transition-all text-sm font-medium shadow-sm"
+                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white rounded-xl transition-all text-sm font-medium shadow-sm"
                 title="上传文档（管理员）"
               >
                 <Upload className="w-4 h-4" />
@@ -956,27 +1006,33 @@ export default function KnowledgeBasePage() {
       </div>
 
       {/* 文档列表 */}
-      <div className="flex-1 min-h-0 bg-white rounded-2xl shadow-sm border border-[#EADDD5] overflow-hidden flex flex-col">
+      <div className="flex-1 min-h-0 bg-white rounded-[28px] shadow-[0_10px_28px_rgba(15,23,42,0.04)] border border-[#E2E8F0] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between border-b border-[#E8EEF6] bg-[#FCFDFF] px-5 py-4">
+          <div>
+            <h2 className="text-lg font-semibold text-[#162033]">知识文档列表</h2>
+            <p className="mt-1 text-sm text-[#6B7B8F]">文档详情、关键词覆盖与下载操作统一在此处完成。</p>
+          </div>
+        </div>
         <div className="overflow-x-auto flex-1">
           <table className="w-full">
-            <thead className="bg-gradient-to-r from-[#F9F5F2] to-[#FDF9F6] sticky top-0 z-10">
+            <thead className="bg-gradient-to-r from-[#F7FAFD] to-white sticky top-0 z-10">
               <tr>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">标题</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">主题</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">子主题</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">关键词</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">格式</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">大小</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">状态</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">上传时间</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">操作</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">标题</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">主题</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">子主题</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">关键词</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">格式</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">大小</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">状态</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">上传时间</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#F0EAE5]">
+            <tbody className="divide-y divide-[#EAF0F6]">
               {docsLoading ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-16 text-center text-[#A89F95]">
-                    <Loader className="w-8 h-8 text-[#C19A83] mx-auto mb-3 animate-spin" />
+                  <td colSpan={9} className="px-4 py-16 text-center text-[#94A3B8]">
+                    <Loader className="w-8 h-8 text-[#2F6BFF] mx-auto mb-3 animate-spin" />
                     <p>加载中...</p>
                   </td>
                 </tr>
@@ -984,14 +1040,14 @@ export default function KnowledgeBasePage() {
                 <tr>
                   <td colSpan={9} className="px-4 py-12 text-center text-red-500">
                     <p>{docsError}</p>
-                    <button onClick={loadDocuments} className="mt-2 text-sm text-orange-500 underline">重试</button>
+                    <button onClick={loadDocuments} className="mt-2 text-sm text-blue-600 underline">重试</button>
                   </td>
                 </tr>
               ) : filteredDocs.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-[#A89F95]">
+                  <td colSpan={9} className="px-4 py-12 text-center text-[#94A3B8]">
                     <div className="flex flex-col items-center gap-2">
-                      <FileText className="w-12 h-12 text-[#D7BFA6]" />
+                      <FileText className="w-12 h-12 text-[#BFD3F2]" />
                       <p>暂无文档</p>
                       <p className="text-sm">点击上方「上传文档」按钮添加知识库文档</p>
                     </div>
@@ -999,19 +1055,19 @@ export default function KnowledgeBasePage() {
                 </tr>
               ) : (
                 filteredDocs.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-[#FAF6F3] transition-colors">
+                  <tr key={doc.id} className="hover:bg-[#F7F9FC] transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-orange-400" />
-                        <span className="text-sm font-medium text-[#4A3B32]">{doc.title}</span>
+                        <FileText className="w-4 h-4 text-blue-500" />
+                      <span className="text-sm font-medium text-[#162033]">{doc.title}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-[#5A4B42]">{doc.topic?.topicName || getTopicName(doc.topicId)}</td>
-                    <td className="px-4 py-3 text-sm text-[#5A4B42]">{doc.subTopic?.subTopicName || getSubTopicName(doc.subTopicId) || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-[#415168]">{doc.topic?.topicName || getTopicName(doc.topicId)}</td>
+                    <td className="px-4 py-3 text-sm text-[#415168]">{doc.subTopic?.subTopicName || getSubTopicName(doc.subTopicId) || '-'}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
                         {getKeywords(doc).slice(0, 3).map((kw, i) => (
-                          <span key={i} className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full">{kw}</span>
+                          <span key={i} className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full">{kw}</span>
                         ))}
                         {getKeywords(doc).length > 3 && (
                           <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full">+{getKeywords(doc).length - 3}</span>
@@ -1019,9 +1075,9 @@ export default function KnowledgeBasePage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">{getFormatBadge(doc.format)}</td>
-                    <td className="px-4 py-3 text-sm text-[#5A4B42]">{getSizeDisplay(doc)}</td>
+                    <td className="px-4 py-3 text-sm text-[#415168]">{getSizeDisplay(doc)}</td>
                     <td className="px-4 py-3">{getStatusBadge(doc.uploadStatus)}</td>
-                    <td className="px-4 py-3 text-sm text-[#5A4B42]">{getUploadTime(doc)}</td>
+                    <td className="px-4 py-3 text-sm text-[#415168]">{getUploadTime(doc)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
                         <button
@@ -1075,11 +1131,11 @@ export default function KnowledgeBasePage() {
         </div>
 
         {/* 分页控件 */}
-        <div className="shrink-0 flex items-center justify-between p-4 border-t border-[#EADDD5] bg-gradient-to-r from-[#F9F5F2] to-white">
+        <div className="shrink-0 flex items-center justify-between p-4 border-t border-[#E2E8F0] bg-gradient-to-r from-[#F7FAFD] to-white">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-[#8C7A6B]">每页显示：</span>
+            <span className="text-sm text-[#64748B]">每页显示：</span>
             <select
-              className="px-3 py-1.5 border border-[#EADDD5] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
+              className="px-3 py-1.5 border border-[#E2E8F0] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
               value={pageSize}
               onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
             >
@@ -1091,25 +1147,25 @@ export default function KnowledgeBasePage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-sm text-[#8C7A6B]">
-              共 <strong className="text-[#4A362C]">{totalDocs}</strong> 条，第 <strong className="text-[#4A362C]">{currentPage}</strong> / <strong className="text-[#4A362C]">{totalPages || 1}</strong> 页
+            <span className="text-sm text-[#64748B]">
+              共 <strong className="text-[#162033]">{totalDocs}</strong> 条，第 <strong className="text-[#162033]">{currentPage}</strong> / <strong className="text-[#162033]">{totalPages || 1}</strong> 页
             </span>
             <div className="flex items-center gap-1 ml-2">
               <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="p-2 hover:bg-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                <ChevronLeft className="w-4 h-4 text-[#5A4B42]" />
+                <ChevronLeft className="w-4 h-4 text-[#415168]" />
               </button>
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                className="px-3 py-1.5 bg-white border border-[#EADDD5] rounded-lg text-sm hover:bg-[#F4EBE1] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                className="px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-sm hover:bg-[#F1F5FA] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 上一页
               </button>
-              <span className="px-4 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg text-sm font-semibold shadow-sm">{currentPage}</span>
+              <span className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg text-sm font-semibold shadow-sm">{currentPage}</span>
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || totalPages === 0}
-                className="px-3 py-1.5 bg-white border border-[#EADDD5] rounded-lg text-sm hover:bg-[#F4EBE1] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                className="px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-sm hover:bg-[#F1F5FA] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 下一页
               </button>
               <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages || totalPages === 0}
                 className="p-2 hover:bg-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                <ChevronRight className="w-4 h-4 text-[#5A4B42]" />
+                <ChevronRight className="w-4 h-4 text-[#415168]" />
               </button>
             </div>
           </div>
@@ -1137,3 +1193,6 @@ export default function KnowledgeBasePage() {
     </div>
   );
 }
+
+
+

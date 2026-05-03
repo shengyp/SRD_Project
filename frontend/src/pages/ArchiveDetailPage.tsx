@@ -49,7 +49,7 @@ const DATA_SOURCES = [
 ];
 
 const DATA_SOURCE_COLORS: Record<string, string> = {
-  reddit: 'bg-orange-100 text-orange-700',
+  reddit: 'bg-[#E8F0FF] text-[#2F6BFF]',
 };
 
 const RISK_COLORS = {
@@ -89,7 +89,7 @@ export default function ArchiveDetailPage() {
       .then((datasets) => {
         if (datasets && datasets.length > 0) {
           const defaultColorMap: Record<string, string> = {
-            reddit: 'bg-orange-100 text-orange-700',
+            reddit: 'bg-[#E8F0FF] text-[#2F6BFF]',
           };
           const colors: Record<string, string> = { ...defaultColorMap };
           datasets.forEach((ds: DatasetProfile) => {
@@ -266,14 +266,14 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
 
   // 获取重要性分数对应的背景色
   const getImportanceBgColor = (score: number): string => {
-    if (score >= 0.7) return 'bg-orange-100';
+    if (score >= 0.7) return 'bg-[#E8F0FF]';
     if (score >= 0.4) return 'bg-yellow-100';
     return 'bg-green-100';
   };
 
   // 获取重要性分数对应的文字色
   const getImportanceTextColor = (score: number): string => {
-    if (score >= 0.7) return 'text-orange-500';
+    if (score >= 0.7) return 'text-[#2F6BFF]';
     if (score >= 0.4) return 'text-yellow-500';
     return 'text-green-500';
   };
@@ -290,17 +290,17 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
     if (index === 0) return '#ef4444';
     if (index === 1) return '#f97316';
     if (index === 2) return '#eab308';
-    return '#C19A83';
+    return '#8FB4FF';
   };
 
   if (!selectedArchive) {
     return (
       <div className="flex flex-1 items-center justify-center">
         <div className="text-center">
-          <p className="text-[#8C7A6B] mb-4">正在加载档案数据...</p>
+          <p className="text-[#64748B] mb-4">正在加载档案数据...</p>
           <button
             onClick={() => navigate('/archive')}
-            className="px-5 py-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl text-sm font-medium"
+            className="px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl text-sm font-medium"
           >
             返回列表
           </button>
@@ -311,22 +311,21 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
 
   return (
     <div className="flex flex-1 flex-col min-h-0 w-full gap-4 md:gap-5 animate-fade-in">
-      {/* 当前已选（仅展示，不可筛选） */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#EADDD5]">
+      <div className="bg-white rounded-[28px] p-5 shadow-[0_10px_28px_rgba(15,23,42,0.04)] border border-[#E2E8F0]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 px-4 py-2.5 bg-[#FAF6F3] border border-[#EADDD5] rounded-xl">
-              <span className="text-sm font-medium text-[#5A4B42]">当前已选：</span>
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl">
+              <span className="text-sm font-medium text-[#415168]">当前已选：</span>
               <span className={`px-3 py-1 ${dataSourceColors[selectedArchive.dataSource]} text-xs rounded-full font-medium`}>
                 {dataSourceOptions.find(d => d.value === selectedArchive.dataSource)?.label}
               </span>
-              <span className="text-sm text-[#5A4B42]">/</span>
-              <span className="text-sm font-semibold text-[#4A362C]">{selectedArchive.userId}</span>
+              <span className="text-sm text-[#415168]">/</span>
+              <span className="text-sm font-semibold text-[#162033]">{selectedArchive.userId}</span>
             </div>
 
             <button
               onClick={() => navigate('/archive')}
-              className="flex items-center gap-2 px-4 py-2 bg-[#F4EBE1] hover:bg-[#EADDD5] text-[#5A4B42] rounded-xl transition-colors text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl transition-colors text-sm font-medium"
             >
               <ArrowLeft className="w-4 h-4" />
               返回列表
@@ -337,22 +336,21 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
             <span className={`px-4 py-1.5 rounded-full text-sm font-semibold ${RISK_COLORS[riskKey].bg} ${RISK_COLORS[riskKey].text}`}>
               {selectedArchive.riskOverview}
             </span>
-            <span className="px-3 py-1.5 bg-[#F4EBE1] text-[#5C4D43] rounded-full text-sm">
+            <span className="px-3 py-1.5 bg-[#F1F5FA] text-[#415168] rounded-full text-sm">
               共 {posts.length} 条帖子
             </span>
           </div>
         </div>
       </div>
 
-      {/* 频繁词汇统计 */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#EADDD5]">
+      <div className="bg-white rounded-[28px] p-4 shadow-[0_10px_28px_rgba(15,23,42,0.04)] border border-[#E2E8F0]">
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 text-sm text-[#8C7A6B]">
+          <div className="flex items-center gap-2 text-sm text-[#64748B]">
             <Clock className="w-4 h-4" />
             <span>近N天内频繁词汇：</span>
           </div>
           {frequentWords.map((word, i) => (
-            <span key={i} className="px-3 py-1 bg-white border border-[#D7BFA6] text-[#5C4D43] text-sm rounded-full font-medium hover:bg-orange-50 transition-colors cursor-default">
+            <span key={i} className="px-3 py-1 bg-white border border-[#DCE7F5] text-[#2F6BFF] text-sm rounded-full font-medium hover:bg-blue-50 transition-colors cursor-default">
               {word}
             </span>
           ))}
@@ -362,15 +360,15 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
       {/* 主内容区 */}
       <div className="flex-1 min-h-0 flex flex-col gap-5">
         {/* 图表区：重要性分数随时间变化 */}
-        <div className="bg-white rounded-2xl border border-[#EADDD5] p-5 shadow-sm shrink-0">
-          <h3 className="text-base font-bold text-[#4A362C] mb-4 flex items-center gap-2">
-            <Star className="w-5 h-5 text-[#C19A83]" />
+        <div className="bg-white rounded-[28px] border border-[#E2E8F0] p-5 shadow-[0_10px_28px_rgba(15,23,42,0.04)] shrink-0">
+          <h3 className="text-base font-semibold text-[#162033] mb-4 flex items-center gap-2">
+            <Star className="w-5 h-5 text-[#2F6BFF]" />
             重要性分数随时间 / 帖子顺序变化
-            <span className="text-xs font-normal text-[#8C7A6B] ml-2">（柱状图 - 高度对应重要性分数，分数越高越重要）</span>
+            <span className="text-xs font-normal text-[#64748B] ml-2">（柱状图高度对应重要性分数，分数越高越重要）</span>
           </h3>
 
           {/* 交互说明 */}
-          <div className="flex flex-wrap gap-4 text-xs text-[#8C7A6B] mb-4 p-3 bg-[#FAF6F3] rounded-xl">
+          <div className="flex flex-wrap gap-4 text-xs text-[#64748B] mb-4 p-3 bg-[#F7FAFD] rounded-xl">
             <span className="flex items-center gap-1"><Info className="w-3 h-3" /> 交互说明：</span>
             <span>• 悬停柱子：显示重要性分数、风险等级、摘要</span>
             <span>• 点击柱子：选中该帖子，下方显示详情</span>
@@ -387,25 +385,25 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
                   data: visiblePosts.map(p =>
                     p.hasTimestamp ? (p.timestamp?.split(' ')[0] || '') : `#${p.postIndex}`
                   ),
-                  axisLine: { lineStyle: { color: '#EADDD5' } },
-                  axisLabel: { color: '#8C7A6B', fontSize: 11 },
+                  axisLine: { lineStyle: { color: '#DCE7F5' } },
+                  axisLabel: { color: '#64748B', fontSize: 11 },
                   name: '时间轴 / 帖子顺序',
                   nameLocation: 'middle',
                   nameGap: 35,
-                  nameTextStyle: { color: '#8C7A6B', fontSize: 11 },
+                  nameTextStyle: { color: '#64748B', fontSize: 11 },
                 },
                 yAxis: {
                   type: 'value',
                   min: 0,
                   max: 1,
                   interval: 0.2,
-                  axisLine: { show: true, lineStyle: { color: '#EADDD5' } },
-                  splitLine: { lineStyle: { color: '#F0EAE5', type: 'dashed' } },
-                  axisLabel: { color: '#8C7A6B', fontSize: 11 },
+                  axisLine: { show: true, lineStyle: { color: '#DCE7F5' } },
+                  splitLine: { lineStyle: { color: '#EAF0F6', type: 'dashed' } },
+                  axisLabel: { color: '#64748B', fontSize: 11 },
                   name: '重要性分数',
                   nameLocation: 'middle',
                   nameGap: 40,
-                  nameTextStyle: { color: '#8C7A6B', fontSize: 11 },
+                  nameTextStyle: { color: '#64748B', fontSize: 11 },
                 },
                 tooltip: {
                   trigger: 'axis',
@@ -422,7 +420,7 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
                       <div style="margin-top:6px;font-size:11px;color:#888;max-width:200px;overflow:hidden;text-overflow:ellipsis">${p.content.slice(0, 50)}...</div>
                     </div>`;
                   },
-                  backgroundColor: '#4A362C',
+                  backgroundColor: '#162033',
                   borderColor: 'transparent',
                   textStyle: { color: '#fff', fontSize: 12 },
                 },
@@ -434,7 +432,7 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
                       value: post.importanceScore,
                       itemStyle: {
                         color: getTopColorHex(topIndex >= 0 ? topIndex : -1),
-                        borderColor: selectedPost?.id === post.id ? '#4A362C' : 'transparent',
+                        borderColor: selectedPost?.id === post.id ? '#2F6BFF' : 'transparent',
                         borderWidth: selectedPost?.id === post.id ? 3 : 0,
                       },
                       emphasis: { itemStyle: { shadowBlur: 8, shadowColor: 'rgba(0,0,0,0.2)' } },
@@ -488,7 +486,7 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
               <button
                 onClick={() => setVisiblePostCount(prev => Math.min(prev + 15, filteredPosts.length))}
                 disabled={isLoadingMore}
-                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl text-sm font-medium transition-all shadow-sm disabled:opacity-50"
+                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl text-sm font-medium transition-all shadow-sm disabled:opacity-50"
               >
                 <MessageSquare className="w-4 h-4" />
                 {isLoadingMore ? '加载中...' : `查看更多帖子（还剩 ${filteredPosts.length - visiblePostCount} 条）`}
@@ -497,28 +495,28 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
           )}
 
           {/* 图例 */}
-          <div className="flex items-center justify-center gap-6 mt-5 pt-4 border-t border-[#F0EAE5] text-sm">
+          <div className="flex items-center justify-center gap-6 mt-5 pt-4 border-t border-[#EAF0F6] text-sm">
             <span className="flex items-center gap-2"><span className="w-4 h-4 rounded bg-gradient-to-r from-red-500 to-red-600"></span> Top1 最重要（分数最高）</span>
-            <span className="flex items-center gap-2"><span className="w-4 h-4 rounded bg-gradient-to-r from-orange-500 to-orange-600"></span> Top2</span>
+            <span className="flex items-center gap-2"><span className="w-4 h-4 rounded bg-gradient-to-r from-blue-500 to-blue-600"></span> Top2</span>
             <span className="flex items-center gap-2"><span className="w-4 h-4 rounded bg-gradient-to-r from-yellow-500 to-yellow-600"></span> Top3</span>
-            <span className="flex items-center gap-2"><span className="w-4 h-4 rounded bg-gradient-to-r from-[#D7BFA6] to-[#C19A83]"></span> 其他</span>
+            <span className="flex items-center gap-2"><span className="w-4 h-4 rounded bg-gradient-to-r from-[#BFD3F2] to-[#8FB4FF]"></span> 其他</span>
           </div>
         </div>
 
         {/* 筛选区 */}
-        <div className="bg-white rounded-2xl border border-[#EADDD5] p-5 shadow-sm shrink-0">
-          <h3 className="text-base font-bold text-[#4A362C] mb-4 flex items-center gap-2">
-            <Filter className="w-5 h-5 text-[#C19A83]" />
+        <div className="bg-white rounded-[28px] border border-[#E2E8F0] p-5 shadow-[0_10px_28px_rgba(15,23,42,0.04)] shrink-0">
+          <h3 className="text-base font-semibold text-[#162033] mb-4 flex items-center gap-2">
+            <Filter className="w-5 h-5 text-[#2F6BFF]" />
             筛选
-            <span className="text-xs font-normal text-[#8C7A6B] ml-2">（筛选说明：Top N 按重要性分数排序，颜色由深到浅）</span>
+            <span className="text-xs font-normal text-[#64748B] ml-2">（Top N 按重要性分数排序）</span>
           </h3>
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-[#5C4D43]">Top N：</label>
+              <label className="text-sm font-medium text-[#415168]">Top N：</label>
               <select
                 value={topN}
                 onChange={(e) => setTopN(Number(e.target.value))}
-                className="px-4 py-2 border border-[#EADDD5] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#D7BFA6] bg-white"
+                className="px-4 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
               >
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
                   <option key={n} value={n}>Top {n}</option>
@@ -526,27 +524,27 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-[#5C4D43]">时间范围：</label>
+              <label className="text-sm font-medium text-[#415168]">时间范围：</label>
               <input
                 type="date"
                 value={timeRange.start}
                 onChange={(e) => setTimeRange({ ...timeRange, start: e.target.value })}
-                className="px-4 py-2 border border-[#EADDD5] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#D7BFA6]"
+                className="px-4 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
               />
-              <span className="text-[#8C7A6B]">至</span>
+              <span className="text-[#64748B]">至</span>
               <input
                 type="date"
                 value={timeRange.end}
                 onChange={(e) => setTimeRange({ ...timeRange, end: e.target.value })}
-                className="px-4 py-2 border border-[#EADDD5] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#D7BFA6]"
+                className="px-4 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
               />
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-[#5C4D43]">重要性分数：</label>
+              <label className="text-sm font-medium text-[#415168]">重要性分数：</label>
               <select
                 value={importanceFilter}
                 onChange={(e) => setImportanceFilter(e.target.value)}
-                className="px-4 py-2 border border-[#EADDD5] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#D7BFA6] bg-white"
+                className="px-4 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
               >
                 <option value="all">全部</option>
                 <option value="high">高重要性 (≥0.7)</option>
@@ -555,23 +553,23 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-[#5C4D43]">帖子序号：</label>
+              <label className="text-sm font-medium text-[#415168]">帖子序号：</label>
               <input
                 type="text"
                 value={postIndexFilter}
                 onChange={(e) => setPostIndexFilter(e.target.value)}
                 placeholder="如: 1-50 或 #5"
-                className="px-4 py-2 border border-[#EADDD5] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#D7BFA6] w-28"
+                className="px-4 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 w-28"
               />
             </div>
             <button
-              className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl text-sm font-medium transition-all shadow-sm"
+              className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white rounded-xl text-sm font-medium transition-all shadow-sm"
             >
               <Search className="w-4 h-4" /> 筛选
             </button>
             <button
               onClick={handleReset}
-              className="flex items-center gap-2 px-5 py-2 bg-[#F4EBE1] hover:bg-[#EADDD5] text-[#5C4D43] rounded-xl text-sm transition-colors"
+              className="flex items-center gap-2 px-5 py-2 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl text-sm transition-colors"
             >
               <FilterX className="w-4 h-4" /> 重置
             </button>
@@ -580,45 +578,45 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
 
         {/* 当前选中帖子详情 */}
         {selectedPost && (
-          <div className="bg-white rounded-2xl border border-[#EADDD5] shadow-sm overflow-hidden shrink-0">
-            <div className="px-5 py-3 bg-gradient-to-r from-[#F9F5F2] to-white border-b border-[#EADDD5]">
-              <h3 className="text-base font-bold text-[#4A362C] flex items-center gap-2">
-                <FileText className="w-5 h-5 text-[#C19A83]" />
+          <div className="bg-white rounded-[28px] border border-[#E2E8F0] shadow-[0_10px_28px_rgba(15,23,42,0.04)] overflow-hidden shrink-0">
+            <div className="px-5 py-3 bg-gradient-to-r from-[#F7FAFD] to-white border-b border-[#E2E8F0]">
+              <h3 className="text-base font-semibold text-[#162033] flex items-center gap-2">
+                <FileText className="w-5 h-5 text-[#2F6BFF]" />
                 当前选中帖子详情
-                <span className="text-xs font-normal text-[#8C7A6B]">（默认展示 Top 1 最重要帖子）</span>
+                <span className="text-xs font-normal text-[#64748B]">（默认展示 Top 1 最重要帖子）</span>
               </h3>
             </div>
             <div className="p-5 space-y-4">
               {/* 帖子信息卡片 */}
-              <div className="bg-gradient-to-r from-[#FAF6F3] to-white rounded-2xl p-5 border border-[#EADDD5]">
-                <h4 className="font-semibold text-sm text-[#4A362C] mb-4 flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-[#C19A83]" />
+              <div className="bg-gradient-to-r from-[#F7FAFD] to-white rounded-2xl p-5 border border-[#DCE7F5]">
+                <h4 className="font-semibold text-sm text-[#162033] mb-4 flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-[#2F6BFF]" />
                   帖子信息
                 </h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-white rounded-xl p-3 border border-[#EADDD5]">
-                    <p className="text-xs text-[#8C7A6B] mb-1">用户ID</p>
-                    <p className="font-semibold text-[#4A362C] text-sm font-mono">{selectedPost.userId}</p>
+                  <div className="bg-white rounded-xl p-3 border border-[#E2E8F0]">
+                    <p className="text-xs text-[#64748B] mb-1">用户ID</p>
+                    <p className="font-semibold text-[#162033] text-sm font-mono">{selectedPost.userId}</p>
                   </div>
-                  <div className="bg-white rounded-xl p-3 border border-[#EADDD5]">
-                    <p className="text-xs text-[#8C7A6B] mb-1">帖子序号</p>
-                    <p className="font-semibold text-[#4A362C] text-sm">#{selectedPost.postIndex}</p>
+                  <div className="bg-white rounded-xl p-3 border border-[#E2E8F0]">
+                    <p className="text-xs text-[#64748B] mb-1">帖子序号</p>
+                    <p className="font-semibold text-[#162033] text-sm">#{selectedPost.postIndex}</p>
                   </div>
-                  <div className="bg-white rounded-xl p-3 border border-[#EADDD5]">
-                    <p className="text-xs text-[#8C7A6B] mb-1">重要性分数</p>
-                    <p className="font-semibold text-[#4A362C] text-sm">{selectedPost.importanceScore.toFixed(2)}</p>
+                  <div className="bg-white rounded-xl p-3 border border-[#E2E8F0]">
+                    <p className="text-xs text-[#64748B] mb-1">重要性分数</p>
+                    <p className="font-semibold text-[#162033] text-sm">{selectedPost.importanceScore.toFixed(2)}</p>
                   </div>
-                  <div className="bg-white rounded-xl p-3 border border-[#EADDD5]">
-                    <p className="text-xs text-[#8C7A6B] mb-1">发布时间</p>
-                    <p className="font-semibold text-[#4A362C] text-sm">{selectedPost.timestamp || '无时间戳'}</p>
+                  <div className="bg-white rounded-xl p-3 border border-[#E2E8F0]">
+                    <p className="text-xs text-[#64748B] mb-1">发布时间</p>
+                    <p className="font-semibold text-[#162033] text-sm">{selectedPost.timestamp || '无时间戳'}</p>
                   </div>
                 </div>
               </div>
 
               {/* 重要性分数与风险等级 */}
-              <div className="bg-gradient-to-r from-[#FAF6F3] to-white rounded-2xl p-5 border border-[#EADDD5]">
-                <h4 className="font-semibold text-sm text-[#4A362C] mb-4 flex items-center gap-2">
-                  <Star className="w-4 h-4 text-[#C19A83]" />
+              <div className="bg-gradient-to-r from-[#F7FAFD] to-white rounded-2xl p-5 border border-[#DCE7F5]">
+                <h4 className="font-semibold text-sm text-[#162033] mb-4 flex items-center gap-2">
+                  <Star className="w-4 h-4 text-[#2F6BFF]" />
                   重要性分数
                 </h4>
                 <div className="flex items-center gap-4">
@@ -626,10 +624,10 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
                     <Star className={`w-7 h-7 ${getImportanceTextColor(selectedPost.importanceScore)}`} />
                   </div>
                   <div>
-                    <span className={`text-xl font-bold ${selectedPost.importanceScore >= 0.7 ? 'text-orange-500' : selectedPost.importanceScore >= 0.4 ? 'text-yellow-600' : 'text-green-600'}`}>
+                    <span className={`text-xl font-bold ${selectedPost.importanceScore >= 0.7 ? 'text-[#2F6BFF]' : selectedPost.importanceScore >= 0.4 ? 'text-yellow-600' : 'text-green-600'}`}>
                       {selectedPost.importanceScore.toFixed(4)}
                     </span>
-                    <span className="text-[#8C7A6B] ml-2">
+                    <span className="text-[#64748B] ml-2">
                       {getImportanceLabel(selectedPost.importanceScore)}
                     </span>
                   </div>
@@ -637,27 +635,27 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
               </div>
 
               {/* 帖子内容 */}
-              <div className="bg-gradient-to-r from-[#FAF6F3] to-white rounded-2xl p-5 border border-[#EADDD5]">
-                <h4 className="font-semibold text-sm text-[#4A362C] mb-4 flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-[#C19A83]" />
+              <div className="bg-gradient-to-r from-[#F7FAFD] to-white rounded-2xl p-5 border border-[#DCE7F5]">
+                <h4 className="font-semibold text-sm text-[#162033] mb-4 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-[#2F6BFF]" />
                   帖子内容全文
                 </h4>
-                <p className="text-[#5A4B42] leading-relaxed text-base bg-white rounded-xl p-4 border border-[#EADDD5]">
+                <p className="text-[#415168] leading-relaxed text-base bg-white rounded-xl p-4 border border-[#E2E8F0]">
                   {selectedPost.content}
                 </p>
               </div>
 
               {/* 微表情序列 */}
               {selectedPost.microExpressions && selectedPost.microExpressions.length > 0 && (
-                <div className="bg-gradient-to-r from-[#FAF6F3] to-white rounded-2xl p-5 border border-[#EADDD5]">
-                  <h4 className="font-semibold text-sm text-[#4A362C] mb-4 flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-[#C19A83]" />
+                <div className="bg-gradient-to-r from-[#F7FAFD] to-white rounded-2xl p-5 border border-[#DCE7F5]">
+                  <h4 className="font-semibold text-sm text-[#162033] mb-4 flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-[#2F6BFF]" />
                     微表情序列
                   </h4>
                   <div className="text-2xl leading-relaxed tracking-wide">
                     {selectedPost.microExpressions.join(' ')}
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-[#8C7A6B]">
+                  <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-[#64748B]">
                     <span>表情符号含义：</span>
                     <span>💀 自杀/死亡 | 🕳️ 空虚 | ⚠️ 警告 | 😭 悲伤</span>
                     <span>😔 失落 | 💪 坚强 | ✨ 希望 | 🌟 积极</span>
@@ -670,8 +668,8 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
 
         {/* 无匹配帖子提示 */}
         {filteredPosts.length === 0 && (
-          <div className="bg-white rounded-2xl border border-[#EADDD5] p-8 text-center shadow-sm">
-            <p className="text-[#8C7A6B]">暂无符合条件的帖子</p>
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-8 text-center shadow-sm">
+            <p className="text-[#64748B]">暂无符合条件的帖子</p>
           </div>
         )}
       </div>

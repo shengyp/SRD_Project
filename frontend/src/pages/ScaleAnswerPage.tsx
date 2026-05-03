@@ -136,8 +136,8 @@ export default function ScaleAnswerPage() {
     return (
       <div className="flex flex-1 items-center justify-center">
         <div className="text-center">
-          <Loader className="w-8 h-8 text-[#C19A83] mx-auto mb-4 animate-spin" />
-          <p className="text-[#8C7A6B]">加载中...</p>
+          <Loader className="w-8 h-8 text-[#2F6BFF] mx-auto mb-4 animate-spin" />
+          <p className="text-[#64748B]">加载中...</p>
           {submitError && (
             <p className="text-red-500 text-sm mt-2">{submitError}</p>
           )}
@@ -150,66 +150,66 @@ export default function ScaleAnswerPage() {
     <div className="flex flex-1 flex-col min-h-0 w-full animate-fade-in space-y-5">
       {/* 顶部导航 */}
       <div className="flex items-center justify-between">
-        <button onClick={handleBack} className="flex items-center gap-2 text-[#8C7A6B] hover:text-[#4A362C] transition-colors">
+        <button onClick={handleBack} className="flex items-center gap-2 text-[#64748B] hover:text-[#162033] transition-colors">
           <ArrowLeft className="w-5 h-5" />
           <span className="text-sm">返回任务列表</span>
         </button>
         <div className="flex items-center gap-3">
-          <span className={`px-4 py-1.5 ${getScaleDisplayInfo(scale.code).bgColor} bg-opacity-20 text-[#4A362C] rounded-full text-sm font-medium`}>{scale.name}</span>
-          <span className="text-sm text-[#8C7A6B]">
+          <span className={`px-4 py-1.5 ${getScaleDisplayInfo(scale.code).bgColor} bg-opacity-20 text-[#162033] rounded-full text-sm font-medium`}>{scale.name}</span>
+          <span className="text-sm text-[#64748B]">
             进度 {Math.round(progress)}%
           </span>
         </div>
       </div>
 
       {/* 进度条 */}
-      <div className="bg-white rounded-2xl border border-[#EADDD5] p-5 shadow-sm">
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-[#4A362C]">答题进度</span>
-          <span className="text-sm text-[#8C7A6B]">{Object.keys(answers).length} / {questions.length} 题已答</span>
+          <span className="text-sm font-medium text-[#162033]">答题进度</span>
+          <span className="text-sm text-[#64748B]">{Object.keys(answers).length} / {questions.length} 题已答</span>
         </div>
-        <div className="h-2 bg-[#EADDD5] rounded-full overflow-hidden">
-          <div className="h-full bg-[#C19A83] rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+        <div className="h-2 bg-[#E2E8F0] rounded-full overflow-hidden">
+          <div className="h-full bg-[#2F6BFF] rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
         </div>
       </div>
 
       {/* 当前任务信息 */}
-      <div className="bg-[#FAF6F3] rounded-xl border border-[#D7BFA6] p-4 flex items-center gap-4">
+      <div className="bg-[#F7FAFD] rounded-xl border border-[#DCE7F5] p-4 flex items-center gap-4">
         <div className={`w-12 h-12 rounded-xl ${getScaleDisplayInfo(scale.code).bgColor} flex items-center justify-center`}>
           <ScaleIcon type={scale.category} />
         </div>
         <div>
-          <p className="font-bold text-[#4A362C]">{task.taskName}</p>
-          <p className="text-sm text-[#8C7A6B]">评估用户：{(task as any).userName || (task as any).userAlias || '用户'} · {scale.full_name || scale.name}</p>
+          <p className="font-bold text-[#162033]">{task.taskName}</p>
+          <p className="text-sm text-[#64748B]">评估用户：{(task as any).userName || (task as any).userAlias || '用户'} · {scale.full_name || scale.name}</p>
         </div>
       </div>
 
       {/* 题目列表 */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-[#4A362C]">
+          <h3 className="text-base font-bold text-[#162033]">
             问题 {currentPage * QUESTIONS_PER_PAGE + 1}～{Math.min((currentPage + 1) * QUESTIONS_PER_PAGE, questions.length)}（共{questions.length}题）
           </h3>
         </div>
 
         {currentQuestions.map((question, idx) => (
-          <div key={question.id} className="bg-white rounded-2xl border border-[#EADDD5] p-5 shadow-sm">
+          <div key={question.id} className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm">
             <div className="flex items-start gap-3 mb-4">
-              <span className="w-8 h-8 rounded-full bg-[#F4EBE1] text-[#4A362C] text-sm font-semibold flex items-center justify-center shrink-0">
+              <span className="w-8 h-8 rounded-full bg-[#F1F5FA] text-[#162033] text-sm font-semibold flex items-center justify-center shrink-0">
                 {currentPage * QUESTIONS_PER_PAGE + idx + 1}
               </span>
-              <p className="text-[#4A362C] font-medium leading-relaxed">{question.text}</p>
+              <p className="text-[#162033] font-medium leading-relaxed">{question.text}</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {question.options.map((option, oIdx) => (
                 <button key={oIdx} onClick={() => handleAnswer(question.id, option.score)}
                   className={`p-3 rounded-xl border-2 text-sm font-medium transition-all ${
                     answers[question.id] === option.score
-                      ? 'border-[#C19A83] bg-[#FAF6F3] text-[#4A362C]'
-                      : 'border-[#EADDD5] text-[#5C4D43] hover:border-[#D7BFA6]'
+                      ? 'border-[#2F6BFF] bg-[#F3F8FF] text-[#162033]'
+                      : 'border-[#E2E8F0] text-[#415168] hover:border-[#8FB4FF]'
                   }`}>
                   <span className="block">{option.label}</span>
-                  <span className="block text-xs text-[#A89F95] mt-1">{option.score}分</span>
+                  <span className="block text-xs text-[#94A3B8] mt-1">{option.score}分</span>
                 </button>
               ))}
             </div>
@@ -218,10 +218,10 @@ export default function ScaleAnswerPage() {
       </div>
 
       {/* 底部操作 */}
-      <div className="flex items-center justify-between bg-white rounded-2xl border border-[#EADDD5] p-5 shadow-sm">
+      <div className="flex items-center justify-between bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm">
         <button onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
           disabled={currentPage === 0}
-          className="flex items-center gap-2 px-6 py-2.5 border border-[#EADDD5] rounded-xl text-[#5C4D43] hover:bg-[#F4EBE1] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+          className="flex items-center gap-2 px-6 py-2.5 border border-[#E2E8F0] rounded-xl text-[#415168] hover:bg-[#F1F5FA] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
           <ChevronLeft className="w-5 h-5" />
           上一页
         </button>
@@ -233,8 +233,8 @@ export default function ScaleAnswerPage() {
               onClick={() => setCurrentPage(i)}
               className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
                 currentPage === i
-                  ? 'bg-[#C19A83] text-white'
-                  : 'bg-[#F4EBE1] text-[#5C4D43] hover:bg-[#EADDD5]'
+                  ? 'bg-[#2F6BFF] text-white'
+                  : 'bg-[#F1F5FA] text-[#415168] hover:bg-[#E2E8F0]'
               }`}
             >
               {i + 1}
@@ -244,7 +244,7 @@ export default function ScaleAnswerPage() {
 
         {currentPage < totalPages - 1 ? (
           <button onClick={() => setCurrentPage(p => p + 1)}
-            className="flex items-center gap-2 px-6 py-2.5 bg-[#C19A83] hover:bg-[#A07D6B] text-white rounded-xl transition-colors font-medium">
+            className="flex items-center gap-2 px-6 py-2.5 bg-[#2F6BFF] hover:bg-[#2458D6] text-white rounded-xl transition-colors font-medium">
             下一页
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -266,7 +266,7 @@ export default function ScaleAnswerPage() {
         </div>
       )}
 
-      <div className="text-center text-sm text-[#A89F95]">
+      <div className="text-center text-sm text-[#94A3B8]">
         答题过程中不显示当前得分，提交后展示评估结果
       </div>
     </div>

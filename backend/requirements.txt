@@ -34,7 +34,7 @@ dirtyjson>=1.0.0
 
 # ============ SuiAgent AI Agent ============
 openai>=1.0.0
-langchain-core>=0.3.0
+langchain-core>=0.2.0,<0.3.0
 
 # ============ 深度学习 & 文本处理 ============
 torch>=2.0.0

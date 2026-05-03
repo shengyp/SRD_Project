@@ -1,0 +1,13 @@
+{
+  "session_id": "session_00001",
+  "turn": 1,
+  "timestamp": "2026-04-22_08-18-07_568",
+  "user_input": "你好，什么是抑郁症？",
+  "agent_response": "根据检索到的信息，检索上下文为空，因此我基于已有知识回答：\n\n抑郁症是一种常见的心理健康障碍，主要表现为持续的情绪低落、兴趣或愉悦感丧失，并可能伴随睡眠和食欲改变、精力减退、注意力难以集中、自我价值感降低，甚至出现自杀念头或行为。它通常需要专业的诊断和治疗，如心理治疗和/或药物治疗。",
+  "risk_assessment": {
+    "emocc_risk": "中风险",
+    "fealearn_risk": "历史低风险"
+  },
+  "intent_classification": "professional_query",
+  "agent_name": "suicide_intervention_agent"
+}

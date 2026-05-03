@@ -28,6 +28,7 @@ import type {
   RiskPageLocalModel,
   EmoccTaskResult,
 } from '../api';
+import PaperStatCard from '../components/PaperStatCard';
 
 // ==================== 类型定义 ====================
 
@@ -443,10 +444,10 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleClose} />
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden m-4 animate-scale-in flex flex-col">
         {/* 头部 */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-[#FAF6F3] to-white shrink-0">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-[#F7F9FC] to-white shrink-0">
           <div>
-            <h3 className="text-lg font-bold text-[#4A3B32]">创建检测任务</h3>
-            <p className="text-sm text-[#8C7A6B] mt-0.5">配置单模型检测参数</p>
+            <h3 className="text-lg font-bold text-[#162033]">创建检测任务</h3>
+            <p className="text-sm text-[#64748B] mt-0.5">配置单模型检测参数</p>
           </div>
           <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
             <X className="w-5 h-5 text-gray-500" />
@@ -456,12 +457,12 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
           {/* 任务名称 */}
           <div>
-            <label className="block text-sm font-semibold text-[#5A4B42] mb-2">
+            <label className="block text-sm font-semibold text-[#415168] mb-2">
               任务名称 <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-orange-300"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-300"
               placeholder="自动生成或输入任务名称"
               value={taskName}
               onChange={e => setTaskName(e.target.value)}
@@ -470,13 +471,13 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
 
           {/* 数据源 */}
           <div>
-            <label className="block text-sm font-semibold text-[#5A4B42] mb-2">
+            <label className="block text-sm font-semibold text-[#415168] mb-2">
               数据源 <span className="text-red-500">*</span>
             </label>
             <select
               value={selectedSource}
               onChange={e => { setSelectedSource(e.target.value); setSelectedUser(null); }}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-orange-300 bg-white"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-300 bg-white"
             >
               <option value="">请选择数据源</option>
               {dataSources.map(s => (
@@ -487,13 +488,13 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
 
           {/* 用户 */}
           <div>
-            <label className="block text-sm font-semibold text-[#5A4B42] mb-2">
+            <label className="block text-sm font-semibold text-[#415168] mb-2">
               目标用户 <span className="text-red-500">*</span>
             </label>
             <select
               value={selectedUser?.id ?? ''}
               onChange={e => setSelectedUser(availableUsers.find(u => u.id === e.target.value) ?? null)}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-orange-300 bg-white"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-300 bg-white"
             >
               <option value="">请选择用户</option>
               {availableUsers.map(u => (
@@ -509,7 +510,7 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
 
           {/* 模型类型选择 */}
           <div>
-            <label className="block text-sm font-semibold text-[#5A4B42] mb-3">
+            <label className="block text-sm font-semibold text-[#415168] mb-3">
               检测模型 <span className="text-red-500">*</span>
             </label>
             <div className="grid grid-cols-3 gap-3">
@@ -522,15 +523,15 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
                     onClick={() => setModelCategory(cat.value as 'api' | 'local_llm' | 'emocc')}
                     className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all ${
                       isActive
-                        ? 'border-orange-400 bg-orange-50 shadow-sm'
-                        : 'border-gray-200 hover:border-orange-200 bg-white'
+                        ? 'border-blue-500 bg-blue-50 shadow-sm'
+                        : 'border-gray-200 hover:border-blue-200 bg-white'
                     }`}
                   >
-                    <Icon className={`w-6 h-6 ${isActive ? 'text-orange-500' : 'text-gray-400'}`} />
-                    <span className={`text-sm font-medium ${isActive ? 'text-[#4A362C]' : 'text-[#8C7A6B]'}`}>
+                    <Icon className={`w-6 h-6 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
+                    <span className={`text-sm font-medium ${isActive ? 'text-[#162033]' : 'text-[#64748B]'}`}>
                       {cat.label}
                     </span>
-                    {isActive && <span className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full" />}
+                    {isActive && <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-600 rounded-full" />}
                   </button>
                 );
               })}
@@ -540,7 +541,7 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
           {/* API 模型选择 */}
           {modelCategory === 'api' && (
             <div>
-              <label className="block text-sm font-medium text-[#8C7A6B] mb-2">API 模型</label>
+              <label className="block text-sm font-medium text-[#64748B] mb-2">API 模型</label>
               {apiModels.length === 0 ? (
                 <div className="flex flex-col items-center justify-center p-6 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50">
                   <Cloud className="w-8 h-8 text-gray-300 mb-2" />
@@ -553,7 +554,7 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
                     <label
                       key={model.id}
                       className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all bg-white ${
-                        selectedApiModel?.id === model.id ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-200'
+                        selectedApiModel?.id === model.id ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-200'
                       }`}
                     >
                       <input
@@ -564,8 +565,8 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
                         onChange={() => setSelectedApiModel(model)}
                         className="sr-only"
                       />
-                      <span className="font-medium text-sm text-[#4A3B32]">{model.name}</span>
-                      <span className="text-xs text-[#8C7A6B] mt-0.5">{model.provider}</span>
+                      <span className="font-medium text-sm text-[#162033]">{model.name}</span>
+                      <span className="text-xs text-[#64748B] mt-0.5">{model.provider}</span>
                       <span className={`mt-1 text-xs px-2 py-0.5 rounded-full ${model.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
                         {model.status === 'active' ? '可用' : '不可用'}
                       </span>
@@ -579,7 +580,7 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
           {/* 本地 LLM 选择 */}
           {modelCategory === 'local_llm' && (
             <div>
-              <label className="block text-sm font-medium text-[#8C7A6B] mb-2">本地 LLM</label>
+              <label className="block text-sm font-medium text-[#64748B] mb-2">本地 LLM</label>
               {llmModels.length === 0 ? (
                 <div className="flex flex-col items-center justify-center p-6 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50">
                   <Server className="w-8 h-8 text-gray-300 mb-2" />
@@ -592,7 +593,7 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
                     <label
                       key={model.id}
                       className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all bg-white ${
-                        selectedLlmModel?.id === model.id ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-200'
+                        selectedLlmModel?.id === model.id ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-blue-200'
                       }`}
                     >
                       <input
@@ -603,9 +604,9 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
                         onChange={() => setSelectedLlmModel(model)}
                         className="sr-only"
                       />
-                      <Bot className={`w-6 h-6 mb-1 ${model.status === 'active' ? 'text-[#C19A83]' : 'text-gray-300'}`} />
-                      <span className="font-medium text-sm text-[#4A3B32]">{model.name}</span>
-                      <span className="text-xs text-[#8C7A6B] mt-0.5 truncate w-full text-center">{model.path}</span>
+                      <Bot className={`w-6 h-6 mb-1 ${model.status === 'active' ? 'text-[#2F6BFF]' : 'text-gray-300'}`} />
+                      <span className="font-medium text-sm text-[#162033]">{model.name}</span>
+                      <span className="text-xs text-[#64748B] mt-0.5 truncate w-full text-center">{model.path}</span>
                       <span className={`mt-1 text-xs px-2 py-0.5 rounded-full ${model.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
                         {model.status === 'active' ? '可用' : '不可用'}
                       </span>
@@ -619,7 +620,7 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
           {/* 指令模板选择 - API 模型和本地 LLM 都可选择 */}
           {(modelCategory === 'api' || modelCategory === 'local_llm') && (
             <div>
-              <label className="block text-sm font-semibold text-[#5A4B42] mb-2">
+              <label className="block text-sm font-semibold text-[#415168] mb-2">
                 指令模板 <span className="text-red-500">*</span>
               </label>
               {promptTemplates.length === 0 ? (
@@ -635,7 +636,7 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
                     const template = promptTemplates.find(t => t.id === e.target.value);
                     setSelectedTemplate(template || null);
                   }}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-orange-300 bg-white text-sm"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-300 bg-white text-sm"
                 >
                   <option value="">请选择指令模板</option>
                   {promptTemplates.map(template => (
@@ -646,8 +647,8 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
                 </select>
               )}
               {selectedTemplate && (
-                <div className="mt-2 p-3 bg-[#FAF6F3] rounded-xl border border-[#EADDD5]">
-                  <p className="text-xs text-[#8C7A6B]">
+                <div className="mt-2 p-3 bg-[#F7F9FC] rounded-xl border border-[#E2E8F0]">
+                  <p className="text-xs text-[#64748B]">
                     <span className="font-medium">模板说明：</span>
                     {selectedTemplate.description || '无描述'}
                   </p>
@@ -659,7 +660,7 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
           {/* 检测模型选择 - 包含 Emocc 和 FeaLearner */}
           {modelCategory === 'emocc' && (
             <div>
-              <label className="block text-sm font-medium text-[#8C7A6B] mb-2">检测模型</label>
+              <label className="block text-sm font-medium text-[#64748B] mb-2">检测模型</label>
               {detectionModels.length === 0 ? (
                 <div className="flex flex-col items-center justify-center p-6 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50">
                   <Brain className="w-8 h-8 text-gray-300 mb-2" />
@@ -684,8 +685,8 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
                         className="sr-only"
                       />
                       <Brain className={`w-6 h-6 mb-1 ${model.status === 'active' ? 'text-purple-500' : 'text-gray-300'}`} />
-                      <span className="font-medium text-sm text-[#4A3B32]">{model.name}</span>
-                      <span className="text-xs text-[#8C7A6B] mt-0.5 truncate w-full text-center">{model.path}</span>
+                      <span className="font-medium text-sm text-[#162033]">{model.name}</span>
+                      <span className="text-xs text-[#64748B] mt-0.5 truncate w-full text-center">{model.path}</span>
                       <span className={`mt-1 text-xs px-2 py-0.5 rounded-full ${model.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
                         {model.status === 'active' ? '可用' : '不可用'}
                       </span>
@@ -698,15 +699,15 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
         </div>
 
         {/* 底部按钮 */}
-        <div className="flex justify-end items-center gap-3 p-5 border-t border-gray-100 bg-[#FAF6F3] shrink-0">
-          <button onClick={handleClose} className="px-5 py-2.5 bg-white hover:bg-gray-100 text-[#5A4B42] rounded-xl transition-colors text-sm font-medium border border-gray-200">
+        <div className="flex justify-end items-center gap-3 p-5 border-t border-gray-100 bg-[#F7F9FC] shrink-0">
+          <button onClick={handleClose} className="px-5 py-2.5 bg-white hover:bg-gray-100 text-[#415168] rounded-xl transition-colors text-sm font-medium border border-gray-200">
             取消
           </button>
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); if (!creating && canProceed) handleCreate(); }}
             disabled={!canProceed || creating}
-            className="px-8 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm flex items-center gap-2 shadow-sm"
+            className="px-8 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm flex items-center gap-2 shadow-sm"
           >
             {creating ? <Loader className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
             {creating ? '创建中...' : '创建任务'}
@@ -928,39 +929,39 @@ function ResultPage({ task, onBack }: ResultPageProps) {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <button onClick={onBack} className="flex items-center gap-2 text-[#8C7A6B] hover:text-[#4A362C] transition-colors group">
+      <button onClick={onBack} className="flex items-center gap-2 text-[#64748B] hover:text-[#162033] transition-colors group">
         <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
         <span className="text-sm font-medium">返回列表</span>
       </button>
 
       {/* 任务信息 */}
-      <div className="bg-white rounded-2xl border border-[#EADDD5] p-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-4 text-sm text-[#8C7A6B]">
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-4 text-sm text-[#64748B]">
           <span className="flex items-center gap-1.5">
             <Users className="w-4 h-4" />
-            用户: <span className="font-medium text-[#5C4D43]">{task.userHash}</span>
+            用户: <span className="font-medium text-[#415168]">{task.userHash}</span>
           </span>
           <span className="flex items-center gap-1.5">
             <FileText className="w-4 h-4" />
-            帖子: <span className="font-medium text-[#5C4D43]">{task.postCount}</span>
+            帖子: <span className="font-medium text-[#415168]">{task.postCount}</span>
           </span>
           <span className="flex items-center gap-1.5">
             <Activity className="w-4 h-4" />
-            模型: <span className="font-medium text-[#5C4D43]">{task.modelName}</span>
+            模型: <span className="font-medium text-[#415168]">{task.modelName}</span>
           </span>
           {task.completedAt && (
             <span className="flex items-center gap-1.5">
               <Clock className="w-4 h-4" />
-              耗时: <span className="font-medium text-[#5C4D43]">{formatTime(task.processingTimeMs)}</span>
+              耗时: <span className="font-medium text-[#415168]">{formatTime(task.processingTimeMs)}</span>
             </span>
           )}
         </div>
       </div>
 
       {/* 风险结果 */}
-      <div className="bg-white rounded-2xl border border-[#EADDD5] p-6 shadow-sm">
-        <h3 className="text-lg font-bold text-[#4A362C] mb-4 flex items-center gap-2">
-          <Shield className="w-5 h-5 text-[#C19A83]" />
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-sm">
+        <h3 className="text-lg font-bold text-[#162033] mb-4 flex items-center gap-2">
+          <Shield className="w-5 h-5 text-[#2F6BFF]" />
           检测结果
         </h3>
         {result && rc ? (
@@ -968,28 +969,28 @@ function ResultPage({ task, onBack }: ResultPageProps) {
             {/* 风险等级 + 分数 + 置信度 */}
             <div className="grid grid-cols-3 gap-4 mb-4">
               <div className={`${rc.bg} border ${rc.border} rounded-xl p-5 text-center`}>
-                <p className="text-sm text-[#8C7A6B] mb-3">风险等级</p>
+                <p className="text-sm text-[#64748B] mb-3">风险等级</p>
                 <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-base font-bold ${rc.text}`}>
                   <AlertTriangle className="w-5 h-5" />
                   {RISK_LABELS[result.riskLevel]}
                 </div>
               </div>
-              <div className="bg-gradient-to-br from-[#FAF6F3] to-[#F5EDE5] rounded-xl p-5 text-center border border-[#EADDD5]">
-                <p className="text-sm text-[#8C7A6B] mb-3">风险分数</p>
-                <p className="text-3xl font-bold text-[#4A362C]">{(result.riskScore ?? 0).toFixed(2)}</p>
-                <p className="text-xs text-[#A89F95] mt-1">(0-1范围)</p>
+              <div className="bg-gradient-to-br from-[#F7FAFD] to-[#F3F8FF] rounded-xl p-5 text-center border border-[#E2E8F0]">
+                <p className="text-sm text-[#64748B] mb-3">风险分数</p>
+                <p className="text-3xl font-bold text-[#162033]">{(result.riskScore ?? 0).toFixed(2)}</p>
+                <p className="text-xs text-[#94A3B8] mt-1">(0-1范围)</p>
               </div>
-              <div className="bg-gradient-to-br from-[#FAF6F3] to-[#F5EDE5] rounded-xl p-5 text-center border border-[#EADDD5]">
-                <p className="text-sm text-[#8C7A6B] mb-3">置信度</p>
-                <p className="text-3xl font-bold text-[#4A362C]">{result.confidence}%</p>
+              <div className="bg-gradient-to-br from-[#F7FAFD] to-[#F3F8FF] rounded-xl p-5 text-center border border-[#E2E8F0]">
+                <p className="text-sm text-[#64748B] mb-3">置信度</p>
+                <p className="text-3xl font-bold text-[#162033]">{result.confidence}%</p>
               </div>
             </div>
 
             {/* 综合评估摘要 */}
             {result.summary && (
-              <div className="bg-gradient-to-r from-[#F4EBE1] to-[#FAF6F3] rounded-xl p-5 border border-[#EADDD5] mb-4">
-                <p className="text-sm font-semibold text-[#5A4B42] mb-2">综合评估摘要</p>
-                <p className="text-sm text-[#5C4D43] leading-relaxed">{result.summary}</p>
+              <div className="bg-gradient-to-r from-[#F1F5FA] to-[#F7F9FC] rounded-xl p-5 border border-[#E2E8F0] mb-4">
+                <p className="text-sm font-semibold text-[#415168] mb-2">综合评估摘要</p>
+                <p className="text-sm text-[#415168] leading-relaxed">{result.summary}</p>
               </div>
             )}
 
@@ -997,11 +998,11 @@ function ResultPage({ task, onBack }: ResultPageProps) {
             {(result.symptomDescription || result.emotionalAnalysis || result.riskInterpretation) && (
               <div className="grid grid-cols-1 gap-3 mb-4">
                 {result.symptomDescription && (
-                  <div className="bg-orange-50 rounded-xl p-4 border border-orange-100">
-                    <p className="text-sm font-semibold text-orange-800 mb-2 flex items-center gap-1.5">
+                  <div className="bg-blue-50 rounded-xl p-4 border border-blue-50">
+                    <p className="text-sm font-semibold text-blue-900 mb-2 flex items-center gap-1.5">
                       <AlertTriangle className="w-4 h-4" /> 临床症状描述
                     </p>
-                    <p className="text-xs text-orange-700 leading-relaxed">{result.symptomDescription}</p>
+                    <p className="text-xs text-blue-700 leading-relaxed">{result.symptomDescription}</p>
                   </div>
                 )}
                 {result.emotionalAnalysis && (
@@ -1060,7 +1061,7 @@ function ResultPage({ task, onBack }: ResultPageProps) {
                     <div className="space-y-1.5">
                       {emocc.classProbs.map((prob: number, idx: number) => {
                         const labels = ['无风险', '极低风险', '低风险', '中风险', '高风险'];
-                        const colors = ['bg-green-400', 'bg-green-300', 'bg-yellow-300', 'bg-orange-400', 'bg-red-400'];
+                        const colors = ['bg-green-400', 'bg-green-300', 'bg-yellow-300', 'bg-blue-500', 'bg-red-400'];
                         return (
                           <div key={idx} className="flex items-center gap-2">
                             <span className="text-xs text-purple-600 w-16 shrink-0">{labels[idx]}</span>
@@ -1153,9 +1154,9 @@ function ResultPage({ task, onBack }: ResultPageProps) {
 
             {/* 干预建议 */}
             {result.interventionSuggestion && (
-              <div className="mt-4 bg-orange-50 rounded-xl p-4 border border-orange-200">
-                <p className="text-sm font-semibold text-orange-800 mb-2">干预建议</p>
-                <p className="text-xs text-orange-700 leading-relaxed">{result.interventionSuggestion}</p>
+              <div className="mt-4 bg-blue-50 rounded-xl p-4 border border-blue-200">
+                <p className="text-sm font-semibold text-blue-900 mb-2">干预建议</p>
+                <p className="text-xs text-blue-700 leading-relaxed">{result.interventionSuggestion}</p>
               </div>
             )}
 
@@ -1178,7 +1179,7 @@ function ResultPage({ task, onBack }: ResultPageProps) {
             )}
           </>
         ) : (
-          <div className="text-center py-8 text-[#8C7A6B]">
+          <div className="text-center py-8 text-[#64748B]">
             <Activity className="w-10 h-10 mx-auto mb-2 text-gray-300" />
             <p className="text-sm">暂无详细结果</p>
           </div>
@@ -1190,7 +1191,7 @@ function ResultPage({ task, onBack }: ResultPageProps) {
         <button
           onClick={handleGenerateReport}
           disabled={isGeneratingReport || !task.resultSummary}
-          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed text-white rounded-xl transition-all font-semibold shadow-sm">
+          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed text-white rounded-xl transition-all font-semibold shadow-sm">
           {isGeneratingReport ? (
             <Loader className="w-5 h-5 animate-spin" />
           ) : (
@@ -1198,7 +1199,7 @@ function ResultPage({ task, onBack }: ResultPageProps) {
           )}
           {isGeneratingReport ? '生成中...' : '生成报告'}
         </button>
-        <button onClick={() => window.location.href = '/map'} className="flex items-center gap-2 px-6 py-3 bg-[#F4EBE1] hover:bg-[#EADDD5] text-[#4A362C] rounded-xl transition-colors font-medium shadow-sm">
+        <button onClick={() => window.location.href = '/map'} className="flex items-center gap-2 px-6 py-3 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#162033] rounded-xl transition-colors font-medium shadow-sm">
           <TrendingUp className="w-5 h-5" />
           查看资源
         </button>
@@ -1216,19 +1217,19 @@ function DeleteConfirmModal({ isOpen, onClose, onConfirm, taskName }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm m-4 animate-scale-in overflow-hidden border border-[#EADDD5]">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm m-4 animate-scale-in overflow-hidden border border-[#E2E8F0]">
         <div className="p-6 text-center">
           <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4 border border-red-200">
             <AlertTriangle className="w-7 h-7 text-red-500" />
           </div>
-          <h3 className="text-lg font-bold text-[#4A362C] mb-2">确认删除</h3>
-          <p className="text-sm text-[#8C7A6B]">
-            确定要删除任务 <span className="font-semibold text-[#5C4D43]">"{taskName}"</span> 吗？此操作不可撤销。
+          <h3 className="text-lg font-bold text-[#162033] mb-2">确认删除</h3>
+          <p className="text-sm text-[#64748B]">
+            确定要删除任务 <span className="font-semibold text-[#415168]">"{taskName}"</span> 吗？此操作不可撤销。
           </p>
         </div>
-        <div className="flex gap-3 p-4 border-t border-[#EADDD5] bg-[#FAF6F3]">
+        <div className="flex gap-3 p-4 border-t border-[#E2E8F0] bg-[#F7F9FC]">
           <button onClick={onClose}
-            className="flex-1 px-4 py-2.5 bg-white hover:bg-gray-100 text-[#5A4B42] rounded-xl transition-colors text-sm font-medium border border-gray-200">
+            className="flex-1 px-4 py-2.5 bg-white hover:bg-gray-100 text-[#415168] rounded-xl transition-colors text-sm font-medium border border-gray-200">
             取消
           </button>
           <button onClick={onConfirm}
@@ -1620,10 +1621,34 @@ export default function RiskPage() {
   };
 
   const statCards = [
-    { label: '总任务', value: stats.total, icon: Activity, colorClass: 'bg-[#C19A83]', border: 'border-[#EADDD5]' },
-    { label: '已完成', value: stats.completed, icon: CheckCircle, colorClass: 'bg-green-500', border: 'border-green-200' },
-    { label: '执行中', value: stats.running, icon: Loader, colorClass: 'bg-blue-500', border: 'border-blue-200' },
-    { label: '高风险', value: stats.highRisk, icon: AlertTriangle, colorClass: 'bg-red-500', border: 'border-red-200' },
+    {
+      label: '检测任务',
+      value: stats.total,
+      note: '覆盖 API、本地 LLM、Emocc 与 FeaLearner 的检测任务总量',
+      icon: Activity,
+      tone: 'blue' as const,
+    },
+    {
+      label: '已完成',
+      value: stats.completed,
+      note: '已形成风险结论、摘要与后续干预建议的任务数量',
+      icon: CheckCircle,
+      tone: 'green' as const,
+    },
+    {
+      label: '执行中',
+      value: stats.running,
+      note: '正在进行模型推理、结果汇总或报告生成的任务',
+      icon: Loader,
+      tone: 'cyan' as const,
+    },
+    {
+      label: '高风险',
+      value: stats.highRisk,
+      note: '需优先复核与转介跟进的高风险检测结果数量',
+      icon: AlertTriangle,
+      tone: 'red' as const,
+    },
   ];
 
   // ==================== 渲染 ====================
@@ -1638,32 +1663,27 @@ export default function RiskPage() {
 
   return (
     <div className="flex flex-col h-full p-6 gap-4">
-      {/* 统计卡片 */}
-      <div className="grid grid-cols-4 gap-4 shrink-0">
-        {statCards.map((card, i) => (
-          <div
-            key={i}
-            className={`bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow flex items-center gap-3 border ${card.border}`}
-          >
-            <div className={`w-12 h-12 rounded-xl ${card.colorClass} flex items-center justify-center shadow-sm shrink-0`}>
-              <card.icon className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className={`text-xs ${i === 3 ? 'text-red-600' : 'text-[#8C7A6B]'}`}>{card.label}</p>
-              <p className={`text-2xl font-bold ${i === 3 ? 'text-red-500' : 'text-[#4A362C]'}`}>{card.value}</p>
-            </div>
-          </div>
+      <div className="grid grid-cols-1 gap-3 shrink-0 md:grid-cols-2 xl:grid-cols-4">
+        {statCards.map((card) => (
+          <PaperStatCard
+            key={card.label}
+            label={card.label}
+            value={card.value}
+            note={card.note}
+            icon={card.icon}
+            tone={card.tone}
+          />
         ))}
       </div>
 
       {/* 筛选栏 */}
-      <div className="shrink-0 bg-white rounded-2xl p-5 shadow-sm border border-[#EADDD5]">
+      <div className="shrink-0 bg-white rounded-[28px] p-5 shadow-[0_10px_28px_rgba(15,23,42,0.04)] border border-[#E2E8F0]">
         <div className="flex flex-wrap items-center gap-3">
           {/* 数据源筛选 */}
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-[#5A4B42] whitespace-nowrap">数据源</label>
+            <label className="text-sm font-medium text-[#415168] whitespace-nowrap">数据源</label>
             <select
-              className="px-3 py-2 border border-[#EADDD5] rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 text-sm bg-[#FAF6F3] min-w-[120px]"
+              className="px-3 py-2 border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 text-sm bg-[#F7F9FC] min-w-[120px]"
               value={filterSource}
               onChange={e => { setFilterSource(e.target.value); setCurrentPage(1); }}
             >
@@ -1674,9 +1694,9 @@ export default function RiskPage() {
 
           {/* 状态筛选 */}
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-[#5A4B42] whitespace-nowrap">状态</label>
+            <label className="text-sm font-medium text-[#415168] whitespace-nowrap">状态</label>
             <select
-              className="px-3 py-2 border border-[#EADDD5] rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 text-sm bg-[#FAF6F3] min-w-[100px]"
+              className="px-3 py-2 border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 text-sm bg-[#F7F9FC] min-w-[100px]"
               value={filterStatus}
               onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}
             >
@@ -1689,9 +1709,9 @@ export default function RiskPage() {
 
           {/* 模型类型筛选 */}
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-[#5A4B42] whitespace-nowrap">模型</label>
+            <label className="text-sm font-medium text-[#415168] whitespace-nowrap">模型</label>
             <select
-              className="px-3 py-2 border border-[#EADDD5] rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 text-sm bg-[#FAF6F3] min-w-[130px]"
+              className="px-3 py-2 border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 text-sm bg-[#F7F9FC] min-w-[130px]"
               value={filterType}
               onChange={e => { setFilterType(e.target.value); setCurrentPage(1); }}
             >
@@ -1701,14 +1721,14 @@ export default function RiskPage() {
           </div>
 
           <button onClick={() => { setFilterStatus(''); setFilterSource(''); setFilterType(''); setCurrentPage(1); }}
-            className="flex items-center gap-2 px-4 py-2 bg-[#F4EBE1] hover:bg-[#EADDD5] text-[#5C4D43] rounded-xl transition-colors text-sm font-medium">
+            className="flex items-center gap-2 px-4 py-2 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl transition-colors text-sm font-medium">
             <RefreshCw className="w-4 h-4" /> 重置
           </button>
 
           {/* 新建按钮 */}
           <div className="ml-auto">
             <button onClick={() => setIsCreateModalOpen(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl transition-all text-sm font-medium shadow-sm">
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white rounded-xl transition-all text-sm font-medium shadow-sm">
               <Plus className="w-4 h-4" /> 新建任务
             </button>
           </div>
@@ -1716,30 +1736,36 @@ export default function RiskPage() {
       </div>
 
       {/* 任务列表 */}
-      <div className="flex-1 min-h-0 bg-white rounded-2xl shadow-sm border border-[#EADDD5] overflow-hidden flex flex-col">
+      <div className="flex-1 min-h-0 bg-white rounded-[28px] shadow-[0_10px_28px_rgba(15,23,42,0.04)] border border-[#E2E8F0] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between border-b border-[#E8EEF6] bg-[#FCFDFF] px-5 py-4">
+          <div>
+            <h2 className="text-lg font-semibold text-[#162033]">风险检测任务列表</h2>
+            <p className="mt-1 text-sm text-[#6B7B8F]">统一查看任务名称、数据来源、模型类型、执行状态与结果入口。</p>
+          </div>
+        </div>
         <div className="overflow-x-auto flex-1">
           <table className="w-full">
-            <thead className="bg-gradient-to-r from-[#F9F5F2] to-[#FDF9F6] sticky top-0 z-10">
+            <thead className="bg-gradient-to-r from-[#F7FAFD] to-white sticky top-0 z-10">
               <tr>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">任务名称</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">数据源</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">模型</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">状态</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">创建时间</th>
-                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#4A3B32]">操作</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">任务名称</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">数据源</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">模型</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">状态</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">创建时间</th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-[#334155]">操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#F0EAE5]">
+            <tbody className="divide-y divide-[#EAF0F6]">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-[#8C7A6B]">
+                  <td colSpan={6} className="px-4 py-12 text-center text-[#64748B]">
                     <Loader className="w-8 h-8 mx-auto mb-2 animate-spin text-gray-300" />
                     <p className="text-sm">加载中...</p>
                   </td>
                 </tr>
               ) : paginatedTasks.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-[#8C7A6B]">
+                  <td colSpan={6} className="px-4 py-12 text-center text-[#64748B]">
                     <Activity className="w-10 h-10 mx-auto mb-2 text-gray-300" />
                     <p className="text-sm">暂无检测任务</p>
                     <p className="text-xs text-gray-400 mt-1">点击上方"新建任务"开始检测</p>
@@ -1753,11 +1779,11 @@ export default function RiskPage() {
                   const ModelIcon = modelCategory?.icon || Activity;
 
                   return (
-                    <tr key={task.id} className="hover:bg-[#FAF6F3] transition-colors">
+                    <tr key={task.id} className="hover:bg-[#F7F9FC] transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <Activity className="w-4 h-4 text-orange-400 shrink-0" />
-                          <span className="text-sm font-medium text-[#4A3B32] max-w-[200px] truncate">
+                          <Activity className="w-4 h-4 text-blue-500 shrink-0" />
+                          <span className="text-sm font-medium text-[#162033] max-w-[200px] truncate">
                             {task.taskName}
                           </span>
                           {rc && task.resultSummary && (
@@ -1768,12 +1794,12 @@ export default function RiskPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="px-2.5 py-1 bg-orange-100 text-orange-700 text-xs rounded-full font-medium">
+                        <span className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs rounded-full font-medium">
                           {dataSources.find(s => s.value === task.dataSource)?.label || task.dataSource}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5 text-sm text-[#5C4D43]">
+                        <div className="flex items-center gap-1.5 text-sm text-[#415168]">
                           <ModelIcon className={`w-4 h-4 ${task.taskMode === 'emocc' ? 'text-purple-400' : task.taskMode === 'api' ? 'text-blue-400' : 'text-gray-400'}`} />
                           {task.modelName || modelCategory?.label || '未知'}
                         </div>
@@ -1793,7 +1819,7 @@ export default function RiskPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-[#5C4D43]">{formatDate(task.createdAt)}</td>
+                      <td className="px-4 py-3 text-sm text-[#415168]">{formatDate(task.createdAt)}</td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2">
                           {/* 开始执行按钮：始终显示，执行后变灰色 */}
@@ -1834,22 +1860,22 @@ export default function RiskPage() {
 
         {/* 分页 */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-[#F0EAE5] bg-[#FAF6F3] shrink-0">
-            <p className="text-sm text-[#8C7A6B]">
+          <div className="flex items-center justify-between px-6 py-4 border-t border-[#E2E8F0] bg-[#F7F9FC] shrink-0">
+            <p className="text-sm text-[#64748B]">
               共 {filteredTasks.length} 条，第 {currentPage}/{totalPages} 页
             </p>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm text-[#5C4D43] border border-gray-200 transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm text-[#415168] border border-gray-200 transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" /> 上一页
               </button>
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm text-[#5C4D43] border border-gray-200 transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm text-[#415168] border border-gray-200 transition-colors"
               >
                 下一页 <ChevronRight className="w-4 h-4" />
               </button>
@@ -1877,3 +1903,6 @@ export default function RiskPage() {
     </div>
   );
 }
+
+
+

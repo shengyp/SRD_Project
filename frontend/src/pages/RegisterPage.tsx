@@ -1,6 +1,5 @@
 /**
- * 注册页 — 居中卡片设计，无左侧介绍区域
- * 与系统整体暖橙色风格保持一致
+ * 注册页 — 白灰蓝科研风，和 demo paper 演示系统保持一致
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -58,34 +57,34 @@ export default function RegisterPage() {
   const usernameOk = form.username.trim().length >= 3;
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #FFF5EE 0%, #FFEDD8 40%, #FFE4CC 100%)' }}>
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #F8FBFF 0%, #F2F6FB 45%, #EAF0F8 100%)' }}>
       {/* 背景装饰圆形 */}
-      <div className="absolute top-20 right-20 w-72 h-72 rounded-full opacity-20" style={{ background: 'radial-gradient(circle, #C19A83 0%, transparent 70%)' }} />
-      <div className="absolute bottom-20 left-16 w-96 h-96 rounded-full opacity-15" style={{ background: 'radial-gradient(circle, #B8896F 0%, transparent 70%)' }} />
-      <div className="absolute top-1/3 left-1/4 w-40 h-40 rounded-full opacity-10" style={{ background: 'radial-gradient(circle, #A07D6B 0%, transparent 70%)' }} />
+      <div className="absolute top-20 right-20 w-72 h-72 rounded-full opacity-20" style={{ background: 'radial-gradient(circle, #8CB5F2 0%, transparent 70%)' }} />
+      <div className="absolute bottom-20 left-16 w-96 h-96 rounded-full opacity-15" style={{ background: 'radial-gradient(circle, #6F8FC9 0%, transparent 70%)' }} />
+      <div className="absolute top-1/3 left-1/4 w-40 h-40 rounded-full opacity-10" style={{ background: 'radial-gradient(circle, #94A3B8 0%, transparent 70%)' }} />
 
       {/* 小装饰点 */}
-      <div className="absolute top-[15%] right-[18%] w-2 h-2 rounded-full opacity-40" style={{ backgroundColor: '#C19A83' }} />
-      <div className="absolute top-[28%] left-[10%] w-3 h-3 rounded-full opacity-25" style={{ backgroundColor: '#B8896F' }} />
-      <div className="absolute bottom-[22%] right-[25%] w-2 h-2 rounded-full opacity-30" style={{ backgroundColor: '#A07D6B' }} />
-      <div className="absolute top-[65%] right-[8%] w-1.5 h-1.5 rounded-full opacity-35" style={{ backgroundColor: '#C19A83' }} />
-      <div className="absolute bottom-[12%] left-[30%] w-2 h-2 rounded-full opacity-20" style={{ backgroundColor: '#B8896F' }} />
+      <div className="absolute top-[15%] right-[18%] w-2 h-2 rounded-full opacity-40" style={{ backgroundColor: '#7EA8FF' }} />
+      <div className="absolute top-[28%] left-[10%] w-3 h-3 rounded-full opacity-25" style={{ backgroundColor: '#A8BEDF' }} />
+      <div className="absolute bottom-[22%] right-[25%] w-2 h-2 rounded-full opacity-30" style={{ backgroundColor: '#94A3B8' }} />
+      <div className="absolute top-[65%] right-[8%] w-1.5 h-1.5 rounded-full opacity-35" style={{ backgroundColor: '#7EA8FF' }} />
+      <div className="absolute bottom-[12%] left-[30%] w-2 h-2 rounded-full opacity-20" style={{ backgroundColor: '#A8BEDF' }} />
 
       {/* 主卡片 */}
       <div className="relative w-full max-w-md mx-4 animate-fade-in">
         {/* Logo 区 */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 shadow-lg" style={{ background: 'linear-gradient(135deg, #C19A83 0%, #A07D6B 100%)' }}>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 shadow-lg" style={{ background: 'linear-gradient(135deg, #89ACFF 0%, #2F6BFF 55%, #1D4ED8 100%)', boxShadow: '0 14px 28px rgba(47,107,255,.18)' }}>
             <Heart className="w-8 h-8 text-white" strokeWidth={2} />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800 tracking-tight">心轨心理平台</h1>
-          <p className="text-gray-500 text-sm mt-1">创建您的专属账户</p>
+          <h1 className="text-2xl font-bold tracking-tight text-[#162033]">VIS4SRD 研究平台</h1>
+          <p className="text-[#6B7A90] text-sm mt-1">创建用于系统演示与研究验证的账户</p>
         </div>
 
         {/* 表单卡片 */}
-        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl shadow-[#C19A83]/10 border border-white/60 overflow-hidden">
+        <div className="bg-white/86 backdrop-blur-xl rounded-3xl shadow-2xl shadow-[rgba(15,23,42,0.08)] border border-[#E2E8F0] overflow-hidden">
           {/* 卡片顶部渐变条 */}
-          <div className="h-1.5" style={{ background: 'linear-gradient(90deg, #C19A83, #B8896F, #A07D6B)' }} />
+          <div className="h-1.5" style={{ background: 'linear-gradient(90deg, #2F6BFF, #5B8CFF, #9EC0F4)' }} />
 
           <div className="px-8 py-8">
             <div className="mb-6">
@@ -100,7 +99,7 @@ export default function RegisterPage() {
                   用户名 <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-[#C19A83]">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-[#2F6BFF]">
                     <User className="w-4 h-4" />
                   </div>
                   <input
@@ -109,7 +108,7 @@ export default function RegisterPage() {
                     onChange={update('username')}
                     placeholder="3-50位字母、数字、下划线或中文"
                     autoComplete="username"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50/80 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C19A83]/30 focus:border-[#C19A83] transition-all placeholder-gray-400"
+                    className="w-full pl-10 pr-4 py-3 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2F6BFF]/25 focus:border-[#2F6BFF] transition-all placeholder-gray-400"
                   />
                   {usernameOk && (
                     <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
@@ -125,7 +124,7 @@ export default function RegisterPage() {
                   昵称 <span className="text-gray-400 font-normal">(可选)</span>
                 </label>
                 <div className="relative">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-[#C19A83]">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-[#2F6BFF]">
                     <User className="w-4 h-4" />
                   </div>
                   <input
@@ -133,7 +132,7 @@ export default function RegisterPage() {
                     value={form.nickname}
                     onChange={update('nickname')}
                     placeholder="公开显示的昵称，不填则显示用户名"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50/80 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C19A83]/30 focus:border-[#C19A83] transition-all placeholder-gray-400"
+                    className="w-full pl-10 pr-4 py-3 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2F6BFF]/25 focus:border-[#2F6BFF] transition-all placeholder-gray-400"
                   />
                 </div>
               </div>
@@ -144,7 +143,7 @@ export default function RegisterPage() {
                   密码 <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-[#C19A83]">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-[#2F6BFF]">
                     <Lock className="w-4 h-4" />
                   </div>
                   <input
@@ -153,7 +152,7 @@ export default function RegisterPage() {
                     onChange={update('password')}
                     placeholder="至少 6 个字符"
                     autoComplete="new-password"
-                    className="w-full pl-10 pr-10 py-3 bg-gray-50/80 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C19A83]/30 focus:border-[#C19A83] transition-all placeholder-gray-400"
+                    className="w-full pl-10 pr-10 py-3 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2F6BFF]/25 focus:border-[#2F6BFF] transition-all placeholder-gray-400"
                   />
                   <button
                     type="button"
@@ -178,7 +177,7 @@ export default function RegisterPage() {
                   确认密码 <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-[#C19A83]">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-[#2F6BFF]">
                     <Lock className="w-4 h-4" />
                   </div>
                   <input
@@ -187,7 +186,7 @@ export default function RegisterPage() {
                     onChange={update('confirmPwd')}
                     placeholder="再次输入密码"
                     autoComplete="new-password"
-                    className="w-full pl-10 pr-10 py-3 bg-gray-50/80 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C19A83]/30 focus:border-[#C19A83] transition-all placeholder-gray-400"
+                    className="w-full pl-10 pr-10 py-3 bg-[#F7F9FC] border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2F6BFF]/25 focus:border-[#2F6BFF] transition-all placeholder-gray-400"
                   />
                   {pwdMatch && (
                     <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
@@ -209,8 +208,8 @@ export default function RegisterPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 rounded-xl font-medium text-sm text-white shadow-lg shadow-[#C19A83]/25 hover:shadow-xl hover:shadow-[#C19A83]/30 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-1"
-                style={{ background: 'linear-gradient(135deg, #C19A83 0%, #A07D6B 100%)' }}
+                className="w-full py-3 rounded-xl font-medium text-sm text-white shadow-lg shadow-[#2F6BFF]/20 hover:shadow-xl hover:shadow-[#2F6BFF]/25 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-1"
+                style={{ background: 'linear-gradient(135deg, #5B8CFF 0%, #2F6BFF 52%, #1D4ED8 100%)' }}
               >
                 {loading ? (
                   <>
@@ -236,7 +235,7 @@ export default function RegisterPage() {
             {/* 登录入口 */}
             <button
               onClick={() => navigate('/login')}
-              className="w-full py-2.5 border border-[#C19A83]/30 text-[#A07D6B] rounded-xl font-medium text-sm hover:bg-[#C19A83]/5 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              className="w-full py-2.5 border border-[#D6E4FA] text-[#385D9D] rounded-xl font-medium text-sm hover:bg-[#EEF5FF] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
               立即登录
             </button>

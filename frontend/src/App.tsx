@@ -42,7 +42,25 @@ function GuestGuard({ children }: { children: ReactNode }) {
 
 function App() {
   return (
-    <ConfigProvider locale={zhCN}>
+    <ConfigProvider
+      locale={zhCN}
+      theme={{
+        token: {
+          colorPrimary: '#2F6BFF',
+          colorInfo: '#2F6BFF',
+          colorSuccess: '#1F9D72',
+          colorWarning: '#F59E0B',
+          colorError: '#DC2626',
+          borderRadius: 14,
+          colorBgLayout: '#F6F8FB',
+          colorBgContainer: '#FFFFFF',
+          colorBorder: '#E2E8F0',
+          colorText: '#162033',
+          colorTextSecondary: '#66758F',
+          boxShadowSecondary: '0 18px 40px rgba(15, 23, 42, 0.08)',
+        },
+      }}
+    >
       <BrowserRouter>
         <Routes>
           {/* ========== 公开路由（无需登录） ========== */}
@@ -75,6 +93,8 @@ function App() {
             <Route path="home" element={<HomePage />} />
             <Route path="model" element={<ModelCenterPage />} />
             <Route path="model/template" element={<ModelCenterPage />} />
+            <Route path="model-center" element={<Navigate to="/model" replace />} />
+            <Route path="model-center/template" element={<Navigate to="/model/template" replace />} />
             <Route path="knowledge" element={<KnowledgeBasePage />} />
             <Route path="knowledge/detail" element={<KnowledgeDocDetailPage />} />
             <Route path="chat" element={<ChatPage />} />

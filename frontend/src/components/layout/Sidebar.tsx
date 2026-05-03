@@ -42,24 +42,24 @@ export default function Sidebar({ activeTab, onNavClick, isCollapsed, setIsColla
         isMapPage ? 'rounded-br-none' : 'rounded-br-3xl rounded-tr-3xl'
       } ${isCollapsed ? 'w-20' : 'w-64'}`}
       style={{
-        background: 'linear-gradient(180deg, #FFE4CC 0%, #FAD2B0 55%, #F5BE92 100%)',
-        boxShadow: 'inset -1px 0 0 rgba(255,255,255,.4), 6px 0 28px rgba(200,120,60,.12), 2px 0 0 rgba(200,120,60,.08)',
-        borderRight: '1px solid #F5BE92',
+        background: 'linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,250,253,0.98) 100%)',
+        boxShadow: '0 18px 44px rgba(15,23,42,.06)',
+        borderRight: '1px solid #E2E8F0',
       }}
     >
       {/* 侧边栏顶部柔光 */}
       <div className="absolute top-0 left-0 right-0 h-[180px] pointer-events-none" style={{
-        background: 'radial-gradient(ellipse at top, rgba(255,255,255,.4) 0, transparent 70%)'
+        background: 'radial-gradient(ellipse at top, rgba(132,165,229,.16) 0, transparent 72%)'
       }}></div>
 
       {/* Logo 区域 */}
       <div className="flex items-center justify-center h-20 mt-4 mb-2 cursor-pointer relative z-10" onClick={() => setIsCollapsed(!isCollapsed)}>
-        <div className="relative flex items-center justify-center w-12 h-12 bg-gradient-to-br from-[#F9B98A] via-[#F2935A] to-[#E07338] rounded-xl shadow-lg"
-          style={{ boxShadow: '0 6px 16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.4)' }}>
+        <div className="relative flex items-center justify-center w-12 h-12 rounded-2xl shadow-lg"
+          style={{ background: 'linear-gradient(135deg, #7EA8FF, #2F6BFF 55%, #1D4ED8 100%)', boxShadow: '0 10px 24px rgba(47,107,255,.22), inset 0 1px 0 rgba(255,255,255,.28)' }}>
           <ShieldCheck className="text-white w-7 h-7" />
-          <HeartPulse className="absolute text-white w-4 h-4 mt-1" style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,.8))' }} />
+          <HeartPulse className="absolute text-white w-4 h-4 mt-1" style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,.58))' }} />
         </div>
-        {!isCollapsed && <span className="ml-3 text-xl font-bold tracking-wider text-[#3A2E26]">VIS4SRD</span>}
+        {!isCollapsed && <span className="ml-3 text-xl font-bold tracking-wide text-[#162033]">VIS4SRD</span>}
       </div>
 
       {/* 导航菜单 */}
@@ -73,25 +73,25 @@ export default function Sidebar({ activeTab, onNavClick, isCollapsed, setIsColla
               onClick={() => onNavClick(item.id)}
               className={`flex items-center w-full rounded-2xl transition-all duration-200 group relative py-2.5 ${ // 增加 py-2.5 内边距
                 isActive 
-                  ? 'bg-white text-[#E07338] font-semibold shadow-md' 
-                  : 'text-[#5C4E42] hover:bg-white/50 hover:text-[#3A2E26]'
+                  ? 'bg-[#EEF4FF] text-[#1D4ED8] font-semibold shadow-sm' 
+                  : 'text-[#516276] hover:bg-[#F5F8FC] hover:text-[#162033]'
               }`}
-              style={isActive ? { boxShadow: '0 4px 14px rgba(200,120,60,.18)' } : {}}
+              style={isActive ? { boxShadow: '0 8px 18px rgba(47,107,255,.10)' } : {}}
             >
               {/* 选中态左侧高亮条 */}
               {isActive && (
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r"
                   style={{
-                    background: 'linear-gradient(180deg, #F2935A, #E07338)',
-                    boxShadow: '0 0 10px rgba(242,147,90,.6)'
+                    background: 'linear-gradient(180deg, #2F6BFF, #1D4ED8)',
+                    boxShadow: '0 0 10px rgba(47,107,255,.32)'
                   }}></div>
               )}
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center mx-3 flex-shrink-0 transition-all duration-200 ${ // mx-3 改为 ml-3 mr-4 增加间距
                 isActive 
-                  ? 'bg-gradient-to-br from-[#FBD9BE] to-[#F2935A] text-white' 
-                  : 'bg-white/45 text-[#5C4E42] group-hover:bg-white/85'
+                  ? 'bg-gradient-to-br from-[#89ACFF] to-[#2F6BFF] text-white' 
+                  : 'bg-white text-[#64748B] group-hover:bg-[#EDF3FB]'
               }`}
-                style={isActive ? { boxShadow: '0 4px 10px rgba(200,120,60,.28)' } : { boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.5)' }}
+                style={isActive ? { boxShadow: '0 8px 16px rgba(47,107,255,.22)' } : { boxShadow: 'inset 0 0 0 1px rgba(226,232,240,.9)' }}
               >
                 <Icon className="w-5 h-5" />
               </div>
@@ -104,22 +104,22 @@ export default function Sidebar({ activeTab, onNavClick, isCollapsed, setIsColla
       {/* 底部用户卡 */}
       <div className="p-4 mt-auto relative z-10">
         {!isCollapsed && (
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-white/55 border border-white/70 shadow-sm">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#F9B98A] to-[#E07338] flex items-center justify-center text-white text-sm font-semibold shadow-md">
-              😊
+          <div className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-[#E2E8F0] shadow-sm">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#93B7FF] to-[#2F6BFF] flex items-center justify-center text-white text-sm font-semibold shadow-md">
+              心
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-[#3A2E26]">你好,朋友</p>
-              <p className="text-xs text-[#8A6F58]">今天也来了</p>
+              <p className="text-sm font-semibold text-[#162033]">系统在线</p>
+              <p className="text-xs text-[#6B7A90]">风险识别与证据推理已就绪</p>
             </div>
-            <div className="w-2 h-2 rounded-full bg-[#7FE0B7] shadow-[0_0_6px_#7FE0B7]"></div>
+            <div className="w-2 h-2 rounded-full bg-[#1F9D72] shadow-[0_0_8px_rgba(31,157,114,.45)]"></div>
           </div>
         )}
       </div>
       
       {/* 版本号 */}
-      <div className="text-center pb-4 pt-2 text-xs text-[#8A6F58] relative z-10">
-        {!isCollapsed ? '每一次打开,都是温柔的勇气' : ''} v1.0
+      <div className="text-center pb-4 pt-2 text-xs text-[#94A3B8] relative z-10">
+        {!isCollapsed ? 'Demo Paper · 风险检测研究系统' : ''} v1.0
       </div>
     </div>
   );

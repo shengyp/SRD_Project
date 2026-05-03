@@ -167,8 +167,8 @@ export default function ScaleResultPage() {
     return (
       <div className="flex flex-1 items-center justify-center">
         <div className="text-center">
-          <Loader className="w-8 h-8 text-[#C19A83] mx-auto mb-4 animate-spin" />
-          <p className="text-[#8C7A6B]">加载中...</p>
+          <Loader className="w-8 h-8 text-[#2F6BFF] mx-auto mb-4 animate-spin" />
+          <p className="text-[#64748B]">加载中...</p>
           {loadError && (
             <p className="text-red-500 text-sm mt-2">{loadError}</p>
           )}
@@ -191,13 +191,13 @@ export default function ScaleResultPage() {
       <div className="flex items-center justify-between no-print">
         <div className="flex items-center gap-3">
           <span className={`px-4 py-1.5 ${scaleDisplay.color} rounded-full text-sm font-medium`}>{scaleDisplay.name}</span>
-          <span className="text-sm text-[#8C7A6B]">评估结果</span>
+          <span className="text-sm text-[#64748B]">评估结果</span>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={handleRetest}
             disabled={retesting}
-            className="flex items-center gap-2 px-4 py-2 border border-[#EADDD5] rounded-xl text-[#5C4D43] hover:bg-[#F4EBE1] transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 border border-[#E2E8F0] rounded-xl text-[#415168] hover:bg-[#F1F5FA] transition-colors disabled:opacity-50"
           >
             {retesting ? (
               <Loader className="w-4 h-4 animate-spin" />
@@ -208,7 +208,7 @@ export default function ScaleResultPage() {
           </button>
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 px-4 py-2 border border-[#EADDD5] rounded-xl text-[#5C4D43] hover:bg-[#F4EBE1] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 border border-[#E2E8F0] rounded-xl text-[#415168] hover:bg-[#F1F5FA] transition-colors"
           >
             <Printer className="w-4 h-4" />
             打印报告
@@ -217,15 +217,15 @@ export default function ScaleResultPage() {
       </div>
 
       {/* 结果卡片 */}
-      <div className="bg-white rounded-2xl border border-[#EADDD5] p-6 shadow-sm scale-result-card">
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-sm scale-result-card">
         {/* 任务信息 */}
-        <div className="bg-[#FAF6F3] rounded-xl border border-[#D7BFA6] p-4 flex items-center gap-4 mb-6">
+        <div className="bg-[#F7FAFD] rounded-xl border border-[#DCE7F5] p-4 flex items-center gap-4 mb-6">
           <div className={`w-12 h-12 rounded-xl ${scaleDisplay.bgColor} flex items-center justify-center`}>
             <ScaleIcon type={scaleDisplay.icon} />
           </div>
           <div>
-            <p className="font-bold text-[#4A362C]">{task.taskName}</p>
-            <p className="text-sm text-[#8C7A6B]">
+            <p className="font-bold text-[#162033]">{task.taskName}</p>
+            <p className="text-sm text-[#64748B]">
               评估用户：{task.userAlias || task.userHash || '用户'} · 完成时间：{formatDateTime(task.completedAt)}
             </p>
           </div>
@@ -234,16 +234,16 @@ export default function ScaleResultPage() {
         {/* 得分与阈值 */}
         <div className="grid grid-cols-2 gap-6 mb-6">
           {/* 当前得分 */}
-          <div className="bg-[#FAF6F3] rounded-2xl p-6 text-center">
-            <p className="text-sm text-[#8C7A6B] mb-2">当前得分</p>
-            <div className="text-5xl font-bold text-[#4A362C] mb-1">{task.totalScore || 0}</div>
-            <p className="text-sm text-[#A89F95]">/{scaleMaxScore} 分</p>
+          <div className="bg-[#F7FAFD] rounded-2xl p-6 text-center">
+            <p className="text-sm text-[#64748B] mb-2">当前得分</p>
+            <div className="text-5xl font-bold text-[#162033] mb-1">{task.totalScore || 0}</div>
+            <p className="text-sm text-[#94A3B8]">/{scaleMaxScore} 分</p>
           </div>
 
           {/* 风险阈值 */}
-          <div className="bg-[#FAF6F3] rounded-2xl p-6 text-center">
-            <p className="text-sm text-[#8C7A6B] mb-2">风险阈值</p>
-            <div className="text-5xl font-bold text-[#4A362C] mb-1">≥ {scaleMeta?.threshold || 10}</div>
+          <div className="bg-[#F7FAFD] rounded-2xl p-6 text-center">
+            <p className="text-sm text-[#64748B] mb-2">风险阈值</p>
+            <div className="text-5xl font-bold text-[#162033] mb-1">≥ {scaleMeta?.threshold || 10}</div>
             <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
               isHighRisk ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
             }`}>
@@ -275,15 +275,15 @@ export default function ScaleResultPage() {
         {comfortMessage && (
           <>
             <div className={`${riskColors.bgLight} rounded-2xl p-5 mb-4`}>
-              <h4 className="font-bold text-[#4A362C] mb-3 flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-[#C19A83]" />
+              <h4 className="font-bold text-[#162033] mb-3 flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-[#2F6BFF]" />
                 信息暗示
               </h4>
-              <p className="text-[#5C4D43] leading-relaxed mb-3">{comfortMessage.content}</p>
+              <p className="text-[#415168] leading-relaxed mb-3">{comfortMessage.content}</p>
               <ul className="space-y-2">
                 {comfortMessage.suggestions.map((suggestion, index) => (
-                  <li key={index} className="flex items-start gap-2 text-sm text-[#5C4D43]">
-                    <Check className="w-4 h-4 text-[#C19A83] mt-0.5 shrink-0" />
+                  <li key={index} className="flex items-start gap-2 text-sm text-[#415168]">
+                    <Check className="w-4 h-4 text-[#2F6BFF] mt-0.5 shrink-0" />
                     {suggestion}
                   </li>
                 ))}
@@ -291,12 +291,12 @@ export default function ScaleResultPage() {
             </div>
 
             {/* 缓解话语 */}
-            <div className="bg-white border border-[#D7BFA6] rounded-2xl p-5 mb-6">
-              <h4 className="font-bold text-[#4A362C] mb-3 flex items-center gap-2">
+            <div className="bg-white border border-[#DCE7F5] rounded-2xl p-5 mb-6">
+              <h4 className="font-bold text-[#162033] mb-3 flex items-center gap-2">
                 <Heart className="w-5 h-5 text-pink-400" />
                 {comfortMessage.title}
               </h4>
-              <p className="text-[#5C4D43] leading-relaxed">{comfortMessage.content}</p>
+              <p className="text-[#415168] leading-relaxed">{comfortMessage.content}</p>
             </div>
           </>
         )}
@@ -304,7 +304,7 @@ export default function ScaleResultPage() {
         {/* 操作按钮 */}
         <div className="flex items-center justify-center gap-4 print-hide">
           <button onClick={handleBack}
-            className="flex items-center gap-2 px-6 py-3 bg-[#F4EBE1] hover:bg-[#EADDD5] text-[#4A362C] rounded-xl transition-colors font-medium">
+            className="flex items-center gap-2 px-6 py-3 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#162033] rounded-xl transition-colors font-medium">
             <ArrowLeft className="w-5 h-5" />
             返回任务列表
           </button>
