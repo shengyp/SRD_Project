@@ -82,6 +82,7 @@ class RAGSkillTool:
         self.index_cache = {}
         self.last_index_load = 0
         self.index_cache_ttl = 3600
+        self.semantic_cache = {}
 
     def _read_markdown(self, file_path: Path) -> str:
         try:
@@ -215,6 +216,57 @@ class RAGSkillTool:
             return [w for w in words if w not in stopwords and len(w) > 1][:10]
         except ImportError:
             return [w for w in text.split() if len(w) > 1][:10]
+
+    def _read_semantic_index_text(self, dir_path: Path) -> str:
+        cache_key = str(dir_path.resolve())
+        if cache_key in self.semantic_cache:
+            return self.semantic_cache[cache_key]
+
+        index_path = dir_path / "data_structure.md"
+        if not index_path.exists():
+            self.semantic_cache[cache_key] = ""
+            return ""
+
+        try:
+            text = index_path.read_text(encoding="utf-8")
+        except Exception:
+            text = ""
+        self.semantic_cache[cache_key] = text
+        return text
+
+    def _get_candidate_semantic_text(self, file_path: Path, subdir_path: Path) -> str:
+        parts = []
+        try:
+            rel_path = file_path.relative_to(subdir_path)
+            parts.extend(rel_path.parts)
+        except ValueError:
+            parts.append(file_path.name)
+
+        current = file_path.parent
+        while True:
+            if current == subdir_path.parent:
+                break
+            parts.append(current.name)
+            parts.append(self._read_semantic_index_text(current))
+            if current == subdir_path:
+                break
+            current = current.parent
+
+        return "\n".join([p for p in parts if p]).lower()
+
+    def _get_query_intents(self, query: str) -> List[str]:
+        query_lower = query.lower()
+        intent_map = {
+            "symptom": ["症状", "表现", "识别", "评估", "诊断", "分类", "特征"],
+            "treatment": ["治疗", "药物", "用药", "剂量", "副作用", "干预", "方案"],
+            "scale": ["量表", "phq", "gad", "sds", "sas", "mini", "c-ssrs", "筛查", "评分"],
+            "risk": ["风险", "自杀", "自伤", "危机", "预防", "求助", "热线", "转介"],
+        }
+        matched = []
+        for intent, hints in intent_map.items():
+            if any(hint in query_lower for hint in hints):
+                matched.append(intent)
+        return matched
 
     async def _call_llm_for_dir(self, index_content: str, query: str, prompt_type: str = "root") -> str:
         if prompt_type == "root":
@@ -487,6 +539,8 @@ class RAGSkillTool:
 
             fname = f.stem  # 文件名（不含扩展名）
             fname_lower = fname.lower()
+            rel_path_lower = str(rel_path).replace("\\", "/").lower()
+            semantic_text = self._get_candidate_semantic_text(f, subdir_path)
             score = 0
 
             # 关键词匹配
@@ -494,17 +548,37 @@ class RAGSkillTool:
                 kw_lower = kw.lower()
                 if kw_lower in fname_lower:
                     score += len(kw) * 3  # 高权重（文件名直接匹配）
+                if kw_lower in rel_path_lower:
+                    score += len(kw) * 2.5
+                if kw_lower in semantic_text:
+                    score += len(kw) * 2
                 # 部分匹配（字符级）
                 for part in kw_lower:
                     if part in fname_lower and len(part) >= 2:
                         score += 0.5
 
-            # 治疗/药物相关关键词额外加分
-            treatment_keywords = ['治疗', '药物', '用药', '吃药', '药物', '服用', '剂量']
-            for kw in treatment_keywords:
-                kw_lower = kw.lower()
-                if kw_lower in fname_lower:
-                    score += len(kw) * 2
+            # 语义层级加权：让“主题 -> 子主题 -> 文档”的三级语义真正参与排序
+            query_intents = self._get_query_intents(query)
+            intent_keywords = {
+                "symptom": ["症状", "识别", "评估", "诊断", "分类", "快感缺失", "情绪低落"],
+                "treatment": ["治疗", "药物", "用药", "剂量", "副作用", "cbt", "ssri"],
+                "scale": ["量表", "phq", "gad", "sds", "sas", "mini", "c-ssrs", "筛查"],
+                "risk": ["风险", "自杀", "危机", "预防", "热线", "转介"],
+            }
+            for intent in query_intents:
+                for hint in intent_keywords.get(intent, []):
+                    if hint in semantic_text:
+                        score += 4
+
+            # 意图冲突轻微惩罚，避免“问症状却落到治疗”
+            if "symptom" in query_intents:
+                for hint in intent_keywords["treatment"]:
+                    if hint in semantic_text:
+                        score -= 2
+            if "treatment" in query_intents:
+                for hint in intent_keywords["symptom"]:
+                    if hint in semantic_text:
+                        score -= 1.5
 
             # 深度加权：更深路径（更具体的内容）得分略高，但只在没有关键词直接匹配时才生效
             depth = len(rel_path.parts) - 1  # 0 = 直接在 subdir 下
