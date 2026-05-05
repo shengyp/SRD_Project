@@ -89,6 +89,19 @@ class KnowledgeService:
         digest = hashlib.sha1(text.encode("utf-8")).hexdigest()[:8]
         return f"{fallback_prefix}_{digest}"
 
+    def _compose_sub_topic_code(self, topic_code: str, sub_name: str, max_length: int = 48) -> str:
+        """生成稳定且受长度约束的 sub_topic_code，避免超出数据库字段限制。"""
+        sub_slug = self._slugify(sub_name, "sub")
+        code = f"{topic_code}__{sub_slug}"
+        if len(code) <= max_length:
+            return code
+
+        digest = hashlib.sha1(f"{topic_code}|{sub_name}".encode("utf-8")).hexdigest()[:8]
+        reserve = max_length - len(digest) - 2
+        topic_prefix = topic_code[:max(8, reserve)]
+        trimmed = f"{topic_prefix}__{digest}"
+        return trimmed[:max_length]
+
     def _format_size(self, file_size: int) -> str:
         if file_size < 1024:
             return f"{file_size} B"
@@ -122,7 +135,7 @@ class KnowledgeService:
 
             for sub_index, subtheme in enumerate(theme.get("subthemes", []), start=1):
                 sub_name = subtheme.get("name") or f"{topic_name}-子主题{sub_index}"
-                sub_code = f"{topic_code}__{self._slugify(sub_name, 'sub')}"
+                sub_code = self._compose_sub_topic_code(topic_code, sub_name)
                 sub_keywords = list(subtheme.get("keywords", []) or [])
                 sub_topics.append({
                     "topic_code": topic_code,
@@ -252,7 +265,7 @@ class KnowledgeService:
 
             for sub_index, sub_dir in enumerate(sorted([p for p in theme_dir.iterdir() if p.is_dir()]), start=1):
                 sub_name = sub_dir.name
-                sub_code = f"{topic_code}__{self._slugify(sub_name, 'sub')}"
+                sub_code = self._compose_sub_topic_code(topic_code, sub_name)
                 if sub_code not in sub_seen:
                     sub_topics.append({
                         "topic_code": topic_code,
@@ -1519,6 +1532,54 @@ class KnowledgeService:
             return content
         return content[:max_length] + "..."
 
+    def _is_compact_keyword(self, keyword: str, usage_count: int) -> bool:
+        """筛选适合前端展示的高信号关键词，避免筛选区过于臃肿。"""
+        kw = (keyword or "").strip()
+        if not kw:
+            return False
+
+        if usage_count < 2:
+            return False
+
+        noise_keywords = {
+            "情绪障碍", "干预与求助资源", "心理健康数据", "趋势报告",
+            "自杀与自伤", "自杀风险预防", "危机预防", "儿童心理健康",
+        }
+        if kw in noise_keywords:
+            return False
+
+        if len(kw) > 12 and not re.fullmatch(r"[A-Za-z0-9\-\+/]{1,12}", kw):
+            return False
+
+        if kw.count(" ") >= 2:
+            return False
+
+        if re.fullmatch(r"[A-Za-z][A-Za-z0-9 _\-\+/]{14,}", kw):
+            return False
+
+        return True
+
+    def _compact_keywords(self, rows: List[Dict[str, Any]], limit: int = 36) -> List[Dict[str, Any]]:
+        """压缩关键词集合，只保留适合筛选区展示的高频标签。"""
+        normalized = []
+        seen = set()
+        for row in rows:
+            keyword = (row.get("keyword") or "").strip()
+            usage_count = int(row.get("usage_count") or row.get("weight") or 0)
+            if keyword in seen:
+                continue
+            seen.add(keyword)
+            if not self._is_compact_keyword(keyword, usage_count):
+                continue
+            normalized.append({
+                **row,
+                "keyword": keyword,
+                "usage_count": usage_count,
+            })
+
+        normalized.sort(key=lambda item: (-int(item.get("usage_count") or 0), len(item.get("keyword") or ""), item.get("keyword") or ""))
+        return normalized[:limit]
+
     async def _check_document_exists(self, title: str, topic_id: int) -> Optional[Dict[str, Any]]:
         """检查文档是否已存在"""
         async with self.mysql_pool.acquire() as conn:
@@ -1561,7 +1622,10 @@ class KnowledgeService:
                 rows = await cursor.fetchall()
 
         if rows:
-            return [dict(row) for row in rows]
+            compact_rows = self._compact_keywords([dict(row) for row in rows], limit=18 if is_hot else 36)
+            if compact_rows:
+                return compact_rows
+            return [dict(row) for row in rows[:18 if is_hot else 36]]
 
         # 如果预定义关键词表为空，回退到从文档关键词聚合（不推荐）
         conditions = ["d.is_deleted = FALSE"]
@@ -1601,4 +1665,5 @@ class KnowledgeService:
                     {"keyword": kw, "weight": count, "category": ""}
                     for kw, count in keyword_counts.most_common(100)
                 ]
-                return result
+                compact_rows = self._compact_keywords(result, limit=18 if is_hot else 36)
+                return compact_rows or result[:18 if is_hot else 36]

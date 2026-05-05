@@ -1,26 +1,44 @@
 {
   "version": "1.0.0",
-  "updated_at": "2026-05-04",
+  "updated_at": "2026-05-05",
   "design_principle": "物理结构保持两层检索，语义结构保留三级展示",
   "themes": [
     {
       "theme_dir": "Mental Health Suicide Prevention",
       "theme_name_zh": "自杀预防与危机识别",
       "theme_name_en": "Mental Health Suicide Prevention",
-      "theme_aliases": ["自杀与自伤", "危机预防", "自杀风险预防"],
+      "theme_aliases": [
+        "自杀与自伤",
+        "危机预防",
+        "自杀风险预防"
+      ],
       "description": "面向自杀风险识别、分级评估、预防干预和大众干预场景。",
       "subthemes": [
         {
           "name": "风险筛查与分级",
           "description": "用于识别自杀意念、自伤风险和分级处置。",
-          "keywords": ["自杀风险", "自伤", "ASQ", "风险筛查", "分级处置"],
+          "keywords": [
+            "自杀风险",
+            "自伤",
+            "ASQ",
+            "风险筛查",
+            "分级处置"
+          ],
           "documents": [
             {
               "filename": "NIMH_ASQ_青少年门诊临床路径.pdf",
               "title": "青少年门诊 ASQ 临床路径",
               "summary": "聚焦青少年门诊筛查、阳性后的评估与随访。",
-              "keywords": ["青少年", "门诊", "ASQ", "筛查"],
-              "aliases": ["青少年自杀筛查", "门诊风险评估"],
+              "keywords": [
+                "青少年",
+                "门诊",
+                "ASQ",
+                "筛查"
+              ],
+              "aliases": [
+                "青少年自杀筛查",
+                "门诊风险评估"
+              ],
               "source": "NIMH",
               "audience": "门诊医护、校园心理支持人员"
             },
@@ -28,8 +46,14 @@
               "filename": "NIMH_ASQ_住院临床路径.pdf",
               "title": "住院患者 ASQ 临床路径",
               "summary": "聚焦住院患者自杀风险识别与安全防护。",
-              "keywords": ["住院", "风险筛查", "安全防护"],
-              "aliases": ["住院自杀风险管理"],
+              "keywords": [
+                "住院",
+                "风险筛查",
+                "安全防护"
+              ],
+              "aliases": [
+                "住院自杀风险管理"
+              ],
               "source": "NIMH",
               "audience": "住院医护"
             },
@@ -37,8 +61,15 @@
               "filename": "NIMH_ASQ_成人急诊临床路径.pdf",
               "title": "成人急诊 ASQ 临床路径",
               "summary": "聚焦急诊风险评估、紧急干预与精神科转诊。",
-              "keywords": ["急诊", "成人", "风险评估", "转诊"],
-              "aliases": ["成人急诊自杀评估"],
+              "keywords": [
+                "急诊",
+                "成人",
+                "风险评估",
+                "转诊"
+              ],
+              "aliases": [
+                "成人急诊自杀评估"
+              ],
               "source": "NIMH",
               "audience": "急诊医护"
             }
@@ -47,14 +78,25 @@
         {
           "name": "大众干预与预防",
           "description": "用于非专业人员的识别、陪伴和干预。",
-          "keywords": ["5行动步骤", "危机干预", "陪伴", "大众预防"],
+          "keywords": [
+            "5行动步骤",
+            "危机干预",
+            "陪伴",
+            "大众预防"
+          ],
           "documents": [
             {
               "filename": "NIMH_5行动步骤.pdf",
               "title": "自杀干预 5 行动步骤",
               "summary": "大众可执行的基础干预流程。",
-              "keywords": ["5行动步骤", "危机干预", "支持"],
-              "aliases": ["大众自杀干预"],
+              "keywords": [
+                "5行动步骤",
+                "危机干预",
+                "支持"
+              ],
+              "aliases": [
+                "大众自杀干预"
+              ],
               "source": "NIMH",
               "audience": "普通公众、同伴支持者"
             },
@@ -62,8 +104,15 @@
               "filename": "WHO：预防自杀——心理辅导员手册 (权威中文版).pdf",
               "title": "WHO 预防自杀心理辅导员手册",
               "summary": "覆盖风险评估、危机干预、特殊人群支持等完整流程。",
-              "keywords": ["WHO", "风险评估", "危机干预", "心理辅导"],
-              "aliases": ["WHO 自杀预防手册"],
+              "keywords": [
+                "WHO",
+                "风险评估",
+                "危机干预",
+                "心理辅导"
+              ],
+              "aliases": [
+                "WHO 自杀预防手册"
+              ],
               "source": "WHO",
               "audience": "心理辅导员、专业支持人员"
             },
@@ -71,8 +120,15 @@
               "filename": "CDC_青年自杀预防机会_PDF.pdf",
               "title": "青年自杀预防机会",
               "summary": "聚焦青年人群流行特征、风险因素和公共卫生预防机会。",
-              "keywords": ["青年", "风险因素", "公共卫生", "预防机会"],
-              "aliases": ["青年自杀预防"],
+              "keywords": [
+                "青年",
+                "风险因素",
+                "公共卫生",
+                "预防机会"
+              ],
+              "aliases": [
+                "青年自杀预防"
+              ],
               "source": "CDC",
               "audience": "公共卫生研究者、政策与教育工作者"
             }
@@ -84,20 +140,35 @@
       "theme_dir": "Mental Health Clinical Guidelines",
       "theme_name_zh": "临床筛查与转诊规范",
       "theme_name_en": "Mental Health Clinical Guidelines",
-      "theme_aliases": ["危机干预", "临床流程", "转诊规范"],
+      "theme_aliases": [
+        "危机干预",
+        "临床流程",
+        "转诊规范"
+      ],
       "description": "用于临床环境中的筛查、评估、转诊和安全管理流程。",
       "subthemes": [
         {
           "name": "青少年门诊路径",
           "description": "适用于门诊环境下青少年风险筛查与随访。",
-          "keywords": ["青少年", "门诊", "筛查", "随访"],
+          "keywords": [
+            "青少年",
+            "门诊",
+            "筛查",
+            "随访"
+          ],
           "documents": [
             {
               "filename": "NIMH_ASQ_青少年门诊临床路径.pdf",
               "title": "青少年门诊 ASQ 临床路径",
               "summary": "标准化的青少年门诊风险筛查与随访流程。",
-              "keywords": ["青少年", "门诊", "ASQ"],
-              "aliases": ["青少年门诊流程"],
+              "keywords": [
+                "青少年",
+                "门诊",
+                "ASQ"
+              ],
+              "aliases": [
+                "青少年门诊流程"
+              ],
               "source": "NIMH",
               "audience": "门诊医护"
             }
@@ -106,14 +177,25 @@
         {
           "name": "住院患者安全管理",
           "description": "适用于住院场景下的筛查、隐私保护和安全防护。",
-          "keywords": ["住院", "安全防护", "隐私保护", "跨科协作"],
+          "keywords": [
+            "住院",
+            "安全防护",
+            "隐私保护",
+            "跨科协作"
+          ],
           "documents": [
             {
               "filename": "NIMH_ASQ_住院临床路径.pdf",
               "title": "住院患者 ASQ 临床路径",
               "summary": "覆盖住院场景中的风险筛查、保护与转诊。",
-              "keywords": ["住院", "风险管理", "转诊"],
-              "aliases": ["住院路径"],
+              "keywords": [
+                "住院",
+                "风险管理",
+                "转诊"
+              ],
+              "aliases": [
+                "住院路径"
+              ],
               "source": "NIMH",
               "audience": "住院医护"
             }
@@ -122,14 +204,25 @@
         {
           "name": "成人急诊临床路径",
           "description": "适用于急诊场景下的快速评估与紧急干预。",
-          "keywords": ["急诊", "成人", "紧急干预", "精神科转诊"],
+          "keywords": [
+            "急诊",
+            "成人",
+            "紧急干预",
+            "精神科转诊"
+          ],
           "documents": [
             {
               "filename": "NIMH_ASQ_成人急诊临床路径.pdf",
               "title": "成人急诊 ASQ 临床路径",
               "summary": "覆盖急诊风险评估、危险物品管控与转诊。",
-              "keywords": ["急诊", "成人", "转诊"],
-              "aliases": ["成人急诊流程"],
+              "keywords": [
+                "急诊",
+                "成人",
+                "转诊"
+              ],
+              "aliases": [
+                "成人急诊流程"
+              ],
               "source": "NIMH",
               "audience": "急诊医护"
             }
@@ -141,22 +234,67 @@
       "theme_dir": "Mental Health Crisis Resources",
       "theme_name_zh": "危机求助资源",
       "theme_name_en": "Mental Health Crisis Resources",
-      "theme_aliases": ["干预与求助资源", "危机热线", "援助渠道"],
+      "theme_aliases": [
+        "干预与求助资源",
+        "危机热线",
+        "援助渠道"
+      ],
       "description": "用于危机时刻的热线、资源转介和支持渠道说明。",
       "subthemes": [
         {
           "name": "热线资源",
           "description": "聚焦危机热线及服务对象、服务范围。",
-          "keywords": ["988", "热线", "求助渠道", "危机支持"],
+          "keywords": [
+            "988",
+            "热线",
+            "求助渠道",
+            "危机支持"
+          ],
           "documents": [
             {
               "filename": "SAMHSA_988事实表.pdf",
               "title": "SAMHSA 988 热线事实表",
               "summary": "介绍 988 热线的服务方式、适用场景和常见问题。",
-              "keywords": ["988", "热线", "危机支持"],
-              "aliases": ["988 事实表", "危机热线"],
+              "keywords": [
+                "988",
+                "热线",
+                "危机支持"
+              ],
+              "aliases": [
+                "988 事实表",
+                "危机热线"
+              ],
               "source": "SAMHSA",
               "audience": "普通公众、支持人员"
+            }
+          ]
+        },
+        {
+          "name": "危机系统与服务设计",
+          "description": "用于理解 988 在更大危机响应体系中的定位、服务方式和系统建设逻辑。",
+          "keywords": [
+            "988",
+            "危机系统",
+            "服务设计",
+            "响应体系"
+          ],
+          "documents": [
+            {
+              "filename": "SAMHSA_988危机系统响应.md",
+              "title": "SAMHSA 988 危机系统响应",
+              "summary": "基于 SAMHSA 官方页面整理 988 的服务方式、系统建设背景和危机照护体系定位。",
+              "keywords": [
+                "988",
+                "危机系统",
+                "24/7支持",
+                "短信聊天"
+              ],
+              "aliases": [
+                "988 crisis response",
+                "988 系统建设"
+              ],
+              "source": "SAMHSA",
+              "audience": "项目设计者、公共服务人员、普通公众"
             }
           ]
         }
@@ -166,29 +304,69 @@
       "theme_dir": "Mental Health Disorders",
       "theme_name_zh": "常见心理障碍知识",
       "theme_name_en": "Mental Health Disorders",
-      "theme_aliases": ["抑郁", "焦虑", "情绪障碍", "儿童心理健康"],
+      "theme_aliases": [
+        "抑郁",
+        "焦虑",
+        "情绪障碍",
+        "儿童心理健康"
+      ],
       "description": "用于常见心理障碍的症状、诊断、治疗和支持知识检索。",
       "subthemes": [
         {
           "name": "情绪障碍",
           "description": "聚焦抑郁、双相和季节性情感障碍。",
-          "keywords": ["抑郁", "双相", "季节性情感障碍", "情绪波动"],
+          "keywords": [
+            "抑郁",
+            "双相",
+            "季节性情感障碍",
+            "情绪波动",
+            "成人抑郁"
+          ],
           "documents": [
             {
               "filename": "NIMH_青少年抑郁.pdf",
               "title": "青少年抑郁",
               "summary": "介绍青少年抑郁的核心症状、自我识别和求助方式。",
-              "keywords": ["青少年抑郁", "症状", "求助"],
-              "aliases": ["青少年抑郁识别"],
+              "keywords": [
+                "青少年抑郁",
+                "症状",
+                "求助"
+              ],
+              "aliases": [
+                "青少年抑郁识别"
+              ],
               "source": "NIMH",
               "audience": "青少年、家长、教育工作者"
+            },
+            {
+              "filename": "NIMH_抑郁症.md",
+              "title": "抑郁症",
+              "summary": "NIMH 官方抑郁症基础科普，覆盖定义、症状、类型、诊断、治疗与求助。",
+              "keywords": [
+                "抑郁症",
+                "情绪低落",
+                "诊断",
+                "治疗"
+              ],
+              "aliases": [
+                "成人抑郁",
+                "抑郁症基础知识"
+              ],
+              "source": "NIMH",
+              "audience": "普通公众、家属、支持人员"
             },
             {
               "filename": "NIMH_双相障碍.pdf",
               "title": "双相障碍",
               "summary": "说明双相障碍的分型、症状、诊疗和日常管理。",
-              "keywords": ["双相障碍", "躁狂", "抑郁发作"],
-              "aliases": ["双相情感障碍"],
+              "keywords": [
+                "双相障碍",
+                "躁狂",
+                "抑郁发作"
+              ],
+              "aliases": [
+                "双相情感障碍"
+              ],
               "source": "NIMH",
               "audience": "患者、家属、支持人员"
             },
@@ -196,24 +374,101 @@
               "filename": "NIMH_季节性情感障碍.pdf",
               "title": "季节性情感障碍",
               "summary": "介绍季节性情绪变化、症状差异与治疗方式。",
-              "keywords": ["季节性情感障碍", "光疗", "冬季抑郁"],
-              "aliases": ["SAD"],
+              "keywords": [
+                "季节性情感障碍",
+                "光疗",
+                "冬季抑郁"
+              ],
+              "aliases": [
+                "SAD"
+              ],
               "source": "NIMH",
               "audience": "普通公众"
             }
           ]
         },
         {
+          "name": "焦虑相关障碍",
+          "description": "聚焦广泛性焦虑、惊恐障碍和社交焦虑障碍的识别与治疗。",
+          "keywords": [
+            "焦虑",
+            "广泛性焦虑",
+            "惊恐障碍",
+            "社交焦虑"
+          ],
+          "documents": [
+            {
+              "filename": "NIMH_广泛性焦虑障碍.md",
+              "title": "广泛性焦虑障碍",
+              "summary": "NIMH 官方资料，覆盖持续性担忧、症状表现、共病、诊断与治疗。",
+              "keywords": [
+                "广泛性焦虑",
+                "持续担忧",
+                "治疗"
+              ],
+              "aliases": [
+                "GAD",
+                "广泛性焦虑障碍基础知识"
+              ],
+              "source": "NIMH",
+              "audience": "普通公众、患者、家属"
+            },
+            {
+              "filename": "NIMH_惊恐障碍.md",
+              "title": "惊恐障碍",
+              "summary": "NIMH 官方资料，覆盖惊恐发作的表现、风险因素、治疗和支持。",
+              "keywords": [
+                "惊恐障碍",
+                "惊恐发作",
+                "回避行为"
+              ],
+              "aliases": [
+                "Panic Disorder",
+                "惊恐发作科普"
+              ],
+              "source": "NIMH",
+              "audience": "普通公众、患者、家属"
+            },
+            {
+              "filename": "NIMH_社交焦虑障碍.md",
+              "title": "社交焦虑障碍",
+              "summary": "NIMH 官方资料，覆盖社交回避、认知与生理症状、治疗和求助方式。",
+              "keywords": [
+                "社交焦虑",
+                "社交回避",
+                "暴露治疗"
+              ],
+              "aliases": [
+                "Social Anxiety Disorder",
+                "社交恐惧"
+              ],
+              "source": "NIMH",
+              "audience": "普通公众、患者、家属"
+            }
+          ]
+        },
+        {
           "name": "神经发育障碍",
           "description": "聚焦 ADHD、自闭谱系等神经发育问题。",
-          "keywords": ["ADHD", "自闭谱系", "注意缺陷", "发育支持"],
+          "keywords": [
+            "ADHD",
+            "自闭谱系",
+            "注意缺陷",
+            "发育支持"
+          ],
           "documents": [
             {
               "filename": "NIMH_ADHD基础.pdf",
               "title": "ADHD 基础",
               "summary": "讲解 ADHD 症状分型、病因与干预策略。",
-              "keywords": ["ADHD", "注意缺陷", "多动"],
-              "aliases": ["注意缺陷多动障碍"],
+              "keywords": [
+                "ADHD",
+                "注意缺陷",
+                "多动"
+              ],
+              "aliases": [
+                "注意缺陷多动障碍"
+              ],
               "source": "NIMH",
               "audience": "家长、教师、患者"
             },
@@ -221,8 +476,14 @@
               "filename": "NIMH_自闭谱系障碍.pdf",
               "title": "自闭谱系障碍",
               "summary": "介绍核心特征、发展表现与干预支持。",
-              "keywords": ["自闭谱系", "社交沟通", "干预服务"],
-              "aliases": ["ASD"],
+              "keywords": [
+                "自闭谱系",
+                "社交沟通",
+                "干预服务"
+              ],
+              "aliases": [
+                "ASD"
+              ],
               "source": "NIMH",
               "audience": "家长、康复与教育支持人员"
             }
@@ -231,14 +492,25 @@
         {
           "name": "创伤与行为相关障碍",
           "description": "聚焦 PTSD、进食障碍和破坏性心境失调问题。",
-          "keywords": ["PTSD", "进食障碍", "心境失调", "创伤"],
+          "keywords": [
+            "PTSD",
+            "进食障碍",
+            "心境失调",
+            "创伤"
+          ],
           "documents": [
             {
               "filename": "NIMH_PTSD.pdf",
               "title": "PTSD",
               "summary": "说明创伤后应激障碍的原因、症状与治疗。",
-              "keywords": ["PTSD", "创伤", "闪回"],
-              "aliases": ["创伤后应激障碍"],
+              "keywords": [
+                "PTSD",
+                "创伤",
+                "闪回"
+              ],
+              "aliases": [
+                "创伤后应激障碍"
+              ],
               "source": "NIMH",
               "audience": "普通公众、支持人员"
             },
@@ -246,8 +518,14 @@
               "filename": "NIMH_进食障碍.pdf",
               "title": "进食障碍",
               "summary": "介绍常见进食障碍类型、危害和治疗方式。",
-              "keywords": ["进食障碍", "厌食", "暴食"],
-              "aliases": ["饮食障碍"],
+              "keywords": [
+                "进食障碍",
+                "厌食",
+                "暴食"
+              ],
+              "aliases": [
+                "饮食障碍"
+              ],
               "source": "NIMH",
               "audience": "普通公众"
             },
@@ -255,8 +533,14 @@
               "filename": "NIMH_破坏性心境失调障碍.pdf",
               "title": "破坏性心境失调障碍",
               "summary": "说明儿童青少年严重情绪爆发和管理方式。",
-              "keywords": ["情绪爆发", "儿童青少年", "行为干预"],
-              "aliases": ["DMDD"],
+              "keywords": [
+                "情绪爆发",
+                "儿童青少年",
+                "行为干预"
+              ],
+              "aliases": [
+                "DMDD"
+              ],
               "source": "NIMH",
               "audience": "家长、教师、临床支持人员"
             },
@@ -264,8 +548,14 @@
               "filename": "NIMH_儿童与心理健康.pdf",
               "title": "儿童与心理健康",
               "summary": "帮助家长识别儿童异常心理信号并了解支持路径。",
-              "keywords": ["儿童心理", "家长识别", "支持路径"],
-              "aliases": ["儿童心理健康"],
+              "keywords": [
+                "儿童心理",
+                "家长识别",
+                "支持路径"
+              ],
+              "aliases": [
+                "儿童心理健康"
+              ],
               "source": "NIMH",
               "audience": "家长、学校支持人员"
             }
@@ -277,20 +567,35 @@
       "theme_dir": "Mental Health Statistics & Reports",
       "theme_name_zh": "心理健康统计与趋势报告",
       "theme_name_en": "Mental Health Statistics & Reports",
-      "theme_aliases": ["心理健康数据", "趋势报告", "流行病学"],
+      "theme_aliases": [
+        "心理健康数据",
+        "趋势报告",
+        "流行病学"
+      ],
       "description": "用于人群心理健康现状、患病率和差异趋势分析。",
       "subthemes": [
         {
           "name": "抑郁患病率统计",
           "description": "聚焦抑郁患病率及群体差异。",
-          "keywords": ["抑郁", "患病率", "收入差异", "年龄差异"],
+          "keywords": [
+            "抑郁",
+            "患病率",
+            "收入差异",
+            "年龄差异"
+          ],
           "documents": [
             {
               "filename": "CDC_心理健康数据简报_2025_527.pdf",
               "title": "CDC 心理健康数据简报 2025",
               "summary": "统计 12 岁以上人群抑郁患病率及差异趋势。",
-              "keywords": ["抑郁", "患病率", "趋势"],
-              "aliases": ["CDC 抑郁简报"],
+              "keywords": [
+                "抑郁",
+                "患病率",
+                "趋势"
+              ],
+              "aliases": [
+                "CDC 抑郁简报"
+              ],
               "source": "CDC",
               "audience": "研究者、政策制定者"
             }
@@ -299,14 +604,25 @@
         {
           "name": "成人焦虑抑郁趋势",
           "description": "聚焦成年人群焦虑与抑郁变化趋势。",
-          "keywords": ["成人", "焦虑", "抑郁", "趋势"],
+          "keywords": [
+            "成人",
+            "焦虑",
+            "抑郁",
+            "趋势"
+          ],
           "documents": [
             {
               "filename": "CDC_心理健康状况与照护_213_PDF.pdf",
               "title": "CDC 心理健康状况与照护",
               "summary": "对比成年人焦虑抑郁症状变化与照护情况。",
-              "keywords": ["成人", "焦虑", "照护"],
-              "aliases": ["成人心理健康照护"],
+              "keywords": [
+                "成人",
+                "焦虑",
+                "照护"
+              ],
+              "aliases": [
+                "成人心理健康照护"
+              ],
               "source": "CDC",
               "audience": "研究者、公共卫生工作者"
             }
@@ -315,14 +631,25 @@
         {
           "name": "青少年焦虑抑郁与欺凌",
           "description": "聚焦青少年欺凌与情绪症状的关系。",
-          "keywords": ["青少年", "欺凌", "焦虑", "抑郁"],
+          "keywords": [
+            "青少年",
+            "欺凌",
+            "焦虑",
+            "抑郁"
+          ],
           "documents": [
             {
               "filename": "CDC_青少年焦虑抑郁与欺凌_数据简报_514.pdf",
               "title": "CDC 青少年焦虑抑郁与欺凌数据简报",
               "summary": "分析欺凌与焦虑抑郁的关联及群体差异。",
-              "keywords": ["青少年", "欺凌", "关联"],
-              "aliases": ["青少年欺凌数据"],
+              "keywords": [
+                "青少年",
+                "欺凌",
+                "关联"
+              ],
+              "aliases": [
+                "青少年欺凌数据"
+              ],
               "source": "CDC",
               "audience": "研究者、教育工作者"
             }
@@ -331,147 +658,208 @@
       ]
     },
     {
-      "theme_dir": "AI Knowledge",
-      "theme_name_zh": "人工智能与智能体知识",
-      "theme_name_en": "AI Knowledge",
-      "theme_aliases": ["AI 行业知识", "AI Agent", "人工智能报告"],
-      "description": "用于 AI Agent、大模型、治理、行业应用和产业趋势检索。",
+      "theme_dir": "Mental Health Self-Help & Early Support",
+      "theme_name_zh": "心理自助与早期支持",
+      "theme_name_en": "Mental Health Self-Help & Early Support",
+      "theme_aliases": [
+        "早期支持",
+        "压力应对",
+        "心理自助"
+      ],
+      "description": "用于早期自我识别、压力管理、支持策略和何时求助的知识检索。",
       "subthemes": [
         {
-          "name": "AI Agent 与大模型",
-          "description": "聚焦智能体、AGI 路线、大模型生态和应用演进。",
-          "keywords": ["AI Agent", "大模型", "AGI", "应用趋势"],
+          "name": "求助判断与自我识别",
+          "description": "帮助用户初步判断症状是否已影响日常生活以及何时寻求专业帮助。",
+          "keywords": [
+            "是否需要帮助",
+            "求助判断",
+            "症状影响",
+            "专业支持"
+          ],
           "documents": [
             {
-              "filename": "2026年AI Agent智能体技术发展报告.pdf",
-              "title": "2026 年 AI Agent 智能体技术发展报告",
-              "summary": "系统梳理 AI Agent 技术发展、架构与趋势。",
-              "keywords": ["AI Agent", "技术趋势", "多智能体"],
-              "aliases": ["AI Agent 发展报告"],
-              "source": "行业报告",
-              "audience": "技术研究者、产品与项目设计者"
-            },
-            {
-              "filename": "OpenAI深度报告：大模型王者，引领AGI之路.pdf",
-              "title": "OpenAI 深度报告",
-              "summary": "分析大模型生态、技术演进和 AGI 路线。",
-              "keywords": ["OpenAI", "大模型", "AGI"],
-              "aliases": ["OpenAI 报告"],
-              "source": "行业研究",
-              "audience": "技术研究者"
-            },
-            {
-              "filename": "2026AI应用专题：各大厂新模型持续迭代，重视AI应用板块投资机会.pdf",
-              "title": "2026 AI 应用专题",
-              "summary": "关注模型迭代与应用投资机会。",
-              "keywords": ["模型迭代", "AI 应用", "投资机会"],
-              "aliases": ["AI 应用专题"],
-              "source": "行业研究",
-              "audience": "研究者、产业分析人员"
+              "filename": "NIMH_我是否需要心理帮助.md",
+              "title": "我是否需要心理帮助",
+              "summary": "NIMH 官方自我判断材料，帮助识别症状持续时间、严重程度和紧急求助时机。",
+              "keywords": [
+                "是否需要心理帮助",
+                "症状持续",
+                "紧急求助"
+              ],
+              "aliases": [
+                "Do I Need Help",
+                "求助判断指南"
+              ],
+              "source": "NIMH",
+              "audience": "普通公众、学生、家属"
             }
           ]
         },
         {
-          "name": "AI 治理与安全",
-          "description": "聚焦治理框架、安全风险和合规要求。",
-          "keywords": ["AI 治理", "安全", "合规", "备案"],
+          "name": "压力管理与早期干预",
+          "description": "聚焦高压、焦虑、灾后心理反应和基础应对策略。",
+          "keywords": [
+            "压力管理",
+            "焦虑应对",
+            "灾后应对",
+            "自我照护"
+          ],
           "documents": [
             {
-              "filename": "2025年AI治理报告：回归现实主义.pdf",
-              "title": "2025 年 AI 治理报告",
-              "summary": "讨论治理框架与现实环境中的落地路径。",
-              "keywords": ["AI 治理", "监管", "政策"],
-              "aliases": ["AI 治理报告"],
-              "source": "行业研究",
-              "audience": "政策与研究人员"
+              "filename": "NIMH_压力与焦虑应对.pdf",
+              "title": "压力与焦虑应对",
+              "summary": "NIMH 官方压力管理资料，覆盖常见压力反应与可执行的自我照护建议。",
+              "keywords": [
+                "压力",
+                "焦虑",
+                "自我照护"
+              ],
+              "aliases": [
+                "I am So Stressed Out",
+                "压力管理"
+              ],
+              "source": "NIMH",
+              "audience": "普通公众、学生"
             },
             {
-              "filename": "人工智能安全治理研究报告（2025年）.pdf",
-              "title": "人工智能安全治理研究报告",
-              "summary": "分析 AI 风险点与治理框架。",
-              "keywords": ["安全治理", "风险控制", "治理框架"],
-              "aliases": ["AI 安全治理"],
-              "source": "行业研究",
-              "audience": "研究者、治理设计者"
-            },
+              "filename": "CDC_灾后与创伤事件应对.pdf",
+              "title": "灾后与创伤事件应对",
+              "summary": "CDC 官方指南，聚焦灾害或创伤事件后的常见反应、支持方式与恢复建议。",
+              "keywords": [
+                "灾后应对",
+                "创伤事件",
+                "恢复建议"
+              ],
+              "aliases": [
+                "Coping with a Disaster or Traumatic Event"
+              ],
+              "source": "CDC",
+              "audience": "普通公众、家庭支持者、社区工作者"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "theme_dir": "Mental Health Integrated Care & Trauma",
+      "theme_name_zh": "创伤知情与综合照护",
+      "theme_name_en": "Mental Health Integrated Care & Trauma",
+      "theme_aliases": [
+        "创伤知情",
+        "共病照护",
+        "危机照护体系",
+        "mhGAP"
+      ],
+      "description": "用于创伤知情照护、共病整合治疗、危机照护体系建设和资源有限场景下的标准化支持知识检索。",
+      "subthemes": [
+        {
+          "name": "创伤知情照护",
+          "description": "帮助理解创伤、恢复和避免再次创伤化的服务设计原则。",
+          "keywords": [
+            "创伤知情",
+            "再次创伤化",
+            "恢复",
+            "安全环境"
+          ],
+          "documents": [
             {
-              "filename": "生成式人工智能服务合规备案指南（2026年）.pdf",
-              "title": "生成式人工智能服务合规备案指南",
-              "summary": "聚焦生成式 AI 服务备案与合规要求。",
-              "keywords": ["生成式 AI", "备案", "合规"],
-              "aliases": ["AI 合规指南"],
-              "source": "合规指南",
-              "audience": "产品、法务、平台负责人"
+              "filename": "SAMHSA_创伤知情照护.md",
+              "title": "SAMHSA 创伤知情照护",
+              "summary": "基于 SAMHSA 官方页面整理创伤定义、创伤知情照护核心动作和机构目标。",
+              "keywords": [
+                "创伤知情",
+                "再次创伤化",
+                "恢复"
+              ],
+              "aliases": [
+                "Trauma-Informed Care",
+                "创伤知情服务"
+              ],
+              "source": "SAMHSA",
+              "audience": "心理支持人员、项目设计者、服务机构"
             }
           ]
         },
         {
-          "name": "行业应用与案例",
-          "description": "聚焦政务、产业、教育、营销和可穿戴场景。",
-          "keywords": ["行业案例", "重庆案例", "营销", "教育", "AI 眼镜"],
+          "name": "共病与整合治疗",
+          "description": "聚焦精神障碍与物质使用障碍并存场景下的整合筛查、整合治疗和转介。",
+          "keywords": [
+            "共病障碍",
+            "整合治疗",
+            "No Wrong Door",
+            "双重障碍"
+          ],
           "documents": [
             {
-              "filename": "2025全球人工智能技术应用洞察报告.pdf",
-              "title": "2025 全球人工智能技术应用洞察报告",
-              "summary": "概览全球 AI 技术与应用趋势。",
-              "keywords": ["全球应用", "技术洞察", "趋势"],
-              "aliases": ["全球 AI 应用报告"],
-              "source": "行业报告",
-              "audience": "研究者、项目设计者"
-            },
+              "filename": "SAMHSA_共病障碍整合治疗.md",
+              "title": "SAMHSA 共病障碍整合治疗",
+              "summary": "基于 SAMHSA 官方页面整理共病障碍整合治疗模式、收益和 No Wrong Door 原则。",
+              "keywords": [
+                "共病障碍",
+                "整合治疗",
+                "No Wrong Door"
+              ],
+              "aliases": [
+                "Co-Occurring Disorders",
+                "双重障碍治疗"
+              ],
+              "source": "SAMHSA",
+              "audience": "临床支持人员、项目设计者、转介服务人员"
+            }
+          ]
+        },
+        {
+          "name": "危机照护体系",
+          "description": "聚焦行为健康危机照护体系建设、规范和服务能力设计。",
+          "keywords": [
+            "危机照护体系",
+            "行为健康危机",
+            "988",
+            "服务规范"
+          ],
+          "documents": [
             {
-              "filename": "2025年度重庆市人工智能应用场景典型案例集（压缩版）.pdf",
-              "title": "重庆市人工智能应用场景典型案例集",
-              "summary": "汇总重庆本地 AI 应用案例。",
-              "keywords": ["重庆", "应用案例", "政务", "工业"],
-              "aliases": ["重庆 AI 案例"],
-              "source": "地方案例集",
-              "audience": "本地项目设计者"
-            },
+              "filename": "SAMHSA_国家行为健康危机照护指南_2025.pdf",
+              "title": "SAMHSA 国家行为健康危机照护指南 2025",
+              "summary": "SAMHSA 官方危机照护指南，适合危机服务体系、热线衔接和行为健康响应能力建设。",
+              "keywords": [
+                "危机照护",
+                "行为健康",
+                "服务规范"
+              ],
+              "aliases": [
+                "National Guidelines for a Behavioral Health Coordinated System of Crisis Care"
+              ],
+              "source": "SAMHSA",
+              "audience": "公共服务机构、项目设计者、危机干预服务人员"
+            }
+          ]
+        },
+        {
+          "name": "资源有限场景标准化支持",
+          "description": "聚焦非专科、基层和资源有限场景下的心理健康服务扩展。",
+          "keywords": [
+            "mhGAP",
+            "基层心理健康",
+            "非专科",
+            "资源有限"
+          ],
+          "documents": [
             {
-              "filename": "2026年快消行业AI营销增长白皮书.pdf",
-              "title": "快消行业 AI 营销增长白皮书",
-              "summary": "聚焦快消行业的 AI 营销与增长实践。",
-              "keywords": ["快消", "营销", "增长"],
-              "aliases": ["AI 营销白皮书"],
-              "source": "行业白皮书",
-              "audience": "市场与增长团队"
-            },
-            {
-              "filename": "中国AI+营销趋势洞察2026.pdf",
-              "title": "中国 AI+营销趋势洞察 2026",
-              "summary": "分析中国市场 AI+营销方案与趋势。",
-              "keywords": ["AI+营销", "中国市场", "趋势"],
-              "aliases": ["AI 营销趋势"],
-              "source": "行业研究",
-              "audience": "市场、品牌与策略人员"
-            },
-            {
-              "filename": "清华大学：职业教育人工智能应用发展报告（2024-2025）.pdf",
-              "title": "职业教育人工智能应用发展报告",
-              "summary": "聚焦 AI 在职业教育中的应用与发展方向。",
-              "keywords": ["职业教育", "教学应用", "教育发展"],
-              "aliases": ["AI 教育应用报告"],
-              "source": "高校研究",
-              "audience": "教育工作者、研究者"
-            },
-            {
-              "filename": "AI眼镜关键技术与产业生态研究报告（2025年）.pdf",
-              "title": "AI 眼镜关键技术与产业生态研究报告",
-              "summary": "介绍 AI 眼镜的关键技术与产业生态。",
-              "keywords": ["AI 眼镜", "可穿戴", "产业生态"],
-              "aliases": ["AI 可穿戴报告"],
-              "source": "产业研究",
-              "audience": "硬件与产业研究者"
-            },
-            {
-              "filename": "2025年第五范式-人工智能驱动的科技创新报告.pdf",
-              "title": "人工智能驱动的科技创新报告",
-              "summary": "介绍企业级 AI 创新实践。",
-              "keywords": ["企业 AI", "科技创新", "应用实践"],
-              "aliases": ["第五范式报告"],
-              "source": "企业研究",
-              "audience": "产业分析与技术管理者"
+              "filename": "WHO_mhGAP项目概览.md",
+              "title": "WHO mhGAP 项目概览",
+              "summary": "基于 WHO 官方页面整理 mhGAP 的目标、资源体系和资源有限场景下的适用价值。",
+              "keywords": [
+                "mhGAP",
+                "基层服务",
+                "标准化支持"
+              ],
+              "aliases": [
+                "Mental Health Gap Action Programme"
+              ],
+              "source": "WHO",
+              "audience": "基层服务设计者、学校和社区支持者、研究者"
             }
           ]
         }

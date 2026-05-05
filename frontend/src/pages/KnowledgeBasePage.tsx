@@ -35,6 +35,7 @@ import {
 } from '../api';
 import { useAuthStore } from '../store/authStore';
 import PaperStatCard from '../components/PaperStatCard';
+import ActionCapsuleButton from '../components/ActionCapsuleButton';
 
 // ==================== 类型定义 ====================
 
@@ -131,30 +132,19 @@ const DEFAULT_KEYWORDS = [
   '高危信号', '预警', '遗书', '轻生', '求助', '失眠', '自伤', '抑郁', '焦虑', '危机', '干预', '自杀', '绝望', '情绪', '压力', '睡眠', '心理', '治疗', '药物', '筛查'
 ];
 
-// 检测是否为乱码关键词（通过字符数判断）
-// 真正的中文每个字符占1个单位，但乱码字符可能组合后看起来像中文
+const MAX_FILTER_KEYWORDS = 36;
+
+// 仅拦截明显的 mojibake / 替换字符，避免误伤 PHQ-9、GAD-7 这类正常关键词。
 function isLikelyGarbledKeyword(keyword: string): boolean {
-  // 如果关键词长度超过8个字符，很可能是乱码（正常关键词应该较短）
-  if (keyword.length > 8) return true;
+  const trimmed = keyword.trim();
+  if (!trimmed) return true;
 
-  // 如果包含明显的乱码特征字符（如扩展 Latin-1 范围）
-  // 遍历每个字符，检查是否在有效的 CJK 中文范围
-  let hasCJKChar = false;
-  for (const char of keyword) {
-    const code = char.charCodeAt(0);
-    // CJK 统一表意文字范围: 0x4E00 - 0x9FFF
-    // CJK 扩展A范围: 0x3400 - 0x4DBF
-    if ((code >= 0x4E00 && code <= 0x9FFF) || (code >= 0x3400 && code <= 0x4DBF)) {
-      hasCJKChar = true;
-      break;
-    }
-  }
+  // Unicode replacement char
+  if (trimmed.includes('\uFFFD')) return true;
 
-  // 如果没有CJK字符，且长度>=4，很可能是乱码
-  if (!hasCJKChar && keyword.length >= 4) return true;
-
-  // 如果有CJK字符，检查长度是否合理（正常中文关键词通常2-4个字符）
-  if (hasCJKChar && keyword.length > 6) return true;
+  // 常见 UTF-8/Latin-1 误解码痕迹，如 "Ã¥", "æŠ‘" 一类。
+  const mojibakePattern = /[ÃÂÅÆÇÐÑØÞßãæçðñøþÿ]/;
+  if (mojibakePattern.test(trimmed)) return true;
 
   return false;
 }
@@ -437,16 +427,18 @@ function UploadModal({
         </div>
 
         <div className="flex justify-end gap-3 p-6 border-t border-gray-100">
-          <button onClick={onClose} disabled={isUploading} className="px-6 py-3 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors disabled:opacity-50">
+          <ActionCapsuleButton onClick={onClose} disabled={isUploading} variant="neutral" size="lg">
             取消
-          </button>
-          <button
+          </ActionCapsuleButton>
+          <ActionCapsuleButton
             onClick={handleSubmit}
             disabled={isUploading}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl transition-colors font-semibold flex items-center gap-2"
+            variant="solid"
+            size="lg"
+            icon={isUploading ? <Activity className="w-4 h-4 animate-spin" /> : undefined}
           >
-            {isUploading ? (<>上传中... <Activity className="w-4 h-4 animate-spin" /></>) : '上传文档'}
-          </button>
+            {isUploading ? '上传中...' : '上传文档'}
+          </ActionCapsuleButton>
         </div>
       </div>
     </div>
@@ -616,16 +608,18 @@ function EditModal({
         </div>
 
         <div className="flex justify-end gap-3 p-6 border-t border-gray-100">
-          <button onClick={onClose} disabled={isSaving} className="px-6 py-3 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors disabled:opacity-50">
+          <ActionCapsuleButton onClick={onClose} disabled={isSaving} variant="neutral" size="lg">
             取消
-          </button>
-          <button
+          </ActionCapsuleButton>
+          <ActionCapsuleButton
             onClick={handleSubmit}
             disabled={isSaving}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl transition-colors font-semibold flex items-center gap-2"
+            variant="solid"
+            size="lg"
+            icon={isSaving ? <Activity className="w-4 h-4 animate-spin" /> : undefined}
           >
-            {isSaving ? (<>保存中... <Activity className="w-4 h-4 animate-spin" /></>) : '保存修改'}
-          </button>
+            {isSaving ? '保存中...' : '保存修改'}
+          </ActionCapsuleButton>
         </div>
       </div>
     </div>
@@ -676,6 +670,7 @@ export default function KnowledgeBasePage() {
   // 文档列表数据（从 API 加载）
   const [documents, setDocuments] = useState<KnowledgeDoc[]>([]);
   const [totalDocs, setTotalDocs] = useState(0);
+  const [uploadedTotal, setUploadedTotal] = useState(0);
   const [docsLoading, setDocsLoading] = useState(false);
   const [docsError, setDocsError] = useState<string | null>(null);
 
@@ -762,20 +757,29 @@ export default function KnowledgeBasePage() {
     try {
       const topicId = appliedFilters.topic ? Number(appliedFilters.topic) : undefined;
       const subTopicId = appliedFilters.subTopic ? Number(appliedFilters.subTopic) : undefined;
-      const data = await fetchKnowledgeDocuments({
-        page: currentPage,
-        limit: pageSize,
-        topicId,
-        subTopicId,
-        status: appliedFilters.status || undefined,
-        format: appliedFilters.format || undefined,
-      });
+      const [data, uploadedData] = await Promise.all([
+        fetchKnowledgeDocuments({
+          page: currentPage,
+          limit: pageSize,
+          topicId,
+          subTopicId,
+          status: appliedFilters.status || undefined,
+          format: appliedFilters.format || undefined,
+        }),
+        fetchKnowledgeDocuments({
+          page: 1,
+          limit: 1,
+          status: 'uploaded',
+        }),
+      ]);
       setDocuments(data.documents || []);
       setTotalDocs(data.pagination?.total || 0);
+      setUploadedTotal(uploadedData.pagination?.total || 0);
     } catch (err) {
       console.error('加载文档列表失败:', err);
       setDocsError('加载文档列表失败，请检查网络连接');
       setDocuments([]);
+      setUploadedTotal(0);
     } finally {
       setDocsLoading(false);
     }
@@ -825,9 +829,8 @@ export default function KnowledgeBasePage() {
   });
 
   const totalPages = Math.ceil(totalDocs / pageSize);
-  const activeFilterCount = [appliedFilters.topic, appliedFilters.subTopic, appliedFilters.status, appliedFilters.format]
-    .filter(Boolean).length + appliedKeywords.length;
-  const uploadedCount = documents.filter((doc) => doc.uploadStatus === 'uploaded').length;
+  const visibleKeywords = keywords.slice(0, MAX_FILTER_KEYWORDS);
+  const hiddenKeywordCount = Math.max(0, keywords.length - visibleKeywords.length);
   const knowledgeStats = [
     {
       label: '知识文档',
@@ -845,15 +848,17 @@ export default function KnowledgeBasePage() {
     },
     {
       label: '已上传文档',
-      value: uploadedCount,
-      note: '当前页已完成入库处理并可直接参与检索的文档',
+      value: uploadedTotal,
+      note: '全库中已完成入库处理并可直接参与检索的文档总数',
       icon: Upload,
       tone: 'green' as const,
     },
     {
-      label: '激活筛选',
-      value: activeFilterCount,
-      note: '按关键词、主题、格式和状态快速收束证据范围',
+      label: '可筛选关键词',
+      value: keywords.length,
+      note: hiddenKeywordCount > 0
+        ? `当前展示 ${visibleKeywords.length} 个高优先级关键词，另收起 ${hiddenKeywordCount} 个低优先级关键词`
+        : '当前用于主题检索与快速筛选的关键词总数',
       icon: Tags,
       tone: 'slate' as const,
     },
@@ -956,9 +961,9 @@ export default function KnowledgeBasePage() {
 
         {/* 关键词筛选 */}
         <div className="mt-4 pt-4 border-t border-[#E2E8F0]">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-[#415168]">关键词：</span>
-            {keywords.map((kw) => (
+          <div className="flex items-start gap-2 flex-wrap">
+            <span className="text-sm font-medium text-[#415168] whitespace-nowrap">关键词：</span>
+            {visibleKeywords.map((kw) => (
               <button
                 key={kw}
                 onClick={() => handleKeywordToggle(kw)}
@@ -971,35 +976,40 @@ export default function KnowledgeBasePage() {
                 {kw}
               </button>
             ))}
+            {hiddenKeywordCount > 0 && (
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-[#F8FAFC] text-[#64748B] border border-[#E2E8F0]">
+                已收起 {hiddenKeywordCount} 个低优先级关键词
+              </span>
+            )}
           </div>
         </div>
 
         {/* 操作按钮 */}
         <div className="mt-4 flex items-center gap-3">
-          <button
+          <ActionCapsuleButton
             onClick={handleApplyFilter}
-            className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white rounded-xl transition-all text-sm font-medium shadow-sm"
+            variant="solid"
+            icon={<Search className="w-4 h-4" />}
           >
-            <Search className="w-4 h-4" />
             筛选
-          </button>
-          <button
+          </ActionCapsuleButton>
+          <ActionCapsuleButton
             onClick={handleReset}
-            className="flex items-center gap-2 px-5 py-2 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl transition-colors text-sm font-medium"
+            variant="neutral"
+            icon={<RefreshCw className="w-4 h-4" />}
           >
-            <RefreshCw className="w-4 h-4" />
             重置
-          </button>
+          </ActionCapsuleButton>
           {isAdmin && (
             <div className="flex items-center gap-2 ml-auto">
-              <button
+              <ActionCapsuleButton
                 onClick={() => setIsUploadModalOpen(true)}
-                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white rounded-xl transition-all text-sm font-medium shadow-sm"
                 title="上传文档（管理员）"
+                variant="solid"
+                icon={<Upload className="w-4 h-4" />}
               >
-                <Upload className="w-4 h-4" />
                 上传文档
-              </button>
+              </ActionCapsuleButton>
             </div>
           )}
         </div>
@@ -1080,31 +1090,37 @@ export default function KnowledgeBasePage() {
                     <td className="px-4 py-3 text-sm text-[#415168]">{getUploadTime(doc)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        <button
+                        <ActionCapsuleButton
                           onClick={() => navigate(`/knowledge/detail?id=${String(doc.id)}`)}
-                          className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-600 rounded-xl transition-all text-sm font-medium border border-blue-200"
                           title="查看详情"
+                          tone="blue"
+                          tableAction
+                          icon={<Eye className="w-4 h-4" />}
                         >
-                          <Eye className="w-4 h-4" /> 查看
-                        </button>
-                        <button
+                          查看
+                        </ActionCapsuleButton>
+                        <ActionCapsuleButton
                           onClick={() => downloadKnowledgeDocument(Number(doc.id), doc.fileName)}
-                          className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 text-green-600 rounded-xl transition-all text-sm font-medium border border-green-200"
                           title="下载"
+                          tone="green"
+                          tableAction
+                          icon={<Download className="w-4 h-4" />}
                         >
-                          <Download className="w-4 h-4" /> 下载
-                        </button>
+                          下载
+                        </ActionCapsuleButton>
                         {isAdmin && (
-                          <button
+                          <ActionCapsuleButton
                             onClick={() => openEditModal(doc)}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-amber-50 to-amber-100 hover:from-amber-100 hover:to-amber-200 text-amber-600 rounded-xl transition-all text-sm font-medium border border-amber-200"
                             title="编辑（管理员）"
+                            tone="amber"
+                            tableAction
+                            icon={<Edit className="w-4 h-4" />}
                           >
-                            <Edit className="w-4 h-4" /> 编辑
-                          </button>
+                            编辑
+                          </ActionCapsuleButton>
                         )}
                         {isAdmin && (
-                          <button
+                          <ActionCapsuleButton
                             onClick={async () => {
                               if (confirm(`确定要删除文档「${doc.title}」吗？此操作不可恢复。`)) {
                                 try {
@@ -1115,11 +1131,13 @@ export default function KnowledgeBasePage() {
                                 }
                               }
                             }}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 text-red-600 rounded-xl transition-all text-sm font-medium border border-red-200"
                             title="删除（管理员）"
+                            tone="red"
+                            tableAction
+                            icon={<Trash2 className="w-4 h-4" />}
                           >
-                            <Trash2 className="w-4 h-4" /> 删除
-                          </button>
+                            删除
+                          </ActionCapsuleButton>
                         )}
                       </div>
                     </td>
