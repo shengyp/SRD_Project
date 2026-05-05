@@ -348,11 +348,12 @@ class KnowledgeService:
         return cursor.lastrowid
 
     async def _upsert_document(self, cursor, doc: Dict[str, Any], topic_id: int, sub_topic_id: Optional[int]) -> int:
+        legacy_file_path = f"/{doc['file_path'].lstrip('/')}"
         await cursor.execute(
             """SELECT id FROM knowledge_documents
-               WHERE file_path = %s AND is_deleted = FALSE
+               WHERE (file_path = %s OR file_path = %s) AND is_deleted = FALSE
                LIMIT 1""",
-            (doc["file_path"],)
+            (doc["file_path"], legacy_file_path)
         )
         existing = await cursor.fetchone()
         keywords_json = json.dumps(doc["keywords"], ensure_ascii=False)
@@ -361,11 +362,11 @@ class KnowledgeService:
             await cursor.execute(
                 """UPDATE knowledge_documents
                    SET title = %s, topic_id = %s, sub_topic_id = %s, keywords = %s,
-                       format = %s, file_name = %s, file_size = %s, size_display = %s,
+                       format = %s, file_name = %s, file_path = %s, file_size = %s, size_display = %s,
                        description = %s, upload_status = 'uploaded', is_deleted = FALSE
                    WHERE id = %s""",
                 (
-                    doc["title"], topic_id, sub_topic_id, keywords_json, doc["format"], doc["file_name"],
+                    doc["title"], topic_id, sub_topic_id, keywords_json, doc["format"], doc["file_name"], doc["file_path"],
                     doc["file_size"], doc["size_display"], doc["description"], doc_id
                 )
             )
@@ -464,7 +465,8 @@ class KnowledgeService:
                         await cursor.execute(
                             f"""UPDATE knowledge_documents
                                 SET is_deleted = TRUE, deleted_at = NOW()
-                                WHERE file_path LIKE 'rag-skill/knowledge/%%'
+                                WHERE (file_path LIKE 'rag-skill/knowledge/%%'
+                                   OR file_path LIKE '/rag-skill/knowledge/%%')
                                   AND file_path NOT IN ({placeholders})""",
                             active_file_paths
                         )
@@ -472,7 +474,8 @@ class KnowledgeService:
                         await cursor.execute(
                             """UPDATE knowledge_documents
                                SET is_deleted = TRUE, deleted_at = NOW()
-                               WHERE file_path LIKE 'rag-skill/knowledge/%'"""
+                               WHERE file_path LIKE 'rag-skill/knowledge/%'
+                                  OR file_path LIKE '/rag-skill/knowledge/%'"""
                         )
 
                     if active_topic_codes:
