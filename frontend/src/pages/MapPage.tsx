@@ -6,9 +6,10 @@ import {
   Locate, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ChevronRight,
   RefreshCw,
 } from 'lucide-react';
-import { Modal, Select, Empty, message } from 'antd';
+import { Modal, Select, Empty, App as AntdApp } from 'antd';
 import { Institution, HotLine } from '../types';
 import { fetchCityCoordinates } from '../api';
+import ActionCapsuleButton from '../components/ActionCapsuleButton';
 
 // ==================== 常量配置 ====================
 // 机构类型定义 - 用于筛选
@@ -125,6 +126,42 @@ function formatDistance(meters?: number): string {
   return meters >= 1000 ? (meters / 1000).toFixed(1) + 'km' : `${Math.round(meters)}m`;
 }
 
+function getCityCenter(city: string, cityCoords: Record<string, [number, number]>): { lng: number; lat: number } | null {
+  const coords = cityCoords[city] || DEFAULT_CITY_COORDS[city];
+  if (!coords) return null;
+  return { lng: coords[0], lat: coords[1] };
+}
+
+function normalizeRegionName(value?: string): string {
+  if (!value) return '';
+  return value
+    .replace(/特别行政区/g, '')
+    .replace(/壮族自治区|回族自治区|维吾尔自治区|自治区/g, '')
+    .replace(/省|市/g, '')
+    .trim();
+}
+
+function matchesSelectedCity(inst: Institution, selectedCity: string): boolean {
+  if (!selectedCity) return true;
+
+  const normalizedSelectedCity = normalizeRegionName(selectedCity);
+  const normalizedInstCity = normalizeRegionName(inst.city);
+  const normalizedInstProvince = normalizeRegionName(inst.province);
+
+  return normalizedInstCity === normalizedSelectedCity || normalizedInstProvince === normalizedSelectedCity;
+}
+
+const CITY_MAX_RADIUS_METERS: Record<string, number> = {
+  '重庆市': 320000,
+  '北京市': 140000,
+  '天津市': 140000,
+  '上海市': 140000,
+};
+
+function getCityMaxRadius(city: string): number {
+  return CITY_MAX_RADIUS_METERS[city] || 220000;
+}
+
 // 加载高德地图 SDK（带重试机制）
 let amapScriptLoaded = false;
 let amapLoadPromise: Promise<void> | null = null;
@@ -197,10 +234,13 @@ const API_BASE = import.meta.env.VITE_API_BASE || '';
 function InstitutionDetailModal({
   institution,
   onClose,
+  distanceLabel,
 }: {
   institution: Institution;
   onClose: () => void;
+  distanceLabel: string;
 }) {
+  const { message } = AntdApp.useApp();
   const getTypeColor = (type: string) => {
     switch (type) {
       case '精神专科医院': return 'bg-red-100 text-red-700 border border-red-200';
@@ -283,7 +323,7 @@ function InstitutionDetailModal({
           {institution._distance !== undefined && (
             <div className="flex items-center gap-2 text-sm text-[#64748B]">
               <Navigation className="w-4 h-4" />
-              <span>距离您约 {formatDistance(institution._distance)}</span>
+              <span>{distanceLabel} {formatDistance(institution._distance)}</span>
             </div>
           )}
 
@@ -308,7 +348,7 @@ function InstitutionDetailModal({
               href={`https://uri.amap.com/marker?position=${institution.longitude},${institution.latitude}&name=${encodeURIComponent(institution.name)}&src=vis4srd&nativeApp=false`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#162033] rounded-xl transition-colors font-medium">
+              className="inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#E2E8F0] bg-[#F1F5FA] px-4 py-3 font-medium text-[#415168] transition-all duration-200 hover:bg-[#E2E8F0]">
               <MapPin className="w-5 h-5" />
               高德导航
             </a>
@@ -366,6 +406,7 @@ function HotLineModal({ hotline, onClose }: { hotline: HotLine; onClose: () => v
 
 // ==================== 主页面组件 ====================
 export default function MapPage() {
+  const { message } = AntdApp.useApp();
   // ==================== 抽屉状态 ====================
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
@@ -415,59 +456,61 @@ export default function MapPage() {
   const infoWindowRef = useRef<any>(null);
   const radiusCircleRef = useRef<any>(null);
   const userMarkerRef = useRef<any>(null);
+  const effectiveLocation = selectedCity ? getCityCenter(selectedCity, cityCoords) : userLocation;
+  const distanceLabel = selectedCity ? `距${selectedCity}中心约` : '距离您约';
 
   // ==================== 计算属性 ====================
   const filteredInstitutions = (() => {
     const term = searchTerm.trim().toLowerCase();
     const types = selectedTypes;
-    const loc = userLocation;
+    const loc = effectiveLocation;
 
     // 基于当前选中的城市进行初步筛选
-    let list = institutions.filter(inst => {
-      // 如果选择了城市（非全国），只显示该城市的机构
-      if (selectedCity && inst.city && inst.city !== selectedCity) {
-        return false;
-      }
-      return true;
-    });
+    const list = institutions.filter(inst => matchesSelectedCity(inst, selectedCity));
 
     // 计算距离
-    list = list.map(inst => {
+    let mappedList = list.map(inst => {
       const dist = (loc && inst.latitude && inst.longitude)
         ? getDistanceMeters(loc.lat, loc.lng, inst.latitude, inst.longitude)
         : undefined;
       return { ...inst, _distance: dist };
     });
 
+    // 选择城市时，额外剔除坐标明显落在外地的脏数据
+    if (selectedCity && loc) {
+      const maxRadius = getCityMaxRadius(selectedCity);
+      mappedList = mappedList.filter(inst => inst._distance === undefined || inst._distance <= maxRadius);
+    }
+
     // 机构类型筛选 - 使用智能类型匹配
     if (types.length > 0) {
-      list = list.filter(inst => typeMatches(inst.type, types));
+      mappedList = mappedList.filter(inst => typeMatches(inst.type, types));
     }
     // 名称/地址搜索
     if (term) {
-      list = list.filter(inst =>
+      mappedList = mappedList.filter(inst =>
         inst.name.toLowerCase().includes(term) ||
         (inst.address && inst.address.toLowerCase().includes(term))
       );
     }
     // 距离筛选
     if (loc && searchRadius !== Infinity) {
-      list = list.filter(inst => inst._distance !== undefined && inst._distance <= searchRadius);
+      mappedList = mappedList.filter(inst => inst._distance !== undefined && inst._distance <= searchRadius);
     }
 
     // 排序
     if (sortBy === 'distance' && loc) {
-      list = [...list].sort((a, b) => (a._distance ?? Infinity) - (b._distance ?? Infinity));
+      mappedList = [...mappedList].sort((a, b) => (a._distance ?? Infinity) - (b._distance ?? Infinity));
     } else if (sortBy === 'rating') {
-      list = [...list].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+      mappedList = [...mappedList].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
     } else if (sortBy === 'comprehensive') {
-      list = [...list].sort((a, b) => {
+      mappedList = [...mappedList].sort((a, b) => {
         const sA = (a.rating ?? 3) * 1000 - (a._distance ?? 99999);
         const sB = (b.rating ?? 3) * 1000 - (b._distance ?? 99999);
         return sB - sA;
       });
     }
-    return list;
+    return mappedList;
   })();
 
   const paginatedInstitutions = filteredInstitutions.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -512,7 +555,6 @@ export default function MapPage() {
       const data = await res.json();
       if (data.success && data.data) {
         setInstitutions(data.data);
-        updateMapMarkers(data.data);
       }
     } catch { message.error('获取机构数据失败'); }
   }, []);
@@ -555,8 +597,8 @@ export default function MapPage() {
   // ==================== 定位功能（简洁版）====================
 
   // 重新定位：优先GPS，失败则IP定位，默认荣昌区
-  const handleLocate = useCallback(async () => {
-    if (!mapInstanceRef.current) return;
+  const handleLocate = useCallback(async (): Promise<string> => {
+    if (!mapInstanceRef.current) return '';
     setLocating(true);
 
     // 1. 尝试浏览器GPS定位
@@ -572,6 +614,7 @@ export default function MapPage() {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         const accuracy = pos.coords.accuracy;
+        let resolvedCity = '';
 
         console.log(`GPS定位成功: ${lng}, ${lat}, 精度: ${accuracy}m`);
 
@@ -600,7 +643,8 @@ export default function MapPage() {
                 }
 
                 // 设置城市信息
-                setUserCity(city.replace(/市$/, ''));
+                resolvedCity = city;
+                setUserCity(city);
                 setUserAddress(displayAddr);
 
                 resolve(displayAddr || '当前位置');
@@ -622,7 +666,8 @@ export default function MapPage() {
             if (data.success && data.data) {
               const addr = data.data.shortAddress || data.data.formattedAddress || '';
               if (addr) {
-                setUserCity((data.data.city || '').replace(/市$/, ''));
+                resolvedCity = data.data.city || '';
+                setUserCity(data.data.city || '');
                 setUserAddress(addr);
                 return addr;
               }
@@ -679,7 +724,7 @@ export default function MapPage() {
 
         message.success(`已定位到：${address}`);
         setLocating(false);
-        return;
+        return resolvedCity;
       } catch (e) {
         console.warn('GPS定位失败:', e);
       }
@@ -726,7 +771,7 @@ export default function MapPage() {
 
       const { lng, lat, city, address } = amapPosition;
       setUserLocation({ lat, lng });
-      setUserCity(city.replace(/市$/, '') || '当前位置');
+      setUserCity(city || '');
       // 优先显示详细地址，否则显示城市名
       setUserAddress(address || city || '当前位置');
       mapInstanceRef.current.setCenter([lng, lat]);
@@ -742,7 +787,7 @@ export default function MapPage() {
       mapInstanceRef.current.add(userMarkerRef.current);
       message.success(`已定位到：${address || city || '当前位置'}`);
       setLocating(false);
-      return;
+      return city || '';
     } catch (e) {
       console.warn('高德定位插件失败:', e);
     }
@@ -760,7 +805,7 @@ export default function MapPage() {
         const lng = longitude || coords[0];
         const lat = latitude || coords[1];
 
-        setUserCity(city?.replace(/市$/, '') || '');
+        setUserCity(city || '');
         setUserAddress(city || '当前位置');
         setUserLocation({ lat, lng });
         mapInstanceRef.current.setCenter([lng, lat]);
@@ -776,7 +821,7 @@ export default function MapPage() {
         mapInstanceRef.current.add(userMarkerRef.current);
         message.success(`已定位到：${city || '当前位置'}`);
         setLocating(false);
-        return;
+        return city || '';
       }
     } catch (e) {
       console.warn('IP定位失败:', e);
@@ -812,7 +857,7 @@ export default function MapPage() {
 
     // 5. 默认定位到荣昌区
     const guess = guessFromBrowser();
-    setUserCity(guess.city.replace(/市$/, ''));
+    setUserCity(guess.city);
     setUserAddress(guess.city);
     setUserLocation({ lng: guess.coords[0], lat: guess.coords[1] });
     mapInstanceRef.current.setCenter(guess.coords);
@@ -828,6 +873,7 @@ export default function MapPage() {
     mapInstanceRef.current.add(userMarkerRef.current);
     message.info(`已定位到：${guess.city}（基于浏览器设置）`);
     setLocating(false);
+    return guess.city;
   }, [cityCoords]);
 
   // ==================== 地图 ====================
@@ -845,9 +891,28 @@ export default function MapPage() {
 
   const updateMapMarkers = useCallback((list: Institution[]) => {
     if (!mapInstanceRef.current) return;
-    if (clusterRef.current) { clusterRef.current.setMap(null); clusterRef.current = null; }
-    markersRef.current.forEach(m => mapInstanceRef.current.remove(m));
+    infoWindowRef.current?.close?.();
+
+    if (clusterRef.current) {
+      clusterRef.current.setData?.([]);
+      clusterRef.current.clearMarkers?.();
+      clusterRef.current.setMap?.(null);
+      clusterRef.current = null;
+    }
+
+    markersRef.current.forEach(m => {
+      m.setMap?.(null);
+      mapInstanceRef.current.remove(m);
+    });
     markersRef.current = [];
+
+    mapInstanceRef.current.clearMap?.();
+    if (userMarkerRef.current) {
+      mapInstanceRef.current.add(userMarkerRef.current);
+    }
+    if (radiusCircleRef.current && userLocation && !selectedCity && searchRadius !== Infinity) {
+      mapInstanceRef.current.add(radiusCircleRef.current);
+    }
 
     list.forEach(inst => {
       if (!inst.longitude || !inst.latitude) return;
@@ -879,35 +944,54 @@ export default function MapPage() {
         mapInstanceRef.current.setFitView(markersRef.current, false, [50, 50, 50, 50], 15);
       }
     }
-  }, [selectedCity, userLocation]);
+  }, [selectedCity, userLocation, searchRadius]);
 
   const showMarkerInfo = useCallback((inst: Institution) => {
     if (!mapInstanceRef.current || !infoWindowRef.current) return;
-    const instId = String(inst.id);
-    const content = `
-      <div style="padding:10px;min-width:220px;border-radius:12px;background:white;border:1px solid #DCE7F5;box-shadow:0 10px 24px rgba(15,23,42,0.08);">
-        <h4 style="margin:0 0 8px;color:#162033;font-size:14px;font-weight:600;">${inst.name}</h4>
-        <p style="margin:4px 0;color:#64748B;font-size:12px;">🏥 ${inst.type || '未知类型'}</p>
-        <p style="margin:4px 0;color:#64748B;font-size:12px;">📍 ${inst.address || '暂无地址'}</p>
-        <p style="margin:4px 0;color:#64748B;font-size:12px;">📞 ${inst.phone || '暂无电话'}</p>
-        ${inst.rating ? `<p style="margin:4px 0;color:#2F6BFF;font-size:12px;">⭐ ${inst.rating}/5.0</p>` : ''}
-        <button id="__show_detail_btn_${instId}" style="margin-top:8px;padding:5px 14px;background:#2F6BFF;color:white;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;">查看详情</button>
-      </div>
-    `;
+    (window as any).__VIS4SRD_OPEN_MAP_DETAIL__ = () => {
+      setSelectedInstitution(inst);
+      setDetailModalVisible(true);
+      infoWindowRef.current?.close();
+    };
+    const content = document.createElement('div');
+    content.style.cssText = 'padding:10px;min-width:220px;border-radius:12px;background:white;border:1px solid #DCE7F5;box-shadow:0 10px 24px rgba(15,23,42,0.08);';
+
+    const title = document.createElement('h4');
+    title.style.cssText = 'margin:0 0 8px;color:#162033;font-size:14px;font-weight:600;';
+    title.textContent = inst.name;
+    content.appendChild(title);
+
+    const type = document.createElement('p');
+    type.style.cssText = 'margin:4px 0;color:#64748B;font-size:12px;';
+    type.textContent = `🏥 ${inst.type || '未知类型'}`;
+    content.appendChild(type);
+
+    const address = document.createElement('p');
+    address.style.cssText = 'margin:4px 0;color:#64748B;font-size:12px;';
+    address.textContent = `📍 ${inst.address || '暂无地址'}`;
+    content.appendChild(address);
+
+    const phone = document.createElement('p');
+    phone.style.cssText = 'margin:4px 0;color:#64748B;font-size:12px;';
+    phone.textContent = `📞 ${inst.phone || '暂无电话'}`;
+    content.appendChild(phone);
+
+    if (inst.rating) {
+      const rating = document.createElement('p');
+      rating.style.cssText = 'margin:4px 0;color:#2F6BFF;font-size:12px;';
+      rating.textContent = `⭐ ${inst.rating}/5.0`;
+      content.appendChild(rating);
+    }
+
+    const detailBtn = document.createElement('button');
+    detailBtn.type = 'button';
+    detailBtn.style.cssText = 'margin-top:8px;padding:8px 14px;background:linear-gradient(90deg,#eff6ff 0%,#dbeafe 100%);color:#2563eb;border:1px solid #bfdbfe;border-radius:12px;cursor:pointer;font-size:12px;font-weight:600;';
+    detailBtn.textContent = '查看详情';
+    detailBtn.setAttribute('onclick', 'window.__VIS4SRD_OPEN_MAP_DETAIL__ && window.__VIS4SRD_OPEN_MAP_DETAIL__()');
+    content.appendChild(detailBtn);
+
     infoWindowRef.current.setContent(content);
     infoWindowRef.current.open(mapInstanceRef.current, new (window as any).AMap.LngLat(inst.longitude!, inst.latitude!));
-
-    // 延迟绑定按钮事件，等待 DOM 渲染
-    setTimeout(() => {
-      const btn = document.getElementById(`__show_detail_btn_${instId}`);
-      if (btn) {
-        btn.addEventListener('click', () => {
-          setSelectedInstitution(inst);
-          setDetailModalVisible(true);
-          if (infoWindowRef.current) infoWindowRef.current.close();
-        });
-      }
-    }, 100);
   }, []);
 
   const initMap = useCallback(async () => {
@@ -991,25 +1075,27 @@ export default function MapPage() {
       fetchHotlines('');
 
       // 调用统一的定位逻辑（已简化为 handleLocate）
-      await handleLocate();
+      const locatedCity = await handleLocate();
 
       // 根据定位结果获取机构数据
-      fetchInstitutions(userCity || selectedCity || '');
+      fetchInstitutions(selectedCity || locatedCity || '');
       setMapLoading(false);
     } catch (err) {
       console.error('地图初始化失败:', err);
       setMapError('地图加载失败，请检查网络连接或刷新页面重试');
       setMapLoading(false);
     }
-  }, [handleLocate, userCity, selectedCity, fetchHotlines, fetchInstitutions]);
+  }, [handleLocate, selectedCity, fetchHotlines, fetchInstitutions]);
 
-  const handleCityChange = useCallback((city: string) => {
-    setSelectedCity(city);
+  const handleCityChange = useCallback((city?: string) => {
+    const nextCity = city || '';
+    setSelectedCity(nextCity);
     setCurrentPage(1);
-    fetchInstitutions(city);
-    fetchHotlines(city);
+    setSearchRadius(Infinity);
+    fetchInstitutions(nextCity);
+    fetchHotlines(nextCity);
     if (mapInstanceRef.current) {
-      const coords = cityCoords[city] || DEFAULT_CITY_COORDS[city] || [116.4074, 39.9042];
+      const coords = cityCoords[nextCity] || DEFAULT_CITY_COORDS[nextCity] || [116.4074, 39.9042];
       mapInstanceRef.current.setCenter(coords);
       mapInstanceRef.current.setZoom(12);
     }
@@ -1057,7 +1143,7 @@ export default function MapPage() {
   }, [filteredInstitutions, updateMapMarkers]);
 
   useEffect(() => {
-    if (userLocation && searchRadius !== Infinity && mapInstanceRef.current) {
+    if (userLocation && !selectedCity && searchRadius !== Infinity && mapInstanceRef.current) {
       if (radiusCircleRef.current) mapInstanceRef.current.remove(radiusCircleRef.current);
       radiusCircleRef.current = new (window as any).AMap.Circle({
         center: [userLocation.lng, userLocation.lat],
@@ -1071,8 +1157,9 @@ export default function MapPage() {
       mapInstanceRef.current.add(radiusCircleRef.current);
     } else if (radiusCircleRef.current && mapInstanceRef.current) {
       mapInstanceRef.current.remove(radiusCircleRef.current);
+      radiusCircleRef.current = null;
     }
-  }, [userLocation, searchRadius]);
+  }, [userLocation, searchRadius, selectedCity]);
 
   // ==================== 渲染 ====================
   return (
@@ -1123,16 +1210,16 @@ export default function MapPage() {
               <RefreshCw className="w-4 h-4" />
               重试加载
             </button>
-            <button
+            <ActionCapsuleButton
               onClick={() => {
                 setMapError(null);
                 setMapLoading(false);
                 message.info('部分功能可能受限，建议检查网络后刷新页面');
               }}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl text-sm transition-colors border border-[#E2E8F0]"
+              variant="neutral"
             >
               继续使用
-            </button>
+            </ActionCapsuleButton>
           </div>
         </div>
       )}
@@ -1322,10 +1409,10 @@ export default function MapPage() {
                 <Select
                   placeholder="选择城市筛选"
                   value={selectedCity || undefined}
-                  onChange={handleCityChange}
+                  onChange={(value) => handleCityChange(value)}
                   allowClear
                   className="w-full"
-                  popupClassName="!min-w-[200px]"
+                  classNames={{ popup: { root: '!min-w-[200px]' } }}
                   options={[
                     { value: '', label: '全国' },
                     ...allCitiesList.map(c => ({ value: c, label: c })),
@@ -1441,9 +1528,9 @@ export default function MapPage() {
       {/* ==================== 底部紧急热线抽屉（Bottom Drawer）==================== */}
       {/* 底部抽屉主体 - 紧贴主区域底部，无空隙；收起按钮在标题行右侧，不遮挡内容 */}
       <div
-        className="absolute left-0 right-0 bottom-0 z-40 transition-all duration-300 ease-in-out"
+        className="absolute left-0 right-0 bottom-0 z-40 overflow-hidden transition-all duration-300 ease-in-out"
         style={{
-          transform: bottomOpen ? 'translateY(0)' : 'translateY(calc(100% - 44px))',
+          maxHeight: bottomOpen ? '240px' : '44px',
         }}
       >
         <div className="w-full bg-gradient-to-r from-[#2F6BFF] to-[#5B8CFF] shadow-[0_-4px_20px_rgba(47,107,255,0.24)]">
@@ -1523,6 +1610,7 @@ export default function MapPage() {
       {detailModalVisible && selectedInstitution && (
         <InstitutionDetailModal
           institution={selectedInstitution}
+          distanceLabel={distanceLabel}
           onClose={() => { setDetailModalVisible(false); setSelectedInstitution(null); }}
         />
       )}
