@@ -1,9 +1,0 @@
-{
-  "session_id": "session_113",
-  "turn": 0,
-  "timestamp": "2026-04-23_03-07-03_503",
-  "error_context": "_decompose_questions",
-  "error_message": "抑郁症有哪些典型症状？: '{' was never closed (<unknown>, line 1)",
-  "traceback": "Traceback (most recent call last):\n  File \"/www/wwwroot/vis4srd-V2.0/backend/SuiAgent-main/agent.py\", line 428, in _decompose_questions\n    items = ast.literal_eval(resp)\n            ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib64/python3.11/ast.py\", line 64, in literal_eval\n    node_or_string = parse(node_or_string.lstrip(\" \\t\"), mode='eval')\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib64/python3.11/ast.py\", line 50, in parse\n    return compile(source, filename, mode, flags,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<unknown>\", line 1\n    {\"user_level\": [], \"theoretical_level\": [\"抑郁症的典型症状\", \"抑郁症的诊断标准（如DSM-5或ICD-11标准）\", \"中医学对抑郁症的认识与辨证分型\"]\n    ^\nSyntaxError: '{' was never closed\n",
-  "agent_name": "suicide_intervention_agent"
-}

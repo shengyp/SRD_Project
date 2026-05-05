@@ -1,9 +1,0 @@
-{
-  "session_id": "session_114",
-  "turn": 0,
-  "timestamp": "2026-04-24_13-53-19_400",
-  "error_context": "_decompose_questions",
-  "error_message": "如何区分抑郁与焦虑？: closing parenthesis ']' does not match opening parenthesis '{' (<unknown>, line 1)",
-  "traceback": "Traceback (most recent call last):\n  File \"/www/wwwroot/vis4srd-V2.0/backend/SuiAgent-main/agent.py\", line 428, in _decompose_questions\n    items = ast.literal_eval(resp)\n            ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib64/python3.11/ast.py\", line 64, in literal_eval\n    node_or_string = parse(node_or_string.lstrip(\" \\t\"), mode='eval')\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib64/python3.11/ast.py\", line 50, in parse\n    return compile(source, filename, mode, flags,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<unknown>\", line 1\n    {\"user_level\": [\"用户近期是否有情绪波动加剧的描述？\", \"用户是否提到过具体焦虑症状（如过度担心、心悸、呼吸急促等）或抑郁症状（如持续低落、兴趣丧失、疲劳等）？\", \"用户在自杀风险评估中是否提及与焦虑或抑郁相关的具体想法或感受？\"], \"theoretical_level\": [\"抑郁与焦虑的核心症状区别\", \"抑郁与焦虑的共病现象及临床表现\", \"情绪障碍的诊断标准（如DSM-5或ICD-11中对抑郁和焦虑障碍的界定）\", \"心理生理机制：抑郁与焦虑在神经递质、自主神经系统中的差异\"]]\n                                                                                                                                                                                                                                                                    ^\nSyntaxError: closing parenthesis ']' does not match opening parenthesis '{'\n",
-  "agent_name": "suicide_intervention_agent"
-}
