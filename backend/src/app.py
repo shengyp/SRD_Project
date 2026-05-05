@@ -67,7 +67,7 @@ async def lifespan(app: FastAPI):
         dataset_svc = DatasetService(mysql_pool)
         await dataset_svc.ensure_custom_dataset_meta_table()
 
-        # 初始化 CSV 数据集服务（直接从 datasets/ 目录读取）
+        # 初始化内置数据集同步服务（仅用于首次入库，不参与运行时查询）
         dataset_csv_base = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "datasets")
         csv_svc = DatasetCSVService(base_dir=dataset_csv_base)
 
@@ -97,39 +97,21 @@ async def lifespan(app: FastAPI):
         app.state.mysql_db = mysql_pool
         app.state.pg_db = pg_pool
 
-        # 启动时自动加载 rag-skill/knowledge 目录（使用相对路径）
+        # 启动时同步本地知识目录到数据库元信息
         try:
-            # 使用相对路径，避免 Windows 中文路径导致的编码问题
-            backend_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            knowledge_base_path = os.path.join(backend_root, "SuiAgent-main", "rag-skill", "knowledge")
-            # 验证路径存在
-            if os.path.exists(knowledge_base_path):
-                topic_code_map = await knowledge_svc.get_topic_code_map()
-                sub_topic_code_map = await knowledge_svc.get_sub_topic_code_map()
-                import_results = await knowledge_svc.import_documents_from_directory(
-                    base_path=knowledge_base_path,
-                    topic_code_map=topic_code_map,
-                    sub_topic_code_map=sub_topic_code_map,
+            sync_result = await knowledge_svc.sync_local_knowledge_to_db(force=True)
+            if sync_result.get("success"):
+                print(
+                    "✅ 知识库元信息同步完成："
+                    f" 主题 {sync_result.get('topics', 0)} /"
+                    f" 子主题 {sync_result.get('sub_topics', 0)} /"
+                    f" 文档 {sync_result.get('imported', 0)} /"
+                    f" 关键词 {sync_result.get('keywords', 0)}"
                 )
-                print(f"✅ 知识库已自动加载：成功 {import_results.get('imported', 0)} 篇，跳过 {import_results.get('skipped', 0)} 篇")
             else:
-                # 尝试使用 Path.resolve() 处理中文路径
-                from pathlib import Path
-                alt_path = Path(backend_root) / "SuiAgent-main" / "rag-skill" / "knowledge"
-                if alt_path.exists():
-                    knowledge_base_path = str(alt_path.resolve())
-                    topic_code_map = await knowledge_svc.get_topic_code_map()
-                    sub_topic_code_map = await knowledge_svc.get_sub_topic_code_map()
-                    import_results = await knowledge_svc.import_documents_from_directory(
-                        base_path=knowledge_base_path,
-                        topic_code_map=topic_code_map,
-                        sub_topic_code_map=sub_topic_code_map,
-                    )
-                    print(f"✅ 知识库已自动加载：成功 {import_results.get('imported', 0)} 篇")
-                else:
-                    print(f"⚠️ 知识库目录不存在：{knowledge_base_path}")
+                print(f"⚠️ 知识库同步失败：{sync_result.get('message', '未知错误')}")
         except Exception as e:
-            print(f"⚠️ 知识库自动加载失败：{str(e)}")
+            print(f"⚠️ 知识库自动同步失败：{str(e)}")
 
         print("🚀 PostgreSQL + PostGIS 连接池已创建（地理数据）")
         print("🚀 MySQL 连接池已创建（业务数据）")
@@ -245,12 +227,6 @@ def create_app() -> FastAPI:
     else:
         print(f"⚠️ uploads 目录不存在：{_uploads_base}")
 
-    datasets_base = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "datasets")
-    if os.path.exists(datasets_base):
-        app.mount("/datasets", StaticFiles(directory=datasets_base), name="datasets")
-    else:
-        print(f"⚠️ datasets 目录不存在：{datasets_base}")
-    
     return app
 
 

@@ -764,48 +764,45 @@ async def import_documents_from_directory(
     request: Request,
     dry_run: bool = Query(False, description="仅扫描不写入数据库"),
 ):
-    """从 rag-skill/knowledge 目录批量导入文档到数据库
-
-    返回导入结果：
-    - imported: 成功导入的文档数量
-    - skipped: 跳过的文档数量（已存在）
-    - errors: 错误列表
-    - documents: 导入的文档详情列表
-    """
+    """从本地 rag-skill/knowledge 同步知识库元信息到数据库"""
     knowledge_svc = _get_knowledge_service(request)
 
-    # 确定知识库目录路径
-    script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    base_path = os.path.join(script_dir, "SuiAgent-main", "rag-skill", "knowledge")
-
-    # 如果目录不存在，尝试备用路径
-    if not os.path.exists(base_path):
-        base_path = os.path.join(script_dir, "..", "SuiAgent-main", "rag-skill", "knowledge")
-    if not os.path.exists(base_path):
+    knowledge_root = knowledge_svc._knowledge_root()
+    if not knowledge_root.exists():
         return {
             "success": False,
-            "message": f"知识库目录不存在: {base_path}",
+            "message": f"知识库目录不存在: {knowledge_root}",
             "data": {
                 "imported": 0,
-                "skipped": 0,
-                "errors": [f"目录不存在: {base_path}"],
+                "topics": 0,
+                "sub_topics": 0,
+                "keywords": 0,
                 "documents": [],
-            }
+            },
         }
 
-    # 获取主题和子主题映射
-    topic_name_to_id = await knowledge_svc.get_topic_code_map()
-    sub_topic_name_to_id = await knowledge_svc.get_sub_topic_code_map()
-
-    # 调用导入方法
-    results = await knowledge_svc.import_documents_from_directory(
-        base_path=base_path,
-        topic_code_map=topic_name_to_id,
-        sub_topic_code_map=sub_topic_name_to_id,
-    )
+    if dry_run:
+        if knowledge_svc._catalog_path().exists():
+            bundle = knowledge_svc._build_local_bundle_from_catalog(knowledge_root)
+        else:
+            bundle = knowledge_svc._build_local_bundle_from_scan(knowledge_root)
+        results = {
+            "success": True,
+            "message": "知识库扫描完成（未写入数据库）",
+            "imported": len(bundle["documents"]),
+            "topics": len(bundle["topics"]),
+            "sub_topics": len(bundle["sub_topics"]),
+            "keywords": len(bundle["keywords"]),
+            "documents": bundle["documents"],
+        }
+    else:
+        results = await knowledge_svc.sync_local_knowledge_to_db(force=True)
 
     return {
-        "success": True,
-        "message": f"导入完成: 成功 {results['imported']} 个, 跳过 {results['skipped']} 个",
+        "success": bool(results.get("success", True)),
+        "message": results.get("message") or (
+            f"同步完成: 主题 {results.get('topics', 0)} / 子主题 {results.get('sub_topics', 0)} / "
+            f"文档 {results.get('imported', 0)} / 关键词 {results.get('keywords', 0)}"
+        ),
         "data": results,
     }

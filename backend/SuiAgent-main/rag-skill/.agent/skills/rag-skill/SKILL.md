@@ -33,7 +33,7 @@ description: 面向本地知识库目录的检索和问答助手。核心流程�
 
 ## 关键原则：先学习，再处理
 
-**遇到 PDF、Excel 或 DOCX 文件时的强制检查清单**：
+**遇到 PDF 或 Excel 文件时的强制检查清单**：
 
 - [ ] ✅ 已读取对应的 references 文档学习处理方法
 - [ ] ✅ 已理解推荐的工具和命令
@@ -43,8 +43,7 @@ description: 面向本地知识库目录的检索和问答助手。核心流程�
 **禁止行为**：
 - ❌ 在未读取 pdf_reading.md 的情况下直接尝试处理 PDF
 - ❌ 在未读取 excel_reading.md 的情况下直接尝试处理 Excel
-- ❌ 在未读取 docx_reading.md 的情况下直接尝试处理 DOCX
-- ❌ 跳过文件处理步骤，直接对原始 PDF/Excel/DOCX 进行检索
+- ❌ 跳过文件处理步骤，直接对原始 PDF/Excel 进行检索
 
 ## 总体流程
 
@@ -77,7 +76,7 @@ description: 面向本地知识库目录的检索和问答助手。核心流程�
      - 其次考虑时间/版本等约束（如果索引中有体现）
      - 通用说明类文档（如 README.md、总体设计类文档）放在较后优先级
 
-3. 学习文件处理方法（遇到 PDF/Excel/DOCX 时强制执行）
+3. 学习文件处理方法（遇到 PDF/Excel 时强制执行）
    - **在处理 PDF 文件前**：
      - **必须先读取** [references/pdf_reading.md](references/pdf_reading.md)（注意这个目录位于 Skills 目录下，而不是 Knowledge 目录下）学习提取方法
      - 重点了解：pdftotext 命令、pdfplumber 用法、表格提取方法
@@ -85,9 +84,6 @@ description: 面向本地知识库目录的检索和问答助手。核心流程�
      - **必须先读取** [references/excel_reading.md](references/excel_reading.md)学习读取方法
      - **必须先读取** [references/excel_analysis.md](references/excel_analysis.md)学习分析方法
      - 重点了解：pandas 读取、列筛选、数据过滤
-   - **在处理 DOCX 文件前**：
-     - **必须先读取** [references/docx_reading.md](references/docx_reading.md)学习读取和转换方法
-     - 重点了解：pandoc 命令行工具、python-docx 用法、表格提取
    - **目的**：确保使用正确的工具和方法，避免盲目检索
 
 4. 按文件类型执行处理和检索
@@ -214,29 +210,6 @@ description: 面向本地知识库目录的检索和问答助手。核心流程�
    - 如问题包含时间范围，在检索中加入时间过滤
    - 应用「多轮迭代检索机制」（见上文公共检索原则）
 
-### 4. DOCX 文件检索策略
-
-**工作流**：
-
-1. **首先：读取处理方法指南**
-   - 在处理任何 DOCX 之前，**必须先读取** [references/docx_reading.md](references/docx_reading.md)（注意这个目录位于 Skills 目录下，而不是 Knowledge 目录下）
-   - 重点了解：pandoc 命令行工具、python-docx 用法、表格提取、快速决策表
-
-2. **选择候选 DOCX**
-   - 根据 `data_structure.md` 中的描述，选择最相关的文件
-   - 如果用户指明具体 DOCX 文件，则优先使用该文件
-
-3. **应用学到的方法提取文本**
-   - 使用 docx_reading.md 中推荐的工具（优先 pandoc 或 python-docx）
-   - **重要**：使用 `pandoc input.docx -o output.txt` 将文本提取到文件，不要直接输出到 stdout（避免占用大量 token）
-   - 如需提取表格，使用 python-docx 的表格提取功能
-
-4. **对提取结果执行检索**
-   - 使用 grep 对提取的文本进行关键词搜索
-   - 对于每个命中，提取命中附近范围的上下文
-   - 保存「文件名 + 大致位置 + 文本片段」
-   - 应用「多轮迭代检索机制」（见上文公共检索原则）
-
 ## 与其他工具的协同
 
 ### PDF 处理
@@ -249,11 +222,6 @@ description: 面向本地知识库目录的检索和问答助手。核心流程�
   - [references/excel_reading.md](references/excel_reading.md) - 学习读取方法
   - [references/excel_analysis.md](references/excel_analysis.md) - 学习分析方法
 - 使用 pandas 进行数据探索、预览、过滤和分析
-
-### DOCX 处理
-- **在处理 DOCX 前必须先读取** [references/docx_reading.md](references/docx_reading.md) 学习处理方法
-- 使用 pandoc 命令行工具进行快速文本提取：`pandoc input.docx -o output.txt`
-- 使用 python-docx 进行表格提取和精细控制
 
 ### 工具使用原则
 - **Grep**：用于按关键词在指定文件中查找行号与匹配片段，始终指定尽量精准的 include 和 path

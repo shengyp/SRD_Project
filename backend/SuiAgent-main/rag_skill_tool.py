@@ -1,3 +1,4 @@
+from langchain_core.tools import tool
 from pathlib import Path
 import subprocess
 import asyncio
@@ -5,84 +6,41 @@ import time
 import re
 import jieba
 import json
-import os
-from typing import List, Dict, Optional, Union
-
-# 异步步进式 RAG 工具：所有 LLM 调用全部走 async_ 前缀版本，彻底避免阻塞事件循环
-from LLM import async_callLLM  # agent.py 已导出的异步 LLM 封装
-
-
-# 关键词 → 子目录 映射（从 data_structure.md 解析得到的知识）
-_KEYWORD_SUBDIR_MAP: Dict[str, str] = {
-    # 自杀与自伤
-    "自杀": "自杀与自伤", "自伤": "自杀与自伤", "自残": "自杀与自伤",
-    "想死": "自杀与自伤", "活不下去": "自杀与自伤", "结束生命": "自杀与自伤",
-    "遗书": "自杀与自伤", "告别": "自杀与自伤", "高危信号": "自杀与自伤",
-    "自杀意念": "自杀与自伤", "自杀风险": "自杀与自伤",
-    # 抑郁
-    "抑郁": "抑郁", "抑郁症": "抑郁", "重度抑郁": "抑郁",
-    "抑郁症状": "抑郁", "抑郁障碍": "抑郁",
-    "PHQ": "抑郁", "PHQ-9": "抑郁",
-    "快感缺失": "抑郁", "绝望感": "抑郁",
-    "SSRIs": "抑郁", "抗抑郁": "抑郁", "抗抑郁药": "抑郁",
-    "治疗抑郁": "抑郁", "抑郁症治疗": "抑郁",
-    # 焦虑
-    "焦虑": "焦虑", "焦虑症": "焦虑", "广泛性焦虑": "焦虑",
-    "GAD": "焦虑", "GAD-7": "焦虑",
-    "惊恐": "焦虑", "惊恐障碍": "焦虑",
-    "焦虑症治疗": "焦虑", "焦虑应对": "焦虑",
-    # 危机干预
-    "危机": "危机干预", "危机干预": "危机干预",
-    "热线": "危机干预", "12356": "危机干预",
-    "求助": "危机干预", "干预": "危机干预",
-    # 情绪
-    "情绪": "情绪", "情绪调节": "情绪",
-    "负面情绪": "情绪", "情绪识别": "情绪",
-    "述情障碍": "情绪", "情绪粒度": "情绪",
-    "情绪管理": "情绪",
-    # 睡眠
-    "失眠": "睡眠与生理", "睡眠": "睡眠与生理",
-    "睡眠障碍": "睡眠与生理", "PSQI": "睡眠与生理",
-    "安眠药": "睡眠与生理", "睡不着": "睡眠与生理",
-    "睡眠问题": "睡眠与生理",
-    # 量表与筛查
-    "量表": "量表与筛查", "筛查": "量表与筛查",
-    "PHQ": "量表与筛查", "PHQ-9": "量表与筛查",
-    "GAD": "量表与筛查", "GAD-7": "量表与筛查",
-    "C-SSRS": "量表与筛查", "SDS": "量表与筛查", "SAS": "量表与筛查",
-    "MINI": "量表与筛查",
-    # 干预与求助资源
-    "求助": "干预与求助资源", "资源": "干预与求助资源",
-    "心理机构": "干预与求助资源", "心理医院": "干预与求助资源",
-    "热线": "干预与求助资源", "心理援助": "干预与求助资源",
-    "医院": "干预与求助资源",
-    # 心理健康素养
-    "心理健康": "心理健康素养", "心理素养": "心理健康素养",
-    "认知扭曲": "心理健康素养", "CBT": "心理健康素养",
-    "正念": "心理健康素养", "心理韧性": "心理健康素养",
-    "心理问题": "心理健康素养",
-}
+from typing import List, Dict, Optional, Union, Tuple
+from LLM import callLLM
 
 
 class RAGSkillTool:
     def __init__(self, knowledge_base_path: str = "rag-skill/knowledge",
-                 references_path: str = "rag-skill/references"):
-        # 使用 Path.resolve() 获取绝对路径，确保路径正确
-        self.knowledge_base_path = Path(knowledge_base_path).resolve()
-        self.references_path = Path(references_path).resolve()
+                 references_path: str = "rag-skill/.agent/skills/rag-skill/references",
+                 max_search_attempts: int = 3,
+                 context_window: int = 300):
+        base_dir = Path(__file__).resolve().parent
+        kb_path = Path(knowledge_base_path)
+        ref_path = Path(references_path)
+        if not kb_path.is_absolute() and kb_path.parts and kb_path.parts[0] == "SuiAgent-main":
+            kb_path = base_dir.parent / kb_path
+        if not ref_path.is_absolute() and ref_path.parts and ref_path.parts[0] == "SuiAgent-main":
+            ref_path = base_dir.parent / ref_path
+        self.knowledge_base_path = (kb_path if kb_path.is_absolute() else (base_dir / kb_path)).resolve()
+        self.references_path = (ref_path if ref_path.is_absolute() else (base_dir / ref_path)).resolve()
+        if not self.references_path.exists():
+            fallback_path = self.knowledge_base_path.parent / ".agent" / "skills" / "rag-skill" / "references"
+            if fallback_path.exists():
+                self.references_path = fallback_path
+        self.max_attempts = max_search_attempts
+        self.context_window = context_window
         self.top_k = 5
         self.format_handlers = {
             ".md": lambda fp: self._read_markdown(fp),
             ".pdf": lambda fp: self._read_pdf(fp),
             ".xlsx": lambda fp: self._read_excel(fp),
             ".xls": lambda fp: self._read_excel(fp),
-            ".txt": lambda fp: self._read_text(fp),
-            ".docx": lambda fp: self._read_docx(fp)
+            ".txt": lambda fp: self._read_text(fp)
         }
         self.index_cache = {}
         self.last_index_load = 0
         self.index_cache_ttl = 3600
-        self.semantic_cache = {}
 
     def _read_markdown(self, file_path: Path) -> str:
         try:
@@ -123,17 +81,10 @@ class RAGSkillTool:
                 return ""
 
     def _read_excel(self, file_path: Path) -> str:
-        # 强制学习机制：处理 Excel 前必须先学习处理方法
-        excel_reading_md = self.references_path / "excel_reading.md"
-        if excel_reading_md.exists():
-            with open(excel_reading_md, "r", encoding="utf-8") as f:
+        excel_handler_md = self.references_path / "excel_reading.md"
+        if excel_handler_md.exists():
+            with open(excel_handler_md, "r", encoding="utf-8") as f:
                 _ = f.read()
-        
-        excel_analysis_md = self.references_path / "excel_analysis.md"
-        if excel_analysis_md.exists():
-            with open(excel_analysis_md, "r", encoding="utf-8") as f:
-                _ = f.read()
-        
         try:
             import pandas as pd
             df = pd.read_excel(file_path)
@@ -147,67 +98,26 @@ class RAGSkillTool:
             print(f"读取Excel失败: {e}")
             return ""
 
-    def _read_docx(self, file_path: Path) -> str:
-        """读取 DOCX 文件，支持 pandoc 和 python-docx"""
-        docx_handler_md = self.references_path / "docx_reading.md"
-        if docx_handler_md.exists():
-            with open(docx_handler_md, "r", encoding="utf-8") as f:
-                _ = f.read()
+    def _extract_query_keywords(self, query: str) -> List[str]:
+        prompt = f"""
+        请从以下用户查询中提取用于检索文献的具体关键词。
+        要求：
+        - 关键词应当是领域专业术语，而非通用词汇。
+        - 返回一个JSON数组，格式如：["关键词1", "关键词2", ...]
+        - 如果查询本身已经是具体术语，直接返回包含该术语的数组。
+        - 优先使用大概率在文中直接出现的简短表达，每个关键词都要有2-3个近义表达。
 
-        # 方法1: 尝试使用 pandoc
+        用户查询：{query}
+        """
         try:
-            import subprocess
-            temp_output = file_path.parent / f"{file_path.stem}_temp.txt"
-            result = subprocess.run(
-                ["pandoc", str(file_path), "-o", str(temp_output)],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            if result.returncode == 0 and temp_output.exists():
-                with open(temp_output, "r", encoding="utf-8") as f:
-                    content = f.read()
-                temp_output.unlink()  # 删除临时文件
-                return content
-        except Exception:
-            pass
-
-        # 方法2: 使用 python-docx
-        try:
-            from docx import Document
-            doc = Document(str(file_path))
-            paragraphs = []
-            for para in doc.paragraphs:
-                text = para.text.strip()
-                if text:
-                    # 根据样式添加标题标记
-                    if para.style.name.startswith('Heading'):
-                        level = para.style.name.replace('Heading ', '')
-                        try:
-                            level = int(level)
-                            paragraphs.append(f"{'#' * min(level, 6)} {text}")
-                        except ValueError:
-                            paragraphs.append(f"## {text}")
-                    else:
-                        paragraphs.append(text)
-
-            # 提取表格
-            if doc.tables:
-                paragraphs.append("\n\n## 表格\n")
-                for i, table in enumerate(doc.tables):
-                    paragraphs.append(f"\n### 表格 {i + 1}\n")
-                    for row in table.rows:
-                        row_text = " | ".join([cell.text.strip() for cell in row.cells])
-                        paragraphs.append(f"| {row_text} |")
-                    paragraphs.append("")
-
-            return "\n".join(paragraphs)
-        except ImportError:
-            print("读取DOCX失败: python-docx 未安装")
-            return ""
+            response = callLLM(prompt).strip()
+            keywords = json.loads(response)
+            if isinstance(keywords, list):
+                return [k for k in keywords if isinstance(k, str) and k.strip()]
         except Exception as e:
-            print(f"读取DOCX失败: {e}")
-            return ""
+            print(f"LLM关键词提取失败，使用jieba备用方案: {e}")
+            return self._extract_keywords(query)
+        return []
 
     def _extract_keywords(self, text: str) -> List[str]:
         try:
@@ -217,441 +127,216 @@ class RAGSkillTool:
         except ImportError:
             return [w for w in text.split() if len(w) > 1][:10]
 
-    def _read_semantic_index_text(self, dir_path: Path) -> str:
-        cache_key = str(dir_path.resolve())
-        if cache_key in self.semantic_cache:
-            return self.semantic_cache[cache_key]
+    def _generate_retreat_keywords(self, current_keywords: List[str]) -> List[str]:
+        prompt = f"""
+        以下关键词在文档中未找到匹配内容：
+        {current_keywords}
 
-        index_path = dir_path / "data_structure.md"
-        if not index_path.exists():
-            self.semantic_cache[cache_key] = ""
-            return ""
+        请生成 1~3 个更宽泛、更常见、更短的关键词（例如从“抑郁核心症状”泛化为“抑郁”）。
+        要求：
+        - 每个关键词不超过 3 个汉字或英文单词
+        - 优先使用文档中可能直接出现的表达
+        - 输出一个 JSON 数组，如：["抑郁", "depression"]
+        只输出 JSON，无其他文字。
+        """
+        try:
+            response = callLLM(prompt).strip()
+            if response.startswith("```json"):
+                response = response[7:]
+            if response.endswith("```"):
+                response = response[:-3]
+            new_kws = json.loads(response)
+            if isinstance(new_kws, list) and len(new_kws) > 0:
+                return [kw for kw in new_kws if isinstance(kw, str) and kw.strip()]
+        except Exception as e:
+            print(f"泛化关键词生成失败: {e}")
+
+    def _search_context_in_file(self, file_path: Path, keywords: List[str]) -> List[str]:
+        suffix = file_path.suffix.lower()
+        if suffix not in self.format_handlers:
+            print(f"不支持的文件格式: {suffix}")
+            return []
+
+        content = self.format_handlers[suffix](file_path)
+        if not content:
+            return []
+
+        positions = []
+        for kw in keywords:
+            if not kw:
+                continue
+            pattern = re.compile(re.escape(kw), re.IGNORECASE)
+            for match in pattern.finditer(content):
+                positions.append(match.start())
+
+        if not positions:
+            return []
+
+        positions = sorted(set(positions))
+
+        fragments = []
+        half_window = self.context_window // 2
+        merged_start = None
+        merged_end = None
+
+        for pos in positions:
+            start = max(0, pos - half_window)
+            end = min(len(content), pos + half_window)
+
+            if merged_start is None:
+                merged_start, merged_end = start, end
+            elif start <= merged_end:
+                merged_end = max(merged_end, end)
+            else:
+                fragments.append(content[merged_start:merged_end].strip())
+                merged_start, merged_end = start, end
+
+        if merged_start is not None:
+            fragments.append(content[merged_start:merged_end].strip())
+
+        unique_fragments = []
+        seen = set()
+        for frag in fragments:
+            if frag not in seen:
+                seen.add(frag)
+                unique_fragments.append(frag)
+
+        return unique_fragments
+
+    def _evaluate_context_and_generate_keyword(self, query: str, cur_kw: List[str], context_fragments: List[str],
+                                               attempt: int) -> Tuple[bool, List[str]]:
+        if not context_fragments:
+            if attempt >= self.max_attempts - 1:
+                return False, []
+            else:
+                prompt = f"""
+                用户查询：{query}
+                以下针对用户查询生成的关键词在文档中未找到匹配内容：
+                {cur_kw}
+
+                请为每个关键词生成 1~3 个更宽泛、更常见、更短的关键词（例如从“抑郁核心症状”泛化为“抑郁”）。
+                要求：
+                - 每个关键词不超过 3 个汉字或英文单词
+                - 优先使用文档中可能直接出现的表达
+                最终的输出格式为关键词组成的数组，无其他文字。
+                返回格式：只返回关键词组成的数组本身，无其他内容。
+                """
+                response = callLLM(prompt).strip()
+                print(response)
+                try:
+                    if response.startswith("```json"):
+                        response = response[7:]
+                    if response.endswith("```"):
+                        response = response[:-3]
+                    new_keywords = json.loads(response)
+                    if isinstance(new_keywords, list):
+                        new_keywords = [kw for kw in new_keywords if isinstance(kw, str) and kw.strip()]
+                        return False, new_keywords
+                    else:
+                        return False, []
+                except Exception as e:
+                    print(f"解析泛化关键词失败: {e}")
+                    return False, []
+
+        context_str = "\n\n---\n\n".join(context_fragments)
+        prompt = f"""
+        请判断以下检索到的上下文片段是否足以回答用户查询。
+        用户查询：{query}
+        当前已检索到的上下文片段（共{len(context_fragments)}段）：
+        {context_str}
+
+        如果信息充分，可以生成高质量答案，请返回 JSON：{{"sufficient": true, "new_keyword": null}}
+        如果信息不足，请提供一个新的搜索关键词（单个专业术语，用于在文献中定位更多相关内容），返回 JSON：{{"sufficient": false, "new_keyword": "你的新关键词"}}
+        仅返回JSON，无其他内容。
+        """
 
         try:
-            text = index_path.read_text(encoding="utf-8")
-        except Exception:
-            text = ""
-        self.semantic_cache[cache_key] = text
-        return text
+            response = callLLM(prompt).strip()
+            if response.startswith("```json"):
+                response = response[7:]
+            if response.endswith("```"):
+                response = response[:-3]
+            data = json.loads(response)
+            sufficient = data.get("sufficient", False)
+            new_keyword = data.get("new_keyword")
+            if sufficient:
+                return True, []
+            else:
+                return False, [new_keyword] if new_keyword else []
+        except Exception as e:
+            print(f"LLM评估失败: {e}")
+            return False, []
 
-    def _get_candidate_semantic_text(self, file_path: Path, subdir_path: Path) -> str:
-        parts = []
-        try:
-            rel_path = file_path.relative_to(subdir_path)
-            parts.extend(rel_path.parts)
-        except ValueError:
-            parts.append(file_path.name)
-
-        current = file_path.parent
-        while True:
-            if current == subdir_path.parent:
-                break
-            parts.append(current.name)
-            parts.append(self._read_semantic_index_text(current))
-            if current == subdir_path:
-                break
-            current = current.parent
-
-        return "\n".join([p for p in parts if p]).lower()
-
-    def _get_query_intents(self, query: str) -> List[str]:
-        query_lower = query.lower()
-        intent_map = {
-            "symptom": ["症状", "表现", "识别", "评估", "诊断", "分类", "特征"],
-            "treatment": ["治疗", "药物", "用药", "剂量", "副作用", "干预", "方案"],
-            "scale": ["量表", "phq", "gad", "sds", "sas", "mini", "c-ssrs", "筛查", "评分"],
-            "risk": ["风险", "自杀", "自伤", "危机", "预防", "求助", "热线", "转介"],
-        }
-        matched = []
-        for intent, hints in intent_map.items():
-            if any(hint in query_lower for hint in hints):
-                matched.append(intent)
-        return matched
-
-    async def _call_llm_for_dir(self, index_content: str, query: str, prompt_type: str = "root") -> str:
+    def _call_llm_for_dir(self, index_content: str, query: str, prompt_type: str = "root") -> Union[str, List[str]]:
         if prompt_type == "root":
             prompt = f"""
-你是一个专业的心理健康知识库索引助手。请分析用户的查询，选择最相关的主题子目录。
-
-用户查询：{query}
-
-以下是知识库的主题列表：
-{index_content}
-
-请仔细阅读用户的查询内容，选择最相关的主题目录。
-
-重要：
-1. 抑郁相关 → 选择"抑郁"
-2. 自杀/自伤/想死/结束生命 → 选择"自杀与自伤"
-3. 焦虑/惊恐/GAD-7 → 选择"焦虑"
-4. 危机/热线/12356/求助 → 选择"危机干预"
-5. 情绪/情绪调节 → 选择"情绪"
-6. 失眠/睡眠/PSQI/安眠药 → 选择"睡眠与生理"
-7. 量表/PHQ-9/GAD-7/C-SSRS → 选择"量表与筛查"
-8. 机构/医院/心理援助 → 选择"干预与求助资源"
-9. 心理健康/CBT/认知扭曲/正念 → 选择"心理健康素养"
-
-只输出目录名称，不要任何其他文字。例如：输出"抑郁"
-"""
+            你需要分析用户查询和根目录索引文件内容，返回需要进入的子目录名称（仅返回目录名，无多余内容）。
+            用户查询：{query}
+            根索引内容：
+            {index_content}
+            """
+            llm_response = callLLM(prompt)
+            return llm_response.strip()
         else:
             prompt = f"""
-你是一个专业的心理健康知识库文档检索助手。请分析用户的查询，选择最相关的文档文件。
+            你需要分析用户查询和子目录索引文件内容，返回所有可能需要检索的文件名（含后缀，
+            比如 "guide.md"、"tables.xlsx"）。请将文件名以 JSON 数组格式输出，例如
+            ["file1.md", "file2.pdf"]。如果查询只对应一个文件，也仍然用数组格式包裹。
+            只输出 JSON 数组，不要包含任何其他文字。
+            用户查询：{query}
+            子索引内容：
+            {index_content}
+            """
+            llm_response = callLLM(prompt).strip()
+            try:
+                if llm_response.startswith("```json"):
+                    llm_response = llm_response[7:]
+                if llm_response.endswith("```"):
+                    llm_response = llm_response[:-3]
+                filenames = json.loads(llm_response)
+                if isinstance(filenames, list):
+                    return [f.strip() for f in filenames if isinstance(f, str) and f.strip()]
+                else:
+                    print("LLM 返回的不是列表，使用原字符串作为单个文件名")
+                    return [llm_response.strip()] if llm_response.strip() else []
+            except Exception as e:
+                print(f"解析子目录文件名列表失败: {e}，使用原字符串作为单个文件名")
+                return [llm_response.strip()] if llm_response.strip() else []
 
-用户查询：{query}
-
-以下是当前主题下的文档列表：
-{index_content}
-
-请根据用户查询的关键词，选择最匹配的文档文件名（含文件扩展名如.md）。
-
-只输出文件名，不要任何其他文字。例如：输出"抑郁症治疗与药物.md"
-"""
-        llm_response = await async_callLLM(prompt)
-        if not llm_response:
-            return ""
-        result = llm_response.strip()
-        result = re.sub(r"^```(?:markdown|md)?\s*", "", result, flags=re.IGNORECASE)
-        result = re.sub(r"\s*```$", "", result)
-        return result.strip()
-
-    async def _locate_target_file(self, query: str) -> Optional[Path]:
+    async def _locate_target_file(self, query: str) -> List[Path]:
         root_index_path = self.knowledge_base_path / "data_structure.md"
         if not root_index_path.exists():
             print("根索引文件不存在，无法定位")
-            return None
+            return []
 
-        # 策略1：关键词直接匹配子目录（优先，比 LLM 更快更可靠）
-        matched_subdir = self._keyword_match_subdir(query)
-        if matched_subdir:
-            subdir_path = self.knowledge_base_path / matched_subdir
-            target_file = await self._locate_target_file_in_subdir(subdir_path, query)
-            if target_file:
-                return target_file
-            # 找到了子目录但没找到文件，继续尝试 LLM 定位
-
-        # 策略2：LLM 定位子目录
         root_index_content = self._read_markdown(root_index_path)
-        target_subdir_name = await self._call_llm_for_dir(root_index_content, query, prompt_type="root")
-        if not target_subdir_name:
-            print("LLM未返回有效子目录，尝试关键词 fallback")
-            if matched_subdir:
-                subdir_path = self.knowledge_base_path / matched_subdir
-                target_file = await self._keyword_match_file(subdir_path, query)
-                if target_file:
-                    return target_file
-            return None
-
-        # 规范化目录名：处理 LLM 返回的英文代码或中文名称
-        subdir_name_map = {
-            "depression": "抑郁",
-            "anxiety": "焦虑",
-            "suicide_self_harm": "自杀与自伤",
-            "crisis_intervention": "危机干预",
-            "emotion": "情绪",
-            "sleep_physiology": "睡眠与生理",
-            "scale_screening": "量表与筛查",
-            "intervention_resources": "干预与求助资源",
-            "mental_health_literacy": "心理健康素养",
-        }
-        target_subdir_name = subdir_name_map.get(target_subdir_name.strip(), target_subdir_name.strip())
+        target_subdir_name = self._call_llm_for_dir(root_index_content, query, prompt_type="root")
+        if not target_subdir_name or not isinstance(target_subdir_name, str):
+            print("LLM未返回有效子目录")
+            return []
 
         subdir_path = self.knowledge_base_path / target_subdir_name
-        if not subdir_path.exists():
-            print(f"子目录{target_subdir_name}不存在，尝试关键词 fallback")
-            if matched_subdir:
-                fallback_subdir = self.knowledge_base_path / matched_subdir
-                target_file = await self._keyword_match_file(fallback_subdir, query)
-                if target_file:
-                    return target_file
-            return None
-
-        target_file = await self._locate_target_file_in_subdir(subdir_path, query)
-        if target_file:
-            return target_file
-
-        # 子目录内 LLM + 关键词都失败，尝试 fallback 到关键词匹配的子目录
-        if matched_subdir and matched_subdir != target_subdir_name:
-            fallback_subdir = self.knowledge_base_path / matched_subdir
-            if fallback_subdir.exists():
-                print(f"主目录LLM失败，尝试 fallback 到 {matched_subdir}")
-                target_file = await self._keyword_match_file(fallback_subdir, query)
-                if target_file:
-                    return target_file
-
-        return None
-
-    def _keyword_match_subdir(self, query: str) -> Optional[str]:
-        """根据查询关键词直接匹配子目录（忽略大小写）"""
-        query_lower = query.lower()
-        # jieba 分词提取关键词
-        try:
-            keywords = jieba.lcut(query)
-            keywords = [w.strip() for w in keywords if len(w.strip()) >= 2]
-        except ImportError:
-            keywords = [w.strip() for w in re.split(r'[，。？！、\s]', query) if len(w.strip()) >= 2]
-
-        # 按关键词长度降序匹配（优先匹配更长的词）
-        keywords.sort(key=len, reverse=True)
-
-        for kw in keywords:
-            kw_lower = kw.lower()
-            for key, subdir in _KEYWORD_SUBDIR_MAP.items():
-                if kw_lower in key.lower() or key.lower() in kw_lower:
-                    # 验证子目录确实存在
-                    subdir_path = self.knowledge_base_path / subdir
-                    if subdir_path.exists():
-                        print(f"关键词匹配子目录: '{kw}' → '{subdir}'")
-                        return subdir
-
-        # 额外中文关键词直接匹配
-        extra_keywords = {
-            "抑郁": "抑郁", "抑郁症": "抑郁", "重度抑郁": "抑郁",
-            "自杀": "自杀与自伤", "自伤": "自杀与自伤", "自残": "自杀与自伤",
-            "焦虑": "焦虑", "焦虑症": "焦虑",
-            "危机": "危机干预",
-            "情绪": "情绪",
-            "失眠": "睡眠与生理", "睡眠": "睡眠与生理", "安眠": "睡眠与生理",
-            "量表": "量表与筛查", "PHQ": "量表与筛查", "GAD": "量表与筛查",
-            "求助": "干预与求助资源", "热线": "危机干预",
-            "心理": "心理健康素养",
-        }
-        for kw in keywords:
-            if kw in extra_keywords:
-                subdir = extra_keywords[kw]
-                subdir_path = self.knowledge_base_path / subdir
-                if subdir_path.exists():
-                    print(f"关键词直接匹配子目录: '{kw}' → '{subdir}'")
-                    return subdir
-        return None
-
-    async def _locate_target_file_in_subdir(self, subdir_path: Path, query: str) -> Optional[Path]:
-        """在子目录中定位目标文件（LLM + 关键词 fallback）"""
         sub_index_path = subdir_path / "data_structure.md"
-
-        # 策略1：关键词匹配文件（快速可靠）
-        target_file = await self._keyword_match_file(subdir_path, query)
-        if target_file:
-            return target_file
-
-        # 策略2：LLM 定位文件
         if not sub_index_path.exists():
-            print(f"子目录{subdir_path.name}无索引文件")
-            return None
+            print(f"子目录{target_subdir_name}无索引文件")
+            return []
 
         sub_index_content = self._read_markdown(sub_index_path)
-        target_filename = await self._call_llm_for_dir(sub_index_content, query, prompt_type="sub")
-        if not target_filename:
-            print("LLM未返回有效文件名")
-            return None
+        target_filenames = self._call_llm_for_dir(sub_index_content, query, prompt_type="sub")
+        if not target_filenames:
+            print("LLM未返回有效文件名列表")
+            return []
 
-        target_filename = target_filename.strip()
-        # 处理多行文件名：只取第一行（LLM 有时会返回多行）
-        target_filename = target_filename.split('\n')[0].strip()
-        target_file_path = subdir_path / target_filename
+        valid_files = []
+        for fname in target_filenames:
+            file_path = subdir_path / fname
+            if file_path.exists():
+                valid_files.append(file_path)
+            else:
+                print(f"文件不存在: {file_path}")
+        return valid_files
 
-        # 如果精确匹配成功（文件存在）
-        if target_file_path.exists() and target_file_path.is_file():
-            return target_file_path
-
-        # 如果返回的是目录名（没有后缀），进入目录继续查找
-        if target_filename not in ["data_structure.md", "data_structure.txt"] and not any(
-                target_filename.endswith(ext) for ext in self.format_handlers):
-            target_dir_path = subdir_path / target_filename
-            if target_dir_path.exists() and target_dir_path.is_dir():
-                print(f"进入子目录: {target_filename}")
-                return await self._locate_in_subdir(target_dir_path, query)
-
-        # 模糊匹配：尝试修复 LLM 轻微幻觉
-        target_filename_clean = target_filename.replace("症", "").replace("的", "").replace(".md", "")
-        target_filename_base = target_filename.replace(".md", "")
-
-        for existing_file in subdir_path.iterdir():
-            if existing_file.is_dir():
-                # 检查目录名是否匹配
-                existing_clean = existing_file.name.replace("症", "").replace("的", "")
-                existing_base = existing_file.name
-
-                # 多种模糊匹配策略
-                match = (
-                    # 策略1: 前6个字符匹配
-                    target_filename_clean[:6] in existing_clean or existing_clean[:6] in target_filename_clean
-                    # 策略2: 包含匹配（去除关键词后）
-                    or (target_filename_base[:4] in existing_base and existing_base[:4] in target_filename_base)
-                    # 策略3: 关键词匹配
-                    or (target_filename_base.split("与")[0][:3] in existing_base and existing_base.split("与")[0][:3] in target_filename_base)
-                )
-
-                if match:
-                    print(f"模糊匹配找到目录: {existing_file.name}")
-                    return await self._locate_in_subdir(existing_file, query)
-
-            elif existing_file.is_file() and existing_file.suffix in self.format_handlers:
-                existing_clean = existing_file.name.replace("症", "").replace("的", "").replace(".md", "")
-                existing_base = existing_file.name.replace(".md", "")
-
-                # 多种模糊匹配策略
-                match = (
-                    target_filename_clean[:6] in existing_clean or existing_clean[:6] in target_filename_clean
-                    or (target_filename_base[:4] in existing_base and existing_base[:4] in target_filename_base)
-                )
-
-                if match:
-                    print(f"模糊匹配找到文件: {existing_file.name}")
-                    return existing_file
-
-        return None
-
-    async def _keyword_match_file(self, subdir_path: Path, query: str) -> Optional[Path]:
-        """根据查询关键词在子目录中递归匹配最相关的文件"""
-        try:
-            keywords = jieba.lcut(query)
-            keywords = [w.strip() for w in keywords if len(w.strip()) >= 2]
-        except ImportError:
-            keywords = [w.strip() for w in re.split(r'[，。？！、\s]', query) if len(w.strip()) >= 2]
-
-        keywords.sort(key=len, reverse=True)
-
-        # 递归收集所有文件
-        def collect_all_files(dir_path: Path) -> List[Path]:
-            files = []
-            try:
-                for item in dir_path.iterdir():
-                    if item.is_file() and item.suffix in self.format_handlers:
-                        files.append(item)
-                    elif item.is_dir():
-                        files.extend(collect_all_files(item))
-            except PermissionError:
-                pass
-            return files
-
-        all_files = collect_all_files(subdir_path)
-        if not all_files:
-            return None
-
-        # 评分每个文件
-        candidates = []
-        for f in all_files:
-            # 计算相对路径（相对于 subdir_path）作为评分参考
-            try:
-                rel_path = f.relative_to(subdir_path)
-            except ValueError:
-                rel_path = Path(f.name)
-
-            fname = f.stem  # 文件名（不含扩展名）
-            fname_lower = fname.lower()
-            rel_path_lower = str(rel_path).replace("\\", "/").lower()
-            semantic_text = self._get_candidate_semantic_text(f, subdir_path)
-            score = 0
-
-            # 关键词匹配
-            for kw in keywords:
-                kw_lower = kw.lower()
-                if kw_lower in fname_lower:
-                    score += len(kw) * 3  # 高权重（文件名直接匹配）
-                if kw_lower in rel_path_lower:
-                    score += len(kw) * 2.5
-                if kw_lower in semantic_text:
-                    score += len(kw) * 2
-                # 部分匹配（字符级）
-                for part in kw_lower:
-                    if part in fname_lower and len(part) >= 2:
-                        score += 0.5
-
-            # 语义层级加权：让“主题 -> 子主题 -> 文档”的三级语义真正参与排序
-            query_intents = self._get_query_intents(query)
-            intent_keywords = {
-                "symptom": ["症状", "识别", "评估", "诊断", "分类", "快感缺失", "情绪低落"],
-                "treatment": ["治疗", "药物", "用药", "剂量", "副作用", "cbt", "ssri"],
-                "scale": ["量表", "phq", "gad", "sds", "sas", "mini", "c-ssrs", "筛查"],
-                "risk": ["风险", "自杀", "危机", "预防", "热线", "转介"],
-            }
-            for intent in query_intents:
-                for hint in intent_keywords.get(intent, []):
-                    if hint in semantic_text:
-                        score += 4
-
-            # 意图冲突轻微惩罚，避免“问症状却落到治疗”
-            if "symptom" in query_intents:
-                for hint in intent_keywords["treatment"]:
-                    if hint in semantic_text:
-                        score -= 2
-            if "treatment" in query_intents:
-                for hint in intent_keywords["symptom"]:
-                    if hint in semantic_text:
-                        score -= 1.5
-
-            # 深度加权：更深路径（更具体的内容）得分略高，但只在没有关键词直接匹配时才生效
-            depth = len(rel_path.parts) - 1  # 0 = 直接在 subdir 下
-            keyword_hit = any(kw.lower() in fname_lower for kw in keywords if len(kw) >= 2)
-            if depth > 0 and not keyword_hit:
-                score += depth * 0.3
-
-            if score > 0:
-                candidates.append((score, f))
-
-        if candidates:
-            candidates.sort(key=lambda x: x[0], reverse=True)
-            best_file = candidates[0][1]
-            try:
-                rel = best_file.relative_to(subdir_path)
-                print(f"关键词匹配文件: '{query}' → '{rel}' (score={candidates[0][0]:.1f})")
-            except ValueError:
-                print(f"关键词匹配文件: '{query}' → '{best_file.name}' (score={candidates[0][0]:.1f})")
-            return best_file
-
-        return None
-
-    async def _locate_in_subdir(self, subdir: Path, query: str) -> Optional[Path]:
-        """在子目录中查找目标文件（关键词 fallback）"""
-        # 优先用关键词匹配文件
-        target_file = await self._keyword_match_file(subdir, query)
-        if target_file:
-            return target_file
-
-        # 读取子目录的索引文件
-        index_file = subdir / "data_structure.md"
-        if index_file.exists():
-            sub_index_content = self._read_markdown(index_file)
-            target_filename = await self._call_llm_for_dir(sub_index_content, query, prompt_type="sub")
-            if not target_filename:
-                return None
-
-            target_filename = target_filename.strip()
-            # 处理多行文件名：只取第一行（LLM 有时会返回多行）
-            target_filename = target_filename.split('\n')[0].strip()
-            target_file_path = subdir / target_filename
-
-            # 精确匹配（文件存在且是文件）
-            if target_file_path.exists() and target_file_path.is_file():
-                return target_file_path
-
-            # 如果返回的是目录名（没有后缀），进入目录继续查找
-            if target_filename not in ["data_structure.md", "data_structure.txt"] and not any(
-                    target_filename.endswith(ext) for ext in self.format_handlers):
-                target_dir_path = subdir / target_filename
-                if target_dir_path.exists() and target_dir_path.is_dir():
-                    return await self._locate_in_subdir(target_dir_path, query)
-
-            # 模糊匹配
-            target_filename_clean = target_filename.replace("症", "").replace("的", "").replace(".md", "")
-            for existing_file in subdir.iterdir():
-                if existing_file.is_dir():
-                    existing_clean = existing_file.name.replace("症", "").replace("的", "")
-                    if target_filename_clean[:6] in existing_clean or existing_clean[:6] in target_filename_clean:
-                        return await self._locate_in_subdir(existing_file, query)
-                elif existing_file.is_file() and existing_file.suffix in self.format_handlers:
-                    existing_clean = existing_file.name.replace("症", "").replace("的", "").replace(".md", "")
-                    if target_filename_clean[:6] in existing_clean or existing_clean[:6] in target_filename_clean:
-                        return existing_file
-
-        # 如果没有索引文件，遍历目录中的所有文件
-        for existing_file in subdir.iterdir():
-            if existing_file.is_file() and existing_file.suffix in self.format_handlers:
-                return existing_file
-
-        return None
-
-    async def _search_in_file(self, file_path: Path, query: str) -> List[str]:
+    def _search_in_file(self, file_path: Path, query: str) -> List[str]:
         suffix = file_path.suffix.lower()
         if suffix not in self.format_handlers:
             return []
@@ -661,7 +346,7 @@ class RAGSkillTool:
             return []
 
         prompt = f"""
-                    请你从以下文件内容中，精准提取与用户查询直接相关的原文内容（不要改写、不要总结，仅复制原文）。
+                    请你从以下文件内容中，精准提取与用户查询直接相关的原文内容（不要改写、不要总结，仅复制原文，若原文为英文，则将相关原文内容翻译后返回）。
                     如果有多个相关段落/句子，都列出来；如果没有相关内容，返回空字符串。
 
                     文件名称：{file_path.name}
@@ -675,7 +360,8 @@ class RAGSkillTool:
                     3. 确保内容完全来自原文，不编造任何信息；
                     4. 最多返回{self.top_k}个相关片段。
                     """
-        llm_extracted = (await async_callLLM(prompt)).strip()
+        llm_extracted = callLLM(prompt).strip()
+        # print(f"llm_extracted:{llm_extracted}\n")
         if not llm_extracted:
             return []
 
@@ -685,139 +371,161 @@ class RAGSkillTool:
             matched_lines.append(fragment)
         return matched_lines
 
-    async def _call_llm_for_answer(self, query: str, context_list: List[str]) -> str:
+    def _call_llm_for_answer(self, query: str, context_list: List[str]) -> str:
         context_str = "\n\n".join(context_list)
         prompt = f"""
-                基于以下检索到的上下文信息，回答用户查询。要求答案准确、简洁，仅基于上下文内容，不编造信息。
+                基于以下检索到的上下文信息，回答用户查询。要求答案准确、简洁，仅基于上下文内容，不编造信息，回答前缀为：”根据检索到的信息“。注意：当检索上下文为空时，使用你已有的知识直接进行回答，并且不需要回答前缀。
                 用户查询：{query}
                 检索上下文：
                 {context_str}
                 """
-        return await async_callLLM(prompt)
+        return callLLM(prompt)
 
     async def retrieve(self, query: str) -> Dict[str, Union[str, List[Dict[str, str]], List[str]]]:
         if not query.strip():
             return {"LLM_ans": "查询内容不能为空", "target_file": [], "rela_text": []}
 
-        try:
-            target_file_path = await self._locate_target_file(query)
-            if not target_file_path:
-                return {"LLM_ans": "未找到匹配的目标文件", "target_file": [], "rela_text": []}
-            else:
-                print(f"已找到{target_file_path}")
+        target_files = await self._locate_target_file(query)
+        if not target_files:
+            print("未找到目标文件")
+            return {"LLM_ans": "未找到匹配的目标文件", "target_file": [], "rela_text": []}
 
-            matched_context = await self._search_in_file(target_file_path, query)
-            if not matched_context:
-                file_info = {"name": target_file_path.name, "path": str(target_file_path)}
-                return {"LLM_ans": "未在目标文件中找到相关信息", "target_file": [file_info], "rela_text": []}
-            else:
-                print(f"已找到{len(matched_context)}个相关片段")
+        print(f"已找到 {len(target_files)} 个目标文件: {[f.name for f in target_files]}")
 
-            final_answer = await self._call_llm_for_answer(query, matched_context)
-            file_info = {"name": target_file_path.name, "path": str(target_file_path)}
+        initial_keywords = self._extract_query_keywords(query)
+        print(f"初始关键词: {initial_keywords}")
 
+        all_context_fragments = []
+        file_infos = [{"name": fp.name, "path": str(fp)} for fp in target_files]
+
+        for file_path in target_files:
+            print(f"开始搜索文件: {file_path.name}")
+            current_keywords = initial_keywords.copy()
+            used_keywords = set(current_keywords)
+            file_fragments = []
+
+            for attempt in range(self.max_attempts):
+                print(f" 第 {attempt + 1} 次搜索，关键词: {current_keywords}")
+                new_fragments = self._search_context_in_file(file_path, current_keywords)
+                print(f" 找到 {len(new_fragments)} 个新上下文片段")
+
+                for frag in new_fragments:
+                    if frag not in file_fragments:
+                        file_fragments.append(frag)
+
+                sufficient, new_keywords = self._evaluate_context_and_generate_keyword(
+                    query, current_keywords, file_fragments, attempt
+                )
+
+                if sufficient:
+                    print(" 上下文已充分")
+                    break
+
+                if attempt == self.max_attempts - 1:
+                    print("已达到最大尝试次数")
+                    break
+
+                if not new_keywords:
+                    print("无法生成有效新关键词")
+                    break
+
+                for kw in new_keywords:
+                    if kw and kw not in used_keywords:
+                        used_keywords.add(kw)
+                        if kw not in current_keywords:
+                            current_keywords.append(kw)
+
+            if not file_fragments:
+                print(f"使用LLM阅读: {file_path.name}")
+                llm_fragments = self._search_in_file(file_path, query)
+                for frag in llm_fragments:
+                    if frag not in file_fragments:
+                        file_fragments.append(frag)
+
+            all_context_fragments.extend(file_fragments)
+
+        if not all_context_fragments:
             return {
-                "LLM_ans": final_answer,
-                "target_file": [file_info],
-                "rela_text": matched_context
+                "LLM_ans": "未在所有目标文件中找到相关信息",
+                "target_file": file_infos,
+                "rela_text": []
             }
-        except Exception as e:
-            import traceback
-            print(f"[RAG retrieve] 异常: {str(e)}")
-            print(f"[RAG retrieve] 堆栈: {traceback.format_exc()}")
-            return {"LLM_ans": f"检索过程中发生错误: {str(e)}", "target_file": [], "rela_text": []}
 
-    @staticmethod
-    async def update_mind_map(cur_mind_map: Dict, rela_text: List[str]) -> Dict:
-        """增量更新思维导图，保留原有结构，仅做补充。"""
-        if not rela_text:
-            return cur_mind_map
+        final_answer = self._call_llm_for_answer(query, all_context_fragments)
 
-        cur_map_str = json.dumps(cur_mind_map, ensure_ascii=False, indent=2)
-        literature_content = "\n".join(rela_text)
+        return {
+            "LLM_ans": final_answer,
+            "target_file": file_infos,
+            "rela_text": all_context_fragments
+        }
 
-        prompt = f"""
-                # 任务
-                你是思维导图增量更新专家，**保留原有思维导图全部结构、节点、层级**，仅基于新检索到的文献内容，做增量补充更新，不重构、不删除原有内容。
-                
-                # 约束规则
-                1. 绝对保留原有思维导图的所有节点、层级、顺序，禁止修改/删除任何已有节点
-                2. 新知识点处理规则：
-                   - 全新主题 → 新增一级节点
-                   - 已有主题的新细节 → 新增对应父节点的子节点
-                   - 与原有节点重复/相近 → 合并描述，不新增节点
-                   - 补充原有节点不完整内容 → 仅优化节点文字，不增删结构
-                3. 层级严格对齐原有
-                4. 输出**纯JSON**，无额外文字、注释、Markdown
-                5. 节点名称精炼（≤15字）
-                
-                # 输入数据
-                1. 原有思维导图结构：
-                {cur_map_str}
-                
-                2. 新检索到的文献内容：
-                {literature_content}
-                
-                # 输出JSON结构示例：
-                {{
-                  "mindMap": {{
-                    "root": {{
-                      "name": "根节点主题",
-                      "children": [
-                        {{
-                          "name": "一级节点1",
-                          "children": [
-                            {{
-                              "name": "二级节点1-1",
-                              "children": [{{"name": "三级节点1-1-1"}}]
-                            }}
-                          ]
-                        }},
-                        {{
-                          "name": "一级节点2",
-                          "children": [{{"name": "二级节点2-1"}}]
-                        }}
-                      ]
-                    }}
-                  }}
-                }}
-                """
+    def _extract_triples(self, context_fragments: List[str],query:str) -> List[Dict]:
+        if not context_fragments:
+            return []
+
+        combined_text = "\n\n".join(context_fragments)
+
+        prompt = f"""你是一个知识图谱构建专家。请从以下文献片段中提取与用户查询相关的、心理健康、自杀干预相关的知识三元组。
+                    每个三元组表示为：主语、谓语、宾语，并附带出处和原文证据。
+                    
+                    要求：
+                    - 主语、宾语应是具体的实体或概念（如“抑郁症”、“氟西汀”、“失眠”）。
+                    - 谓语描述两者之间的关系（如“一线药物”、“副作用”、“推荐剂量”、“危险因素”）。
+                    - 每个三元组必须给出原文证据（直接引用原文中支持该三元组的句子）。
+                    - 如果同一关系有多个宾语，分拆为多个三元组。
+                    - 输出一个 JSON 数组，每个元素包含 subject, predicate, object, evidence 字段。
+                    - 只输出 JSON，不要其他文字。
+                    
+                    文献内容：
+                    {combined_text}
+                    用户查询：
+                    {query}
+                    
+                    输出示例：
+                    [
+                      {{
+                        "subject": "抑郁症",
+                        "predicate": "一线药物",
+                        "object": "SSRI类",
+                        "evidence": "选择性5-羟色胺再摄取抑制剂（SSRIs）是抑郁症的一线治疗药物。"
+                      }},
+                      {{
+                        "subject": "氟西汀",
+                        "predicate": "常见副作用",
+                        "object": "恶心",
+                        "evidence": "氟西汀最常见的副作用包括恶心、失眠和头痛。"
+                      }}
+                    ]
+                    """
         try:
-            llm_response = await async_callLLM(prompt)
-            updated_map = json.loads(llm_response)
-            if "mindMap" not in updated_map:
-                if "root" in updated_map:
-                    updated_map = {"mindMap": updated_map}
-                else:
-                    updated_map = {"mindMap": updated_map}
-            return updated_map
+            response = callLLM(prompt).strip()
+            if response.startswith("```json"):
+                response = response[7:]
+            if response.endswith("```"):
+                response = response[:-3]
+            triples = json.loads(response)
+            if isinstance(triples, list):
+                return triples
+            return []
         except Exception as e:
-            print(f"思维导图更新失败: {e}")
-            return cur_mind_map
+            print(f"三元组抽取失败: {e}")
+        return []
 
 
+@tool("rag_skill_local_knowledge", return_direct=False)
 async def rag_skill_tool_func(query: str, knowledge_base_path: str = "./knowledge") -> Dict[
     str, Union[str, List[Dict[str, str]], List[str]]]:
-    """
-    从本地知识库中检索与查询相关的信息，返回包含答案、来源文件（含文件名和路径）和相关文本片段的字典。
-    
-    Args:
-        query: 用户查询内容
-        knowledge_base_path: 知识库根目录路径，默认为 ./knowledge
-    
-    Returns:
-        包含以下键的字典:
-        - LLM_ans: LLM综合生成的答案
-        - target_file: 来源文件列表 [{"name": 文件名, "path": 文件路径}]
-        - rela_text: 相关原文片段列表
-    """
+    """从本地知识库中检索与查询相关的信息，返回答案、来源文件和相关文本片段。"""
     rag_skill = RAGSkillTool(knowledge_base_path)
     return await rag_skill.retrieve(query)
 
 
 def create_rag_skill_tool(knowledge_base_path: str = "./knowledge"):
     async def bound_rag_skill(query: str) -> Dict[str, Union[str, List[Dict[str, str]], List[str]]]:
-        return await rag_skill_tool_func(query, knowledge_base_path)
+        return await rag_skill_tool_func.ainvoke({
+            "query": query,
+            "knowledge_base_path": knowledge_base_path
+        })
 
     return bound_rag_skill
 

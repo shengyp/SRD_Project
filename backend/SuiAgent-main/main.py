@@ -1,8 +1,7 @@
 import asyncio
 import time
-
+import json
 from agent import SuicideAgent
-from openai import OpenAI
 import openai
 
 
@@ -15,7 +14,6 @@ def callLLM(prompt, history):
         if not history:
             history.append({"role": "system",
                             "content": "你是一个有心理问题的用户，需要和情绪咨询agent进行20轮对话，对话要贴合普通闲聊、专业知识询问、情感疏通三种场景，且情绪有明显波动。"})
-
         history.append({"role": "user", "content": prompt})
 
         response = client.chat.completions.create(
@@ -43,7 +41,6 @@ if __name__ == "__main__":
     agent = SuicideAgent(
         session_id="00001",
         knowledge_base_path="rag-skill/knowledge",
-        preset_intent="professional_query"
     )
 
     print("agent ready")
@@ -81,10 +78,12 @@ if __name__ == "__main__":
     async def main_async(user_input):
         start_time = time.time()
         agent_response = await agent.process_message(user_input)
+        response=agent_response.get("content")
         end_time = time.time()
-        print(f"SuiAgent：{agent_response}\n"
-              f"总用时:{end_time-start_time}s")
+        # print(f"SuiAgent：\n{json.dumps(agent_response, indent=2, ensure_ascii=False)}")
+        print(f"SuiAgent：\n{response}")
+        print(f"总用时:{end_time-start_time}s")
 
 
-    asyncio.run(main_async("你好，2026年AI Agent技术有哪些关键发展趋势？"))
+    asyncio.run(main_async("你好，抑郁症的症状有哪些？"))
     print("fns")

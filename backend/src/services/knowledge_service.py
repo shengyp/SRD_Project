@@ -1,11 +1,14 @@
 # 知识库服务：从 knowledge_topics 和 knowledge_documents 表获取数据
+import asyncio
 import aiomysql
 from typing import List, Dict, Any, Optional
 import json
 import os
 import re
 import time
+import hashlib
 from functools import wraps
+from pathlib import Path
 
 
 def _simple_cache(ttl_seconds: int = 300):
@@ -49,6 +52,467 @@ class KnowledgeService:
         self._docs_cache: Optional[Dict[str, Any]] = None
         self._docs_cache_time: float = 0
         self._docs_cache_ttl: int = 60  # 1分钟缓存
+        self._sync_signature: Optional[str] = None
+        self._sync_result: Optional[Dict[str, Any]] = None
+        self._sync_lock = asyncio.Lock()
+
+    def _knowledge_root(self) -> Path:
+        backend_dir = Path(__file__).resolve().parents[2]
+        return backend_dir / "SuiAgent-main" / "rag-skill" / "knowledge"
+
+    def _catalog_path(self) -> Path:
+        return self._knowledge_root() / "knowledge_catalog.json"
+
+    def _clear_all_caches(self):
+        self._clear_topics_cache()
+        self._docs_cache = None
+        self._docs_cache_time = 0
+        try:
+            self.get_keywords._cache_clear()  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+    def _compute_local_signature(self, base_path: Path) -> str:
+        if not base_path.exists():
+            return "missing"
+        entries = []
+        for file_path in sorted(p for p in base_path.rglob("*") if p.is_file()):
+            rel = str(file_path.relative_to(base_path)).replace("\\", "/")
+            stat = file_path.stat()
+            entries.append(f"{rel}|{int(stat.st_mtime)}|{stat.st_size}")
+        return hashlib.sha1("\n".join(entries).encode("utf-8", errors="ignore")).hexdigest()
+
+    def _slugify(self, text: str, fallback_prefix: str = "item") -> str:
+        slug = re.sub(r"[^a-zA-Z0-9]+", "_", text).strip("_").lower()
+        if slug:
+            return slug
+        digest = hashlib.sha1(text.encode("utf-8")).hexdigest()[:8]
+        return f"{fallback_prefix}_{digest}"
+
+    def _format_size(self, file_size: int) -> str:
+        if file_size < 1024:
+            return f"{file_size} B"
+        if file_size < 1024 * 1024:
+            return f"{file_size / 1024:.1f} KB"
+        return f"{file_size / 1024 / 1024:.1f} MB"
+
+    def _build_local_bundle_from_catalog(self, base_path: Path) -> Dict[str, Any]:
+        catalog_path = self._catalog_path()
+        with open(catalog_path, "r", encoding="utf-8") as f:
+            catalog = json.load(f)
+
+        topics: List[Dict[str, Any]] = []
+        sub_topics: List[Dict[str, Any]] = []
+        documents: List[Dict[str, Any]] = []
+        keyword_counts: Dict[str, int] = {}
+
+        for topic_index, theme in enumerate(catalog.get("themes", []), start=1):
+            topic_name = theme.get("theme_name_zh") or theme.get("theme_dir") or f"主题{topic_index}"
+            theme_dir = theme.get("theme_dir") or topic_name
+            topic_code = self._slugify(theme_dir, "topic")
+            topic_keywords = list(theme.get("theme_aliases", []) or [])
+
+            topics.append({
+                "topic_code": topic_code,
+                "topic_name": topic_name,
+                "description": theme.get("description", ""),
+                "sort_order": topic_index,
+                "keywords": topic_keywords,
+            })
+
+            for sub_index, subtheme in enumerate(theme.get("subthemes", []), start=1):
+                sub_name = subtheme.get("name") or f"{topic_name}-子主题{sub_index}"
+                sub_code = f"{topic_code}__{self._slugify(sub_name, 'sub')}"
+                sub_keywords = list(subtheme.get("keywords", []) or [])
+                sub_topics.append({
+                    "topic_code": topic_code,
+                    "sub_topic_code": sub_code,
+                    "sub_topic_name": sub_name,
+                    "description": subtheme.get("description", ""),
+                    "sort_order": sub_index,
+                    "keywords": sub_keywords,
+                })
+
+                for doc_index, doc in enumerate(subtheme.get("documents", []), start=1):
+                    file_name = doc.get("filename", "")
+                    if not file_name:
+                        continue
+                    file_path = base_path / theme_dir / file_name
+                    if not file_path.exists():
+                        continue
+                    rel_path = file_path.relative_to(base_path).as_posix()
+                    rag_path = f"rag-skill/knowledge/{rel_path}"
+                    ext = file_path.suffix.lower().lstrip(".") or "txt"
+                    title = doc.get("title") or file_path.stem
+                    doc_keywords = []
+                    for kw in (doc.get("keywords", []) or []):
+                        if kw and kw not in doc_keywords:
+                            doc_keywords.append(kw)
+                    for kw in (doc.get("aliases", []) or []):
+                        if kw and kw not in doc_keywords:
+                            doc_keywords.append(kw)
+                    for kw in topic_keywords + sub_keywords:
+                        if kw and kw not in doc_keywords:
+                            doc_keywords.append(kw)
+                    for kw in doc_keywords:
+                        keyword_counts[kw] = keyword_counts.get(kw, 0) + 1
+
+                    documents.append({
+                        "title": title,
+                        "topic_code": topic_code,
+                        "sub_topic_code": sub_code,
+                        "keywords": doc_keywords[:30],
+                        "description": doc.get("summary", "") or subtheme.get("description", "") or theme.get("description", ""),
+                        "format": ext,
+                        "file_name": file_name,
+                        "file_path": rag_path,
+                        "file_size": file_path.stat().st_size,
+                        "size_display": self._format_size(file_path.stat().st_size),
+                        "topic_name": topic_name,
+                        "sub_topic_name": sub_name,
+                        "source": doc.get("source", ""),
+                        "audience": doc.get("audience", ""),
+                        "sort_order": doc_index,
+                    })
+
+        keywords = []
+        for sort_order, (keyword, count) in enumerate(sorted(keyword_counts.items(), key=lambda x: (-x[1], x[0])), start=1):
+            keywords.append({
+                "keyword": keyword,
+                "category": "local_knowledge",
+                "color_class": "blue",
+                "is_hot": count >= 2,
+                "usage_count": count,
+                "sort_order": sort_order,
+            })
+
+        return {"topics": topics, "sub_topics": sub_topics, "documents": documents, "keywords": keywords}
+
+    def _extract_keywords_from_title(self, title: str) -> List[str]:
+        words = re.findall(r"[\u4e00-\u9fa5A-Za-z0-9\-]+", title)
+        return [w for w in words if len(w) >= 2][:10]
+
+    def _build_local_bundle_from_scan(self, base_path: Path) -> Dict[str, Any]:
+        topics: List[Dict[str, Any]] = []
+        sub_topics: List[Dict[str, Any]] = []
+        documents: List[Dict[str, Any]] = []
+        keywords_counter: Dict[str, int] = {}
+        topic_seen = set()
+        sub_seen = set()
+
+        for theme_index, theme_dir in enumerate(sorted([p for p in base_path.iterdir() if p.is_dir()]), start=1):
+            topic_name = theme_dir.name
+            topic_code = self._slugify(topic_name, "topic")
+            if topic_code not in topic_seen:
+                topics.append({
+                    "topic_code": topic_code,
+                    "topic_name": topic_name,
+                    "description": "",
+                    "sort_order": theme_index,
+                    "keywords": [],
+                })
+                topic_seen.add(topic_code)
+
+            files = [p for p in theme_dir.iterdir() if p.is_file() and p.name != "data_structure.md"]
+            if files:
+                sub_name = "未细分子主题"
+                sub_code = f"{topic_code}__uncategorized"
+                if sub_code not in sub_seen:
+                    sub_topics.append({
+                        "topic_code": topic_code,
+                        "sub_topic_code": sub_code,
+                        "sub_topic_name": sub_name,
+                        "description": "",
+                        "sort_order": 1,
+                        "keywords": [],
+                    })
+                    sub_seen.add(sub_code)
+                for file in files:
+                    rel_path = file.relative_to(base_path).as_posix()
+                    keywords = self._extract_keywords_from_title(file.stem)
+                    for kw in keywords:
+                        keywords_counter[kw] = keywords_counter.get(kw, 0) + 1
+                    documents.append({
+                        "title": file.stem,
+                        "topic_code": topic_code,
+                        "sub_topic_code": sub_code,
+                        "keywords": keywords,
+                        "description": "",
+                        "format": file.suffix.lower().lstrip(".") or "txt",
+                        "file_name": file.name,
+                        "file_path": f"rag-skill/knowledge/{rel_path}",
+                        "file_size": file.stat().st_size,
+                        "size_display": self._format_size(file.stat().st_size),
+                        "topic_name": topic_name,
+                        "sub_topic_name": sub_name,
+                        "source": "",
+                        "audience": "",
+                        "sort_order": 1,
+                    })
+
+            for sub_index, sub_dir in enumerate(sorted([p for p in theme_dir.iterdir() if p.is_dir()]), start=1):
+                sub_name = sub_dir.name
+                sub_code = f"{topic_code}__{self._slugify(sub_name, 'sub')}"
+                if sub_code not in sub_seen:
+                    sub_topics.append({
+                        "topic_code": topic_code,
+                        "sub_topic_code": sub_code,
+                        "sub_topic_name": sub_name,
+                        "description": "",
+                        "sort_order": sub_index,
+                        "keywords": [],
+                    })
+                    sub_seen.add(sub_code)
+                for file in sorted([p for p in sub_dir.rglob("*") if p.is_file() and p.name != "data_structure.md"]):
+                    rel_path = file.relative_to(base_path).as_posix()
+                    keywords = self._extract_keywords_from_title(file.stem)
+                    for kw in keywords:
+                        keywords_counter[kw] = keywords_counter.get(kw, 0) + 1
+                    documents.append({
+                        "title": file.stem,
+                        "topic_code": topic_code,
+                        "sub_topic_code": sub_code,
+                        "keywords": keywords,
+                        "description": "",
+                        "format": file.suffix.lower().lstrip(".") or "txt",
+                        "file_name": file.name,
+                        "file_path": f"rag-skill/knowledge/{rel_path}",
+                        "file_size": file.stat().st_size,
+                        "size_display": self._format_size(file.stat().st_size),
+                        "topic_name": topic_name,
+                        "sub_topic_name": sub_name,
+                        "source": "",
+                        "audience": "",
+                        "sort_order": sub_index,
+                    })
+
+        keywords = []
+        for sort_order, (keyword, count) in enumerate(sorted(keywords_counter.items(), key=lambda x: (-x[1], x[0])), start=1):
+            keywords.append({
+                "keyword": keyword,
+                "category": "local_knowledge",
+                "color_class": "blue",
+                "is_hot": count >= 2,
+                "usage_count": count,
+                "sort_order": sort_order,
+            })
+
+        return {"topics": topics, "sub_topics": sub_topics, "documents": documents, "keywords": keywords}
+
+    async def _upsert_topic(self, cursor, topic: Dict[str, Any]) -> int:
+        await cursor.execute(
+            """SELECT id FROM knowledge_topics WHERE topic_code = %s LIMIT 1""",
+            (topic["topic_code"],)
+        )
+        existing = await cursor.fetchone()
+        if existing:
+            topic_id = existing["id"]
+            await cursor.execute(
+                """UPDATE knowledge_topics
+                   SET topic_name = %s, description = %s, sort_order = %s, is_active = TRUE
+                   WHERE id = %s""",
+                (topic["topic_name"], topic["description"], topic["sort_order"], topic_id)
+            )
+            return topic_id
+
+        await cursor.execute(
+            """INSERT INTO knowledge_topics
+               (topic_name, topic_code, description, icon, color, sort_order, is_active)
+               VALUES (%s, %s, %s, %s, %s, %s, TRUE)""",
+            (topic["topic_name"], topic["topic_code"], topic["description"], "FolderTree", "blue", topic["sort_order"])
+        )
+        return cursor.lastrowid
+
+    async def _upsert_sub_topic(self, cursor, sub_topic: Dict[str, Any], topic_id: int) -> int:
+        await cursor.execute(
+            """SELECT id FROM knowledge_sub_topics WHERE sub_topic_code = %s LIMIT 1""",
+            (sub_topic["sub_topic_code"],)
+        )
+        existing = await cursor.fetchone()
+        if existing:
+            sub_topic_id = existing["id"]
+            await cursor.execute(
+                """UPDATE knowledge_sub_topics
+                   SET topic_id = %s, sub_topic_name = %s, description = %s, sort_order = %s, is_active = TRUE
+                   WHERE id = %s""",
+                (topic_id, sub_topic["sub_topic_name"], sub_topic["description"], sub_topic["sort_order"], sub_topic_id)
+            )
+            return sub_topic_id
+
+        await cursor.execute(
+            """INSERT INTO knowledge_sub_topics
+               (topic_id, sub_topic_name, sub_topic_code, description, sort_order, is_active)
+               VALUES (%s, %s, %s, %s, %s, TRUE)""",
+            (topic_id, sub_topic["sub_topic_name"], sub_topic["sub_topic_code"], sub_topic["description"], sub_topic["sort_order"])
+        )
+        return cursor.lastrowid
+
+    async def _upsert_document(self, cursor, doc: Dict[str, Any], topic_id: int, sub_topic_id: Optional[int]) -> int:
+        await cursor.execute(
+            """SELECT id FROM knowledge_documents
+               WHERE file_path = %s AND is_deleted = FALSE
+               LIMIT 1""",
+            (doc["file_path"],)
+        )
+        existing = await cursor.fetchone()
+        keywords_json = json.dumps(doc["keywords"], ensure_ascii=False)
+        if existing:
+            doc_id = existing["id"]
+            await cursor.execute(
+                """UPDATE knowledge_documents
+                   SET title = %s, topic_id = %s, sub_topic_id = %s, keywords = %s,
+                       format = %s, file_name = %s, file_size = %s, size_display = %s,
+                       description = %s, upload_status = 'uploaded', is_deleted = FALSE
+                   WHERE id = %s""",
+                (
+                    doc["title"], topic_id, sub_topic_id, keywords_json, doc["format"], doc["file_name"],
+                    doc["file_size"], doc["size_display"], doc["description"], doc_id
+                )
+            )
+            return doc_id
+
+        await cursor.execute(
+            """INSERT INTO knowledge_documents
+               (title, topic_id, sub_topic_id, keywords, format, file_name, file_path,
+                file_size, size_display, description, upload_status, uploaded_at, uploaded_by)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'uploaded', NOW(), %s)""",
+            (
+                doc["title"], topic_id, sub_topic_id, keywords_json, doc["format"], doc["file_name"],
+                doc["file_path"], doc["file_size"], doc["size_display"], doc["description"], "local_sync"
+            )
+        )
+        return cursor.lastrowid
+
+    async def _upsert_keyword(self, cursor, keyword: Dict[str, Any]) -> None:
+        await cursor.execute(
+            """SELECT id FROM knowledge_keywords WHERE keyword = %s LIMIT 1""",
+            (keyword["keyword"],)
+        )
+        existing = await cursor.fetchone()
+        if existing:
+            await cursor.execute(
+                """UPDATE knowledge_keywords
+                   SET category = %s, color_class = %s, is_hot = %s, usage_count = %s,
+                       sort_order = %s, is_active = TRUE
+                   WHERE id = %s""",
+                (
+                    keyword["category"], keyword["color_class"], keyword["is_hot"], keyword["usage_count"],
+                    keyword["sort_order"], existing["id"]
+                )
+            )
+            return
+
+        await cursor.execute(
+            """INSERT INTO knowledge_keywords
+               (keyword, category, color_class, is_hot, usage_count, sort_order, is_active)
+               VALUES (%s, %s, %s, %s, %s, %s, TRUE)""",
+            (
+                keyword["keyword"], keyword["category"], keyword["color_class"], keyword["is_hot"],
+                keyword["usage_count"], keyword["sort_order"]
+            )
+        )
+
+    async def sync_local_knowledge_to_db(self, force: bool = False) -> Dict[str, Any]:
+        base_path = self._knowledge_root()
+        if not base_path.exists():
+            return {"success": False, "message": f"知识库目录不存在: {base_path}", "imported": 0, "topics": 0, "sub_topics": 0, "keywords": 0}
+
+        signature = self._compute_local_signature(base_path)
+        if not force and self._sync_signature == signature and self._sync_result is not None:
+            return self._sync_result
+
+        async with self._sync_lock:
+            signature = self._compute_local_signature(base_path)
+            if not force and self._sync_signature == signature and self._sync_result is not None:
+                return self._sync_result
+
+            if self._catalog_path().exists():
+                bundle = self._build_local_bundle_from_catalog(base_path)
+            else:
+                bundle = self._build_local_bundle_from_scan(base_path)
+
+            imported = 0
+            active_file_paths = [doc["file_path"] for doc in bundle["documents"]]
+            active_topic_codes = [topic["topic_code"] for topic in bundle["topics"]]
+            active_sub_codes = [sub["sub_topic_code"] for sub in bundle["sub_topics"]]
+            active_keywords = [kw["keyword"] for kw in bundle["keywords"]]
+
+            async with self.mysql_pool.acquire() as conn:
+                async with conn.cursor(aiomysql.DictCursor) as cursor:
+                    await cursor.execute("SET NAMES utf8mb4")
+
+                    topic_id_map: Dict[str, int] = {}
+                    for topic in bundle["topics"]:
+                        topic_id_map[topic["topic_code"]] = await self._upsert_topic(cursor, topic)
+
+                    sub_id_map: Dict[str, int] = {}
+                    for sub_topic in bundle["sub_topics"]:
+                        topic_id = topic_id_map[sub_topic["topic_code"]]
+                        sub_id_map[sub_topic["sub_topic_code"]] = await self._upsert_sub_topic(cursor, sub_topic, topic_id)
+
+                    for doc in bundle["documents"]:
+                        topic_id = topic_id_map[doc["topic_code"]]
+                        sub_topic_id = sub_id_map.get(doc["sub_topic_code"])
+                        await self._upsert_document(cursor, doc, topic_id, sub_topic_id)
+                        imported += 1
+
+                    for keyword in bundle["keywords"]:
+                        await self._upsert_keyword(cursor, keyword)
+
+                    if active_file_paths:
+                        placeholders = ",".join(["%s"] * len(active_file_paths))
+                        await cursor.execute(
+                            f"""UPDATE knowledge_documents
+                                SET is_deleted = TRUE, deleted_at = NOW()
+                                WHERE file_path LIKE 'rag-skill/knowledge/%%'
+                                  AND file_path NOT IN ({placeholders})""",
+                            active_file_paths
+                        )
+                    else:
+                        await cursor.execute(
+                            """UPDATE knowledge_documents
+                               SET is_deleted = TRUE, deleted_at = NOW()
+                               WHERE file_path LIKE 'rag-skill/knowledge/%'"""
+                        )
+
+                    if active_topic_codes:
+                        placeholders = ",".join(["%s"] * len(active_topic_codes))
+                        await cursor.execute(
+                            f"""UPDATE knowledge_topics SET is_active = FALSE
+                                WHERE topic_code NOT IN ({placeholders})""",
+                            active_topic_codes
+                        )
+                    if active_sub_codes:
+                        placeholders = ",".join(["%s"] * len(active_sub_codes))
+                        await cursor.execute(
+                            f"""UPDATE knowledge_sub_topics SET is_active = FALSE
+                                WHERE sub_topic_code NOT IN ({placeholders})""",
+                            active_sub_codes
+                        )
+                    if active_keywords:
+                        placeholders = ",".join(["%s"] * len(active_keywords))
+                        await cursor.execute(
+                            f"""UPDATE knowledge_keywords SET is_active = FALSE
+                                WHERE keyword NOT IN ({placeholders})""",
+                            active_keywords
+                        )
+                    else:
+                        await cursor.execute("""UPDATE knowledge_keywords SET is_active = FALSE""")
+
+                    await conn.commit()
+
+            self._clear_all_caches()
+            self._sync_signature = signature
+            self._sync_result = {
+                "success": True,
+                "message": "本地知识库元信息已同步到数据库",
+                "imported": imported,
+                "topics": len(bundle["topics"]),
+                "sub_topics": len(bundle["sub_topics"]),
+                "keywords": len(bundle["keywords"]),
+                "documents": bundle["documents"],
+            }
+            return self._sync_result
 
     def _clear_topics_cache(self):
         """清除主题缓存"""
@@ -57,6 +521,7 @@ class KnowledgeService:
 
     async def get_topics(self, is_active: bool = True) -> List[Dict[str, Any]]:
         """获取知识主题列表（优化：单次查询 + 5分钟缓存）"""
+        await self.sync_local_knowledge_to_db(force=False)
         # 检查缓存是否有效
         cache_key = f"topics_{is_active}"
         current_time = time.time()
@@ -126,6 +591,7 @@ class KnowledgeService:
 
         优化：仅对无筛选条件的第一页请求进行1分钟缓存，减少数据库压力。
         """
+        await self.sync_local_knowledge_to_db(force=False)
         # 仅缓存无筛选条件的第一页（最常用场景）
         use_cache = (
             page == 1 and
@@ -441,6 +907,7 @@ class KnowledgeService:
         topic_id: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """获取子主题列表（支持按 topic_id 筛选）"""
+        await self.sync_local_knowledge_to_db(force=False)
         conditions = []
         params = []
 
@@ -1063,6 +1530,7 @@ class KnowledgeService:
 
     async def get_keywords(self, topic_id: Optional[int] = None, is_hot: bool = False) -> List[Dict[str, Any]]:
         """获取关键词列表（优先从 knowledge_keywords 表获取预定义关键词）"""
+        await self.sync_local_knowledge_to_db(force=False)
         # 首先尝试从预定义的 knowledge_keywords 表获取
         async with self.mysql_pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cursor:

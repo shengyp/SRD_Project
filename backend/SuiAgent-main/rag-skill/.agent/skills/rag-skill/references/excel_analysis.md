@@ -1,140 +1,129 @@
-# Excel 数据分析方法指南
+# Excel 数据分析
 
-> 处理 Excel 数据分析任务前必须先阅读本文档。
+> ⚠️ **使用本文档前请注意**：本文档应在实际分析 Excel 数据之前阅读，以了解正确的 pandas 分析方法。请先阅读 excel_reading.md 学习如何读取数据。
 
----
+使用 pandas 对 Excel 数据进行常规分析操作。
 
-## 一、分组聚合
+## 快速参考
 
-### 1.1 按列分组统计
+| 任务 | 常用方法 | 代码示例 |
+|------|----------|----------|
+| 按条件过滤 | 布尔索引 | `df[df['sales'] > 10000]` |
+| 分组聚合 | groupby | `df.groupby('region')['sales'].sum()` |
+| 排序 | sort_values | `df.sort_values('sales', ascending=False)` |
+| 计算新列 | 直接赋值 | `df['profit'] = df['revenue'] - df['cost']` |
+| 统计汇总 | describe | `df.describe()` |
+
+## 分组聚合（GroupBy）
 
 ```python
 import pandas as pd
 
-df = pd.read_excel("data.xlsx")
+df = pd.read_excel("sales.xlsx")
 
-# 按单列分组求和
-grouped = df.groupby("类别")["数值列"].sum()
+# 按列分组并聚合
+sales_by_region = df.groupby("region")["sales"].sum()
+print(sales_by_region)
 
-# 按多列分组
-grouped = df.groupby(["类别", "地区"])["销售额"].mean()
-
-# 多种聚合
-result = df.groupby("部门").agg({
-    "销售额": ["sum", "mean", "count"],
-    "利润": ["sum", "mean"]
+# 多列分组和多重聚合
+result = df.groupby(["region", "product"]).agg({
+    "sales": "sum",
+    "quantity": "count",
+    "price": "mean"
 })
 ```
 
-### 1.2 分组后筛选
+## 数据过滤
 
 ```python
-# 筛选分组后满足条件的组
-grouped = df.groupby("类别").filter(lambda x: x["销售额"].sum() > 1000)
+# 按条件过滤行
+high_sales = df[df["sales"] > 10000]
+
+# 多条件过滤
+filtered = df[(df["sales"] > 10000) & (df["region"] == "North")]
+
+# 使用 isin 过滤
+selected = df[df["product"].isin(["A", "B", "C"])]
 ```
 
----
-
-## 二、数据过滤
-
-### 2.1 基础过滤
+## 派生指标计算
 
 ```python
-# 等于
-df[df["列"] == "值"]
+# 计算新列
+df["profit_margin"] = (df["revenue"] - df["cost"]) / df["revenue"]
 
-# 不等于
-df[df["列"] != "值"]
+# 百分比计算
+df["growth_rate"] = (df["current"] - df["previous"]) / df["previous"] * 100
 
-# 大于/小于
-df[df["数值列"] > 10]
-
-# 范围
-df[(df["列"] >= 5) & (df["列"] <= 15)]
+# 累计求和
+df["cumulative_sales"] = df["sales"].cumsum()
 ```
 
-### 2.2 字符串过滤
+## 排序
 
 ```python
-# 包含
-df[df["文本列"].str.contains("关键词")]
+# 按单列排序
+df_sorted = df.sort_values("sales", ascending=False)
 
-# 开头/结尾
-df[df["文本列"].str.startswith("前缀")]
-df[df["文本列"].str.endswith("后缀")]
-
-# 正则匹配
-df[df["文本列"].str.match(r"正则表达式")]
+# 按多列排序
+df_sorted = df.sort_values(["region", "sales"], ascending=[True, False])
 ```
 
----
-
-## 三、派生指标
-
-### 3.1 新增计算列
+## 数据透视表
 
 ```python
-# 简单计算
-df["新列"] = df["列A"] + df["列B"]
+# 创建数据透视表
+pivot = pd.pivot_table(
+    df,
+    values="sales",
+    index="region",
+    columns="product",
+    aggfunc="sum",
+    fill_value=0
+)
 
-# 百分比
-df["占比"] = df["数值"] / df["数值"].sum() * 100
-
-# 条件赋值
-df["等级"] = df["分数"].apply(lambda x: "高" if x >= 80 else "低")
+print(pivot)
 ```
 
-### 3.2 时间处理
+## 统计分析
 
 ```python
-# 转换日期格式
-df["日期"] = pd.to_datetime(df["日期"])
+# 基本统计
+print(df.describe())
 
-# 提取年月日
-df["年"] = df["日期"].dt.year
-df["月"] = df["日期"].dt.month
+# 特定列统计
+print(df["sales"].mean())
+print(df["sales"].median())
+print(df["sales"].std())
 
-# 按月分组
-df.groupby(df["日期"].dt.to_period("M")).sum()
+# 计数统计
+print(df["category"].value_counts())
 ```
 
----
-
-## 四、排序与排名
+## 数据合并
 
 ```python
-# 按列排序
-df.sort_values("列名", ascending=True)
+# 垂直合并多个 DataFrame
+combined = pd.concat([df1, df2], ignore_index=True)
 
-# 多列排序
-df.sort_values(["列1", "列2"], ascending=[True, False])
-
-# 排名
-df["排名"] = df["分数"].rank(ascending=False)
+# 按公共列合并（类似 SQL JOIN）
+merged = pd.merge(sales, customers, on="customer_id", how="left")
 ```
 
----
-
-## 五、数据清洗
+## 数据清洗
 
 ```python
-# 去除重复
-df.drop_duplicates()
+# 删除重复行
+df = df.drop_duplicates()
 
-# 填充缺失值
-df.fillna(0)
+# 处理缺失值
+df = df.fillna(0)  # 填充为 0
+df = df.dropna()   # 删除含缺失值的行
 
-# 删除缺失值
-df.dropna()
+# 去除空格
+df["name"] = df["name"].str.strip()
 
-# 替换值
-df.replace({"旧值": "新值"})
+# 类型转换
+df["date"] = pd.to_datetime(df["date"])
+df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
 ```
-
----
-
-## 六、禁止事项
-
-- ❌ 未学习本文档就直接进行数据分析
-- ❌ 在不了解数据结构时就读取全量数据
-- ❌ 不进行数据清洗就开始分析
