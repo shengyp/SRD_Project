@@ -8,6 +8,7 @@ import csv
 import uuid
 import json
 import hashlib
+import re
 from pathlib import Path
 from typing import Optional, List, Tuple, Dict, Any
 from dataclasses import dataclass, field
@@ -97,14 +98,14 @@ def parse_csv_file(file_path: str) -> Tuple[List[ParsedArchiveRecord], Dict[str,
         reader = csv.DictReader(f)
         columns = reader.fieldnames or []
         
-        for row in reader:
+        for row_index, row in enumerate(reader, start=1):
             # 规范化字段名
             row = {k.strip().lower(): v for k, v in row.items()}
             
             # 获取用户 ID
             user_id = row.get('user', row.get('user_id', ''))
             if not user_id:
-                continue
+                user_id = f'row_{row_index}'
             user_id = str(user_id).strip()
             
             # 获取帖子内容（支持多种字段名）
@@ -177,10 +178,18 @@ def _parse_posts(post_str: str) -> List[str]:
         except Exception:
             pass
     
+    # 检查换行分隔（weibo）
+    if '\n' in post_str:
+        parts = [p.strip() for p in post_str.split('\n') if p.strip()]
+        if len(parts) > 1:
+            return parts
+
     # 检查逗号分隔
     if ',' in post_str and not post_str.startswith('['):
-        # 可能是逗号分隔的多个帖子（简单场景）
-        return [p.strip() for p in post_str.split(',') if p.strip()]
+        # 避免把普通长文本中的英文逗号切碎，仅在明显短片段结构下分割
+        parts = [p.strip() for p in post_str.split(',') if p.strip()]
+        if len(parts) > 1 and all(len(part) < 200 for part in parts):
+            return parts
     
     return [post_str]
 
@@ -195,6 +204,47 @@ def _label_to_name(label: int) -> str:
         4: '高风险',
     }
     return label_map.get(label, f'风险{label}')
+
+
+def _build_risk_schema(data_source: str, records: List[ParsedArchiveRecord]) -> Tuple[Dict[str, str], Dict[str, str], int]:
+    """根据数据源和标签范围生成细粒度/粗粒度风险映射。"""
+    max_label = max((r.label for r in records), default=0)
+    source = (data_source or "").lower()
+
+    if source in {"sigir", "weibo"} or max_label <= 1:
+        fine_labels = {"0": "无风险", "1": "高风险"}
+        coarse_risk_mapping = {"0": "low", "1": "high"}
+        class_count = 2
+    else:
+        fine_labels = {"0": "无风险", "1": "极低风险", "2": "低风险", "3": "中风险", "4": "高风险"}
+        coarse_risk_mapping = {"0": "low", "1": "low", "2": "low", "3": "medium", "4": "high"}
+        class_count = 5
+
+    return fine_labels, coarse_risk_mapping, class_count
+
+
+def _detect_language(data_source: str) -> str:
+    return "zh" if (data_source or "").lower() == "weibo" else "en"
+
+
+def _detect_has_timestamp(records: List[ParsedArchiveRecord]) -> bool:
+    if not records:
+        return False
+    sample_values = [str(r.raw_row.get("created_utc", "")).strip() for r in records[:5]]
+    return any("timestamp(" in value.lower() or re.search(r"\d{4}-\d{2}-\d{2}", value) for value in sample_values if value)
+
+
+def _detect_has_emojis(file_path: str, data_source: str) -> bool:
+    source = (data_source or "").lower()
+    builtin_pairs = {
+        "reddit": Path(_BACKEND_ROOT).parent / "datasets" / "reddit" / "reddit_500_emoji_batch.csv",
+        "bigdata": Path(_BACKEND_ROOT).parent / "datasets" / "bigdata" / "bigdata_emoji_batch.csv",
+        "sigir": Path(_BACKEND_ROOT).parent / "datasets" / "sigir" / "sigir_emojis.csv",
+        "weibo": Path(_BACKEND_ROOT).parent / "datasets" / "weibo" / "weibo_1000_emoji_batch.csv",
+    }
+    if source in builtin_pairs:
+        return builtin_pairs[source].exists()
+    return False
 
 
 def generate_dataset_key(filename: str) -> str:
@@ -375,10 +425,9 @@ async def confirm_archive_import(
         else:
             coarse_risk_dist["low"] += 1
     
-    # 细粒度标签映射
-    fine_labels = {str(i): _label_to_name(i) for i in range(5)}
-    # 粗粒度风险映射
-    coarse_risk_mapping = {"0": "low", "1": "low", "2": "low", "3": "medium", "4": "high"}
+    fine_labels, coarse_risk_mapping, class_count = _build_risk_schema(data_source, records)
+    has_timestamp = _detect_has_timestamp(records)
+    has_emojis = _detect_has_emojis(full_path, data_source)
     
     # 过滤要导入的记录
     if accepted_records:
@@ -416,9 +465,9 @@ async def confirm_archive_import(
                     stats['total_users'],
                     stats['total_posts'],
                     json.dumps(fine_labels, ensure_ascii=False),
-                    5,  # 五分类
+                    class_count,
                     json.dumps(coarse_risk_mapping, ensure_ascii=False),
-                    'en',  # 语言
+                    _detect_language(data_source),
                     datetime.now(),
                     datetime.now()
                 ))
@@ -442,14 +491,14 @@ async def confirm_archive_import(
                     stats['total_users'],
                     stats['total_posts'],
                     json.dumps(fine_risk_dist, ensure_ascii=False),
-                    5,  # 五分类
+                    class_count,
                     json.dumps(fine_labels, ensure_ascii=False),
                     json.dumps(coarse_risk_mapping, ensure_ascii=False),
                     json.dumps(coarse_risk_dist, ensure_ascii=False),
                     1,  # post_count
                     is_manual_annotation,
-                    False,  # has_timestamp
-                    False,  # has_emojis
+                    has_timestamp,
+                    has_emojis,
                     len(records_to_import),
                     len(records) - len(records_to_import),
                     'committed',
@@ -460,12 +509,7 @@ async def confirm_archive_import(
                 # 2. 插入心理档案记录
                 for r in records_to_import:
                     # 计算粗粒度风险等级
-                    if r.label >= 3:
-                        risk_level = 'high'
-                    elif r.label >= 1:
-                        risk_level = 'medium'
-                    else:
-                        risk_level = 'low'
+                    risk_level = coarse_risk_mapping.get(str(r.label), 'low')
                     
                     await cursor.execute("""
                         INSERT INTO psychological_archives (
@@ -487,8 +531,8 @@ async def confirm_archive_import(
                         risk_level,
                         r.label,
                         r.label,
-                        0,  # has_timestamp
-                        0,  # has_emojis
+                        1 if has_timestamp else 0,
+                        1 if has_emojis else 0,
                         batch_id,
                         datetime.now(),
                         'ready'

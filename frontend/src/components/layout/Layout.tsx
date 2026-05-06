@@ -26,9 +26,7 @@ export default function Layout() {
   }
 
   return (
-    <div className="flex h-screen font-sans selection:bg-blue-100" style={{
-      background: 'linear-gradient(180deg, #F7F9FC 0%, #F5F8FC 100%)'
-    }}>
+    <div className="flex h-screen font-sans selection:bg-blue-100 bg-[#F5F7FB]">
       <Sidebar
         activeTab={activeTab}
         onNavClick={handleNavClick}
@@ -37,35 +35,15 @@ export default function Layout() {
         isMapPage={location.pathname.includes('/map')}
       />
 
-      {/* 右侧区域：全屏相对定位，内部由 header/main 分别占据独立堆叠层级 */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        {/* 装饰层（极淡科研蓝点阵纹理） */}
-        <div className="absolute inset-0 pointer-events-none z-0" style={{
-          backgroundImage: 'radial-gradient(rgba(84,124,214,.08) 1px, transparent 1px)',
-          backgroundSize: '24px 24px',
-          maskImage: 'linear-gradient(180deg, rgba(0,0,0,.38), transparent 68%)',
-          WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,.38), transparent 68%)'
-        }}></div>
-
-        {/* 右侧装饰光晕 */}
-        <div className="absolute right-0 bottom-0 w-64 h-64 pointer-events-none z-0" style={{
-          background: 'radial-gradient(circle at 100% 100%, rgba(125, 164, 235, .12) 0%, transparent 38%)'
-        }}></div>
-        <div className="absolute left-0 bottom-0 w-48 h-48 pointer-events-none z-0" style={{
-          background: 'radial-gradient(circle at 0% 100%, rgba(195, 214, 241, .14) 0%, transparent 44%)'
-        }}></div>
-
-        {/* TopBar：独立最高层级，绝对固定在顶部 */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
         <TopBar
           isCollapsed={isCollapsed}
           setIsCollapsed={setIsCollapsed}
         />
 
-        {/* 主内容区：独立堆叠层级，低于 TopBar */}
         <main className={`flex flex-1 flex-col min-h-0 overflow-x-hidden custom-scrollbar relative ${
-          location.pathname.includes('/map') ? 'p-0 overflow-hidden' : 'p-4 md:p-6 lg:p-8 overflow-y-auto'
+          location.pathname.includes('/map') ? 'p-0 overflow-hidden' : 'px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6 overflow-y-auto'
         }`}>
-          {/* 页面根节点：地图页用 absolute 填满以避免底部空隙 */}
           <div className={`w-full ${location.pathname.includes('/map') ? 'relative flex-1 min-h-0 h-full' : 'flex flex-1 flex-col min-h-0'}`}>
             <Outlet />
           </div>

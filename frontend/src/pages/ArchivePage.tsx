@@ -7,9 +7,10 @@ import {
   FileStack, Activity, Database, FileText as FileIcon,
   CheckCircle, XCircle, Plus, Info, Trash2, Layers
 } from 'lucide-react';
-import { fetchDatasets, fetchCSVArchives, fetchHomeStats, uploadArchiveCSV, confirmArchiveImport, type DatasetProfile } from '../api';
+import { fetchDatasets, fetchArchives, fetchHomeStats, uploadArchiveCSV, confirmArchiveImport, type DatasetProfile } from '../api';
 import { formatDateTime } from '../utils/dateFormat';
 import PaperStatCard from '../components/PaperStatCard';
+import ActionCapsuleButton from '../components/ActionCapsuleButton';
 
 // ==================== 类型定义 ====================
 
@@ -59,14 +60,23 @@ interface ImportStep {
 const DATA_SOURCES = [
   { value: '', label: '全部数据源' },
   { value: 'reddit', label: 'Reddit系列' },
+  { value: 'bigdata', label: 'Bigdata系列' },
+  { value: 'sigir', label: 'SIGIR系列' },
+  { value: 'weibo', label: 'Weibo系列' },
 ];
 
 const DATA_SOURCE_LABELS: Record<string, string> = {
   reddit: 'Reddit系列',
+  bigdata: 'Bigdata系列',
+  sigir: 'SIGIR系列',
+  weibo: 'Weibo系列',
 };
 
 const DATA_SOURCE_COLORS: Record<string, string> = {
   reddit: 'bg-[#E8F0FF] text-[#2F6BFF]',
+  bigdata: 'bg-[#EEF7FF] text-[#0F6CBD]',
+  sigir: 'bg-[#F5F0FF] text-[#7C3AED]',
+  weibo: 'bg-[#FFF4E8] text-[#EA580C]',
 };
 
 const RISK_COLORS = {
@@ -84,11 +94,17 @@ void RISK_LABELS;
 // 细粒度风险标签映射（根据数据集）- 仅保留 reddit 五分类
 const FINE_RISK_LABELS: Record<string, Record<number, string>> = {
   reddit: { 0: '无风险', 1: '极低风险', 2: '低风险', 3: '中风险', 4: '高风险' }, // 五分类
+  bigdata: { 0: '无风险', 1: '极低风险', 2: '低风险', 3: '中风险', 4: '高风险' },
+  sigir: { 0: '无风险', 1: '高风险' },
+  weibo: { 0: '无风险', 1: '高风险' },
 };
 
 // 粗粒度风险等级映射（用于颜色/统一显示）
 const COARSE_RISK_MAP: Record<string, Record<number, 'low' | 'medium' | 'high'>> = {
   reddit: { 0: 'low', 1: 'low', 2: 'medium', 3: 'medium', 4: 'high' },
+  bigdata: { 0: 'low', 1: 'low', 2: 'low', 3: 'medium', 4: 'high' },
+  sigir: { 0: 'low', 1: 'high' },
+  weibo: { 0: 'low', 1: 'high' },
 };
 
 // 获取细粒度风险标签（优先使用动态映射，兜底使用静态默认值）
@@ -771,8 +787,8 @@ function ImportWizardModal({
                           </label>
                         </div>
                       </div>
-                      <a href={templateType === 'excel' ? '/datasets/archives/导入模板_Excel.csv' : '/datasets/archives/导入模板_TAB.txt'} download
-                        className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-medium transition-colors shadow-sm">
+                      <a href={templateType === 'excel' ? '/uploads/archives/导入模板_Excel.csv' : '/uploads/archives/导入模板_TAB.txt'} download
+                        className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-green-600 bg-gradient-to-r from-green-600 to-green-700 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:from-green-700 hover:to-green-700">
                         <Download className="w-4 h-4" />
                         下载{templateType === 'excel' ? 'Excel' : 'TXT'}模板
                       </a>
@@ -1143,17 +1159,18 @@ function ImportWizardModal({
 
         {/* 底部按钮 */}
         <div className="flex justify-between items-center p-5 bg-white border-t border-[#E2E8F0]">
-          <button onClick={() => currentStep > 1 && setCurrentStep(s => s - 1)}
+          <ActionCapsuleButton onClick={() => currentStep > 1 && setCurrentStep(s => s - 1)}
             disabled={currentStep === 1}
-            className="flex items-center gap-2 px-5 py-2.5 text-[#415168] hover:bg-[#F1F5FA] rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium">
-            <ChevronLeft className="w-4 h-4" /> 上一步
-          </button>
+            variant="neutral"
+            size="lg"
+            icon={<ChevronLeft className="w-4 h-4" />}>
+            上一步
+          </ActionCapsuleButton>
           <div className="flex items-center gap-3">
-            <button onClick={onClose}
-              className="px-5 py-2.5 text-[#64748B] hover:bg-[#F1F5FA] rounded-xl transition-colors font-medium">
+            <ActionCapsuleButton onClick={onClose} variant="neutral" size="lg">
               取消
-            </button>
-            <button onClick={() => {
+            </ActionCapsuleButton>
+            <ActionCapsuleButton onClick={() => {
               if (currentStep === 1) {
                 if (selectedSource && dataFile) handleImport();
               } else if (currentStep === 2) {
@@ -1163,21 +1180,28 @@ function ImportWizardModal({
               }
             }}
               disabled={(currentStep === 1 && (!selectedSource || !dataFile || isUploading)) || (currentStep === 2 && isConfirming)}
-              className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl transition-all font-semibold shadow-sm">
-              {currentStep === 1 ? (
-                isUploading ? (
-                  <>上传中... <Activity className="w-4 h-4 animate-spin" /></>
-                ) : (
-                  <>下一步 <ChevronRight className="w-4 h-4" /></>
-                )
+              variant="solid"
+              size="lg"
+              icon={currentStep === 1 ? (
+                isUploading ? <Activity className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />
               ) : currentStep === 3 ? (
-                <>完成 <Check className="w-4 h-4" /></>
+                <Check className="w-4 h-4" />
               ) : isConfirming ? (
-                <>确认中... <Activity className="w-4 h-4 animate-spin" /></>
+                <Activity className="w-4 h-4 animate-spin" />
               ) : (
-                <>下一步 <ChevronRight className="w-4 h-4" /></>
+                <ChevronRight className="w-4 h-4" />
               )}
-            </button>
+            >
+              {currentStep === 1 ? (
+                isUploading ? '上传中...' : '下一步'
+              ) : currentStep === 3 ? (
+                '完成'
+              ) : isConfirming ? (
+                '确认中...'
+              ) : (
+                '下一步'
+              )}
+            </ActionCapsuleButton>
           </div>
         </div>
       </div>
@@ -1198,30 +1222,6 @@ export default function ArchivePage() {
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [isBatchPanelOpen, setIsBatchPanelOpen] = useState(false);
 
-  // 导入完成后刷新列表
-  const handleImportComplete = async () => {
-    // 刷新数据 - 重新加载档案和统计
-    try {
-      const allArchives = await loadDatasetArchives('reddit', 500);
-      setArchives(allArchives);
-      setArchiveStats({
-        total: allArchives.length,
-        lowRisk: allArchives.filter(a => a.riskOverview?.includes('低风险')).length,
-        mediumRisk: allArchives.filter(a => a.riskOverview?.includes('中风险')).length,
-        highRisk: allArchives.filter(a => a.riskOverview?.includes('高风险')).length,
-        bySource: {},
-      });
-      const stats = await fetchHomeStats();
-      setHomeStats({
-        totalArchives: stats.totalArchives ?? stats.totalUsers ?? 0,
-        totalPosts: stats.totalPosts ?? 0,
-        riskDistribution: stats.riskDistribution ?? { low: { count: 0, percentage: 0 }, medium: { count: 0, percentage: 0 }, high: { count: 0, percentage: 0 } },
-      });
-    } catch (err) {
-      console.warn('刷新数据失败:', err);
-    }
-  };
-
   // 动态数据源配置（从 API 加载）
   const [dataSourceOptions, setDataSourceOptions] = useState<{ value: string; label: string }[]>(DATA_SOURCES);
   const [dataSourceLabels, setDataSourceLabels] = useState<Record<string, string>>({ ...DATA_SOURCE_LABELS });
@@ -1232,58 +1232,22 @@ export default function ArchivePage() {
 
   // 演示档案列表（从 demo_archives 表加载，替代静态 mockArchives）
   const [archives, setArchives] = useState<ArchiveRecord[]>([]);
-  const [archiveStats, setArchiveStats] = useState<{
-    total: number;
-    lowRisk: number;
-    mediumRisk: number;
-    highRisk: number;
-    bySource: Record<string, number>;
-  }>({ total: 0, lowRisk: 0, mediumRisk: 0, highRisk: 0, bySource: {} });
+  const [archiveTotal, setArchiveTotal] = useState(0);
 
-  // 辅助函数：加载指定数据集的档案（支持限制数量）
-  // 默认限制 reddit 为 500 条，其他数据集默认不限制
-  const loadDatasetArchives = async (datasetKey: string, maxRecords?: number) => {
-    const allArchives: ArchiveRecord[] = [];
-    const pageSize = 100;
-    const MAX_CONCURRENT = 4;
-    let page = 1;
-    let hasMore = true;
-
-    const loadBatch = async (startPage: number, count: number): Promise<{ archives: ArchiveRecord[]; hasMore: boolean }> => {
-      const batchPromises: Promise<any>[] = [];
-      for (let i = 0; i < count; i++) {
-        batchPromises.push(fetchCSVArchives({ datasetKey, page: startPage + i, pageSize }));
-      }
-      const results = await Promise.allSettled(batchPromises);
-      const archives: ArchiveRecord[] = [];
-      let totalFetched = 0;
-      for (const result of results) {
-        if (result.status === 'fulfilled' && result.value?.archives) {
-          archives.push(...result.value.archives);
-          totalFetched += result.value.archives.length;
-        }
-      }
-      return { archives, hasMore: totalFetched >= count * pageSize };
-    };
-
-    while (hasMore) {
-      const batchSize = Math.min(MAX_CONCURRENT, 10);
-      const { archives: batchArchives, hasMore: batchHasMore } = await loadBatch(page, batchSize);
-      if (batchArchives.length > 0) {
-        allArchives.push(...batchArchives);
-        page += batchSize;
-      }
-      hasMore = batchHasMore && batchArchives.length > 0;
-
-      // 检查是否达到最大记录数限制
-      if (maxRecords && allArchives.length >= maxRecords) {
-        return allArchives.slice(0, maxRecords);
-      }
-
-      if (page > 200) break;
-    }
-
-    return allArchives;
+  const loadArchivePage = async (
+    page: number,
+    nextFilters = appliedFilters,
+    nextPageSize = pageSize,
+  ) => {
+    const result = await fetchArchives({
+      page,
+      limit: nextPageSize,
+      dataset: nextFilters.dataSource || undefined,
+      keyword: nextFilters.keyword || undefined,
+      status: nextFilters.status || undefined,
+    });
+    setArchives(result.archives as ArchiveRecord[]);
+    setArchiveTotal(result.total);
   };
 
   // 预留函数，后续可能用到
@@ -1298,6 +1262,21 @@ export default function ArchivePage() {
       high: { count: number; percentage: number };
     };
   } | null>(null);
+
+  // 导入完成后刷新列表
+  const handleImportComplete = async () => {
+    try {
+      await loadArchivePage(currentPage, appliedFilters, pageSize);
+      const stats = await fetchHomeStats();
+      setHomeStats({
+        totalArchives: stats.totalArchives ?? stats.totalUsers ?? 0,
+        totalPosts: stats.totalPosts ?? 0,
+        riskDistribution: stats.riskDistribution ?? { low: { count: 0, percentage: 0 }, medium: { count: 0, percentage: 0 }, high: { count: 0, percentage: 0 } },
+      });
+    } catch (err) {
+      console.warn('刷新数据失败:', err);
+    }
+  };
 
   // 初始化：加载数据集配置和演示档案
   useEffect(() => {
@@ -1344,32 +1323,6 @@ export default function ArchivePage() {
       }
     };
 
-    // 初始化加载：默认只加载 reddit 数据集的 500 条用户，提升首屏加载速度
-    const loadDefaultArchives = async () => {
-      try {
-        let allArchives: ArchiveRecord[];
-
-        if (appliedFilters.dataSource) {
-          // 如果已有数据源筛选，按筛选加载
-          allArchives = await loadDatasetArchives(appliedFilters.dataSource);
-        } else {
-          // 默认只加载 reddit 的 500 条用户
-          allArchives = await loadDatasetArchives('reddit', 500);
-        }
-
-        setArchives(allArchives);
-        setArchiveStats({
-          total: allArchives.length,
-          lowRisk: allArchives.filter(a => a.riskOverview?.includes('低风险')).length,
-          mediumRisk: allArchives.filter(a => a.riskOverview?.includes('中风险')).length,
-          highRisk: allArchives.filter(a => a.riskOverview?.includes('高风险')).length,
-          bySource: {},
-        });
-      } catch (err) {
-        console.warn('加载档案失败:', err);
-      }
-    };
-
     const loadHomeStats = async () => {
       try {
         const stats = await fetchHomeStats();
@@ -1384,67 +1337,25 @@ export default function ArchivePage() {
     };
 
     loadDatasetConfig();
-    loadDefaultArchives();
     loadHomeStats();
   }, []);
 
-  // 数据源切换时重新加载档案
+  // 分页/筛选变化时重新加载档案
   useEffect(() => {
-    const loadArchivesOnSourceChange = async () => {
-      if (archives.length > 0 || appliedFilters.dataSource) {
-        try {
-          let allArchives: ArchiveRecord[];
-
-          if (appliedFilters.dataSource) {
-            // 加载指定数据集的档案
-            allArchives = await loadDatasetArchives(appliedFilters.dataSource);
-          } else {
-            // 默认只加载 reddit 的 500 条用户
-            allArchives = await loadDatasetArchives('reddit', 500);
-          }
-
-          setArchives(allArchives);
-          setArchiveStats({
-            total: allArchives.length,
-            lowRisk: allArchives.filter(a => a.riskOverview?.includes('低风险')).length,
-            mediumRisk: allArchives.filter(a => a.riskOverview?.includes('中风险')).length,
-            highRisk: allArchives.filter(a => a.riskOverview?.includes('高风险')).length,
-            bySource: {},
-          });
-        } catch (err) {
-          console.warn('加载档案失败:', err);
-        }
+    const loadArchives = async () => {
+      try {
+        await loadArchivePage(currentPage, appliedFilters, pageSize);
+      } catch (err) {
+        console.warn('加载档案失败:', err);
       }
     };
-    loadArchivesOnSourceChange();
-  }, [appliedFilters.dataSource]);
+    loadArchives();
+  }, [currentPage, pageSize, appliedFilters]);
 
   // 筛选并重新加载档案
-  const handleFilterAndReload = async () => {
+  const handleFilterAndReload = () => {
     setAppliedFilters({ ...filters });
     setCurrentPage(1);
-    try {
-      let allArchives: ArchiveRecord[];
-
-      if (filters.dataSource) {
-        // 加载指定数据集的档案
-        allArchives = await loadDatasetArchives(filters.dataSource);
-      } else {
-        // 默认只加载 reddit 的 500 条用户
-        allArchives = await loadDatasetArchives('reddit', 500);
-      }
-
-      setArchives(allArchives);
-      setArchiveStats({
-        total: allArchives.length,
-        lowRisk: allArchives.filter(a => a.riskOverview?.includes('低风险')).length,
-        mediumRisk: allArchives.filter(a => a.riskOverview?.includes('中风险')).length,
-        highRisk: allArchives.filter(a => a.riskOverview?.includes('高风险')).length,
-        bySource: {},
-      });
-    } catch (err) {
-      console.warn('筛选加载档案失败:', err);
-    }
   };
 
   const handleKeywordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -1453,43 +1364,21 @@ export default function ArchivePage() {
     }
   };
 
-  const handleReset = async () => {
+  const handleReset = () => {
     setFilters({ keyword: '', dataSource: '', status: '' });
     setAppliedFilters({ keyword: '', dataSource: '', status: '' });
     setCurrentPage(1);
-    // 重置后只加载 reddit 的 500 条用户
-    try {
-      const allArchives = await loadDatasetArchives('reddit', 500);
-
-      setArchives(allArchives);
-      setArchiveStats({
-        total: allArchives.length,
-        lowRisk: allArchives.filter(a => a.riskOverview?.includes('低风险')).length,
-        mediumRisk: allArchives.filter(a => a.riskOverview?.includes('中风险')).length,
-        highRisk: allArchives.filter(a => a.riskOverview?.includes('高风险')).length,
-        bySource: {},
-      });
-    } catch (err) {
-      console.warn('重置加载档案失败:', err);
-    }
   };
 
-  const filteredArchives = archives.filter(archive => {
-    if (appliedFilters.keyword && !archive.userId.toLowerCase().includes(appliedFilters.keyword.toLowerCase())) return false;
-    if (appliedFilters.dataSource && archive.dataSource !== appliedFilters.dataSource) return false;
-    if (appliedFilters.status && archive.status !== appliedFilters.status) return false;
-    return true;
-  });
-
-  const totalPages = Math.ceil(filteredArchives.length / pageSize);
-  const paginatedArchives = filteredArchives.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const totalPages = Math.ceil(archiveTotal / pageSize);
+  const paginatedArchives = archives;
 
   // 统计概览数据（优先取首页口径，确保与分页显示一致）
   // 档案总数：使用首页统计的总数，而非过滤后的数量
-  const totalUsers = homeStats?.totalArchives ?? archiveStats.total;
-  const totalPosts = homeStats?.totalPosts ?? archives.reduce((sum, a) => sum + a.postCount, 0);
-  const highRiskCount = homeStats?.riskDistribution.high.count ?? archiveStats.highRisk;
-  const lowRiskCount = homeStats?.riskDistribution.low.count ?? archiveStats.lowRisk;
+  const totalUsers = homeStats?.totalArchives ?? archiveTotal;
+  const totalPosts = homeStats?.totalPosts ?? 0;
+  const highRiskCount = homeStats?.riskDistribution.high.count ?? 0;
+  const lowRiskCount = homeStats?.riskDistribution.low.count ?? 0;
   const archiveStatCards = [
     { label: '档案总数', value: totalUsers, note: '已纳入样本库并支持后续问答与检测联动的用户档案数量', icon: FileStack, tone: 'blue' as const },
     { label: '帖子总数', value: totalPosts, note: '覆盖档案用户全部贴文记录与时间序列行为数据', icon: FileText, tone: 'slate' as const },
@@ -1508,18 +1397,20 @@ export default function ArchivePage() {
       <div className="shrink-0 bg-white rounded-[28px] p-5 shadow-[0_10px_28px_rgba(15,23,42,0.04)] border border-[#E2E8F0]">
         <div className="flex flex-wrap items-center gap-4">
           <span className="text-sm font-medium text-[#334155]">快捷操作：</span>
-          <button
+          <ActionCapsuleButton
             onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white rounded-xl text-sm font-medium transition-all shadow-sm"
+            variant="solid"
+            icon={<Plus className="w-4 h-4" />}
           >
-            <Plus className="w-4 h-4" /> 导入数据
-          </button>
-          <button
+            导入数据
+          </ActionCapsuleButton>
+          <ActionCapsuleButton
             onClick={() => { setIsBatchMode(true); setIsBatchPanelOpen(true); }}
-            className="flex items-center gap-2 px-5 py-2 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl text-sm font-medium transition-colors border border-[#E2E8F0]"
+            variant="neutral"
+            icon={<Layers className="w-4 h-4" />}
           >
-            <Layers className="w-4 h-4" /> 批量管理
-          </button>
+            批量管理
+          </ActionCapsuleButton>
         </div>
       </div>
 
@@ -1548,14 +1439,12 @@ export default function ArchivePage() {
               <option value="analyzing">分析中</option>
             </select>
           </div>
-          <button onClick={handleFilterAndReload}
-            className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white rounded-xl transition-all text-sm font-medium shadow-sm">
-            <Search className="w-4 h-4" /> 筛选
-          </button>
-          <button onClick={handleReset}
-            className="flex items-center gap-2 px-5 py-2 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl transition-colors text-sm font-medium">
-            <RefreshCw className="w-4 h-4" /> 重置
-          </button>
+          <ActionCapsuleButton onClick={handleFilterAndReload} variant="solid" icon={<Search className="w-4 h-4" />}>
+            筛选
+          </ActionCapsuleButton>
+          <ActionCapsuleButton onClick={handleReset} variant="neutral" icon={<RefreshCw className="w-4 h-4" />}>
+            重置
+          </ActionCapsuleButton>
           
           {/* 已应用筛选条件提示 */}
           {appliedFilters.keyword || appliedFilters.dataSource || appliedFilters.status ? (
@@ -1669,24 +1558,22 @@ export default function ArchivePage() {
                     </td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-2">
-                        <button onClick={() => {
+                        <ActionCapsuleButton onClick={() => {
                           sessionStorage.setItem('selectedArchive', JSON.stringify(archive));
                           navigate(`/archive/detail/${archive.id}`);
-                        }}
-                          className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-600 rounded-xl transition-all text-sm font-medium border border-blue-200">
-                          <Eye className="w-4 h-4" /> 查看
-                        </button>
-                        <button onClick={() => {
+                        }} tone="blue" tableAction icon={<Eye className="w-4 h-4" />}>
+                          查看
+                        </ActionCapsuleButton>
+                        <ActionCapsuleButton onClick={() => {
                           const confirmed = window.confirm(`确定要删除档案「${archive.userId}」吗？此操作不可恢复。`);
                           if (confirmed) {
                             // 模拟删除：从列表中移除
                             // 实际项目中应调用 API 删除
                             console.log('删除档案:', archive.id);
                           }
-                        }}
-                          className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 text-red-600 rounded-xl transition-all text-sm font-medium border border-red-200">
-                          <Trash2 className="w-4 h-4" /> 删除
-                        </button>
+                        }} tone="red" tableAction icon={<Trash2 className="w-4 h-4" />}>
+                          删除
+                        </ActionCapsuleButton>
                       </div>
                     </td>
                   </tr>
@@ -1711,7 +1598,7 @@ export default function ArchivePage() {
               </button>
             </div>
             <div className="flex items-center gap-3">
-              <button
+              <ActionCapsuleButton
                 onClick={() => {
                   const confirmed = window.confirm(`确定要删除选中的 ${selectedArchives.size} 条档案吗？`);
                   if (confirmed) {
@@ -1721,16 +1608,19 @@ export default function ArchivePage() {
                     setIsBatchPanelOpen(false);
                   }
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl text-sm font-medium transition-all shadow-sm"
+                variant="solid"
+                tone="red"
+                icon={<Trash2 className="w-4 h-4" />}
               >
-                <Trash2 className="w-4 h-4" /> 批量删除
-              </button>
-              <button
+                批量删除
+              </ActionCapsuleButton>
+              <ActionCapsuleButton
                 onClick={() => { setIsBatchMode(false); setIsBatchPanelOpen(false); }}
-                className="flex items-center gap-2 px-4 py-2 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl text-sm font-medium transition-colors"
+                variant="neutral"
+                icon={<X className="w-4 h-4" />}
               >
-                <X className="w-4 h-4" /> 关闭
-              </button>
+                关闭
+              </ActionCapsuleButton>
             </div>
           </div>
         )}
@@ -1747,7 +1637,7 @@ export default function ArchivePage() {
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-[#64748B]">共 <strong className="text-[#162033]">{filteredArchives.length}</strong> 条，第 <strong className="text-[#162033]">{currentPage}</strong>/<strong className="text-[#162033]">{totalPages || 1}</strong> 页</span>
+            <span className="text-sm text-[#64748B]">共 <strong className="text-[#162033]">{archiveTotal}</strong> 条，第 <strong className="text-[#162033]">{currentPage}</strong>/<strong className="text-[#162033]">{totalPages || 1}</strong> 页</span>
             <div className="flex items-center gap-1 ml-2">
               <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1}
                 className="p-2 hover:bg-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors">

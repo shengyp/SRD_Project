@@ -200,7 +200,7 @@ def create_app() -> FastAPI:
     from src.routes import (
         health_router, dataset_router, user_router, map_router,
         home_router, system_router, scales_router, risk_router,
-        knowledge_router, chat_router, upload_router, upload_archive_router,
+        knowledge_router, chat_router, upload_archive_router,
         models_router, auth_router,
     )
     
@@ -214,7 +214,6 @@ def create_app() -> FastAPI:
     app.include_router(risk_router)
     app.include_router(knowledge_router)
     app.include_router(chat_router)
-    app.include_router(upload_router)
     app.include_router(upload_archive_router)
     app.include_router(models_router)
     app.include_router(auth_router)

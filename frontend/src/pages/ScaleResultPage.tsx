@@ -17,6 +17,7 @@ import {
   loadScalesData,
   type ScaleDefinition,
 } from '../scales';
+import ActionCapsuleButton from '../components/ActionCapsuleButton';
 
 interface RiskInfo {
   level: string;
@@ -303,11 +304,9 @@ export default function ScaleResultPage() {
 
         {/* 操作按钮 */}
         <div className="flex items-center justify-center gap-4 print-hide">
-          <button onClick={handleBack}
-            className="flex items-center gap-2 px-6 py-3 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#162033] rounded-xl transition-colors font-medium">
-            <ArrowLeft className="w-5 h-5" />
+          <ActionCapsuleButton onClick={handleBack} variant="neutral" size="lg" icon={<ArrowLeft className="w-5 h-5" />}>
             返回任务列表
-          </button>
+          </ActionCapsuleButton>
         </div>
       </div>
     </div>

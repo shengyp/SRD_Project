@@ -1,119 +1,130 @@
-# 用户/心理档案业务：列表、详情，从 datasets/ CSV 文件读取
 from typing import Dict, List, Optional
+import aiomysql
 from src.core.constants import RISK_LEVEL_LOW, RISK_LEVEL_MEDIUM, RISK_LEVEL_HIGH
-from src.services.dataset_csv_service import DatasetCSVService
 
 
 class UserService:
-    """用户与心理档案业务，依赖 CSV 文件读取服务。"""
+    """用户与心理档案业务，仅依赖 MySQL。"""
 
     def __init__(self, mysql_pool, get_dataset_config_fn):
         self.mysql_pool = mysql_pool
         self.get_dataset_config = get_dataset_config_fn
-        self._csv_svc: Optional[DatasetCSVService] = None
-
-    def _get_csv_service(self) -> DatasetCSVService:
-        if self._csv_svc is None:
-            self._csv_svc = DatasetCSVService()
-        return self._csv_svc
 
     async def get_users(
         self,
         dataset: Optional[str] = None,
         risk_level: Optional[str] = None,
+        keyword: Optional[str] = None,
+        status: Optional[str] = None,
         page: int = 1,
         page_size: int = 20,
     ) -> dict:
-        """分页获取用户列表，从 datasets/ CSV 文件读取。
+        """分页获取用户列表，仅从 MySQL 读取。"""
+        async with self.mysql_pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute("SET NAMES utf8mb4")
+                query = """
+                    SELECT id, user_id, dataset_source, post_count, risk_value, import_timestamp,
+                           risk_level, status, has_timestamp, has_emojis
+                    FROM psychological_archives
+                    WHERE 1=1
+                """
+                count_query = "SELECT COUNT(*) AS cnt FROM psychological_archives WHERE 1=1"
+                params = []
+                if dataset:
+                    query += " AND dataset_source = %s"
+                    count_query += " AND dataset_source = %s"
+                    params.append(dataset)
+                if risk_level:
+                    query += " AND risk_level = %s"
+                    count_query += " AND risk_level = %s"
+                    params.append(risk_level)
+                if keyword:
+                    query += " AND user_id LIKE %s"
+                    count_query += " AND user_id LIKE %s"
+                    params.append(f"%{keyword}%")
+                if status:
+                    query += " AND status = %s"
+                    count_query += " AND status = %s"
+                    params.append(status)
 
-        数据从 datasets/ 目录下的 CSV 文件聚合，按数据集、风险等级筛选。
-        """
-        csv_svc = self._get_csv_service()
-        archives, total = csv_svc.get_archives_page(
-            dataset_key=dataset,
-            risk_level=risk_level,
-            page=page,
-            page_size=page_size,
-        )
+                await cursor.execute(count_query, params)
+                count_row = await cursor.fetchone()
+                total = count_row["cnt"] if count_row else 0
+                if total:
+                    query += " ORDER BY import_timestamp DESC, id DESC LIMIT %s OFFSET %s"
+                    await cursor.execute(query, params + [page_size, (page - 1) * page_size])
+                    rows = await cursor.fetchall()
+                    archives = []
+                    for a in rows:
+                        archives.append({
+                            "id": a["user_id"],
+                            "userId": a["user_id"],
+                            "datasetSource": a["dataset_source"],
+                            "postCount": a["post_count"],
+                            "riskValue": a["risk_value"],
+                            "riskLevel": a["risk_level"],
+                            "riskScore": 0.9 if a["risk_level"] == RISK_LEVEL_HIGH else 0.6 if a["risk_level"] == RISK_LEVEL_MEDIUM else 0.1,
+                            "importTime": a["import_timestamp"].isoformat() if a["import_timestamp"] else "",
+                            "status": a["status"],
+                            "hasTimestamp": bool(a["has_timestamp"]),
+                            "hasEmojis": bool(a["has_emojis"]),
+                        })
+                    return {
+                        "archives": archives,
+                        "total": total,
+                        "page": page,
+                        "pageSize": page_size,
+                        "totalPages": (total + page_size - 1) // page_size,
+                    }
 
-        users = []
-        for a in archives:
-            if a.risk_value == 0:
-                risk_level_val = RISK_LEVEL_LOW
-                risk_score = 0.1
-            elif a.risk_value == 1:
-                risk_level_val = RISK_LEVEL_LOW
-                risk_score = 0.35
-            elif a.risk_value == 2:
-                risk_level_val = RISK_LEVEL_MEDIUM
-                risk_score = 0.6
-            else:
-                risk_level_val = RISK_LEVEL_HIGH
-                risk_score = 0.9
-
-            users.append({
-                "id": a.user_id[-4:] if len(a.user_id) > 4 else a.user_id,
-                "userId": a.user_id,
-                "source": a.dataset_key,
-                "postCount": a.post_count,
-                "avgLabel": float(a.risk_value),
-                "maxLabel": a.risk_value,
-                "riskLevel": risk_level_val,
-                "riskScore": risk_score,
-                "assessmentTime": a.import_timestamp or "",
-            })
-
-        return {
-            "users": users,
-            "total": total,
-            "page": page,
-            "page_size": page_size,
-        }
+        return {"archives": [], "total": 0, "page": page, "pageSize": page_size, "totalPages": 0}
 
     async def get_user_detail(self, user_hash: str) -> dict:
-        """获取单个用户心理档案详情（含帖子列表），从 CSV 文件读取。"""
-        csv_svc = self._get_csv_service()
-        posts, _ = csv_svc.get_user_posts(user_hash=user_hash, page=1, page_size=20)
+        """获取单个用户心理档案详情（含帖子列表），仅从 MySQL。"""
+        async with self.mysql_pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute("SET NAMES utf8mb4")
+                await cursor.execute(
+                    """
+                    SELECT user_id, dataset_source, post_count, risk_value, risk_level, import_timestamp
+                    FROM psychological_archives
+                    WHERE user_id = %s
+                    LIMIT 1
+                    """,
+                    (user_hash,),
+                )
+                archive = await cursor.fetchone()
+                if archive:
+                    await cursor.execute(
+                        """
+                        SELECT post_index, content, fine_risk_value, post_timestamp
+                        FROM user_posts
+                        WHERE user_id = %s
+                        ORDER BY post_index ASC
+                        LIMIT 20
+                        """,
+                        (user_hash,),
+                    )
+                    posts_rows = await cursor.fetchall()
+                    return {
+                        "userId": archive["user_id"],
+                        "source": archive["dataset_source"],
+                        "postCount": archive["post_count"],
+                        "avgLabel": float(archive["risk_value"]),
+                        "maxLabel": archive["risk_value"],
+                        "riskLevel": archive["risk_level"],
+                        "riskScore": 0.9 if archive["risk_level"] == RISK_LEVEL_HIGH else 0.6 if archive["risk_level"] == RISK_LEVEL_MEDIUM else 0.1,
+                        "posts": [
+                            {
+                                "id": f"{user_hash}_{p['post_index']}",
+                                "text": (p["content"][:200] + "...") if p["content"] and len(p["content"]) > 200 else p["content"],
+                                "label": p["fine_risk_value"],
+                                "timestamp": p["post_timestamp"].isoformat(sep=" ") if p["post_timestamp"] else None,
+                            }
+                            for p in posts_rows
+                        ],
+                        "assessmentTime": archive["import_timestamp"].isoformat() if archive["import_timestamp"] else "",
+                    }
 
-        if not posts:
-            raise ValueError("用户不存在")
-
-        max_risk = max((p.risk_value for p in posts), default=0)
-        dataset_key = next((p.user_id.split('_')[0] for p in posts if '_' in p.user_id), "unknown")
-
-        if max_risk == 0:
-            risk_level_val = RISK_LEVEL_LOW
-            risk_score = 0.1
-        elif max_risk == 1:
-            risk_level_val = RISK_LEVEL_LOW
-            risk_score = 0.35
-        elif max_risk == 2:
-            risk_level_val = RISK_LEVEL_MEDIUM
-            risk_score = 0.6
-        else:
-            risk_level_val = RISK_LEVEL_HIGH
-            risk_score = 0.9
-
-        user_posts = []
-        for p in posts:
-            text = p.content
-            if len(text) > 200:
-                text = text[:200] + "..."
-            user_posts.append({
-                "id": f"{p.user_id}_{p.post_index}",
-                "text": text,
-                "label": p.risk_value,
-                "timestamp": p.timestamp,
-            })
-
-        return {
-            "userId": user_hash,
-            "source": dataset_key,
-            "postCount": len(user_posts),
-            "avgLabel": float(max_risk),
-            "maxLabel": max_risk,
-            "riskLevel": risk_level_val,
-            "riskScore": risk_score,
-            "posts": user_posts,
-            "assessmentTime": "",
-        }
+        raise ValueError("用户不存在")

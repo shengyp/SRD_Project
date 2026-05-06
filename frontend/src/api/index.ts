@@ -199,9 +199,6 @@ export interface DatasetProfile {
   color?: string;
   bgColor?: string;
   textColor?: string;
-  // CSV 路径（前端直接读取静态文件）
-  csvPath?: string;
-  emojiCsvPath?: string;
 }
 
 export async function fetchDatasets(): Promise<DatasetProfile[]> {
@@ -210,27 +207,7 @@ export async function fetchDatasets(): Promise<DatasetProfile[]> {
   return data;
 }
 
-/** 获取数据集 CSV 文件信息（元信息 + 路径） */
-export async function fetchDatasetCSVInfo(datasetKey: string): Promise<{
-  datasetKey: string;
-  displayName: string;
-  csvPath: string;
-  emojiCsvPath: string | null;
-  totalUsers: number;
-  totalPosts: number;
-  columns: string[];
-  language: string;
-  classSystem: string;
-  classCount: number;
-  fineLabels: Record<string, string>;
-  coarseRiskMapping: Record<string, string>;
-}> {
-  const endpoint = `/api/datasets/csv/${encodeURIComponent(datasetKey)}`;
-  const data = await request<any>(endpoint);
-  return data;
-}
-
-/** 获取数据集档案分页列表（从 CSV 读取） */
+/** 获取数据集档案分页列表 */
 export async function fetchCSVArchives(params: {
   datasetKey: string;
   dataset?: string;
@@ -294,7 +271,7 @@ function _mapRiskLevelToChinese(level: string): '高风险' | '中风险' | '低
   return '低风险';
 }
 
-/** 获取用户贴文列表（从 CSV 读取） */
+/** 获取用户贴文列表 */
 export async function fetchCSVPUserPosts(params: {
   datasetKey: string;
   userHash: string;
@@ -316,7 +293,7 @@ export async function fetchCSVPUserPosts(params: {
   return data;
 }
 
-/** 获取用户贴文高频词汇（从 CSV 读取） */
+/** 获取用户贴文高频词汇 */
 export async function fetchCSVUserKeywords(params: {
   datasetKey: string;
   userHash: string;
@@ -349,7 +326,7 @@ export async function fetchDatasetsCompare(): Promise<any> {
 export interface DemoArchiveRecord {
   id: string;
   userId: string;
-  dataSource: 'reddit';
+  dataSource: string;
   postCount: number;
   riskOverview: '高风险' | '中风险' | '低风险';
   importTime: string;
@@ -465,14 +442,11 @@ export interface PsychologicalArchive {
 }
 
 export interface ArchiveListResponse {
-  archives: PsychologicalArchive[];
-  stats: {
-    total: number;
-    lowRisk: number;
-    mediumRisk: number;
-    highRisk: number;
-    bySource: Record<string, number>;
-  };
+  archives: DemoArchiveRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 export async function fetchArchives(params?: {
@@ -481,17 +455,39 @@ export async function fetchArchives(params?: {
   dataset?: string;
   riskLevel?: string;
   keyword?: string;
+  status?: string;
 }): Promise<ArchiveListResponse> {
   const searchParams = new URLSearchParams();
   if (params?.page) searchParams.set('page', String(params.page));
-  if (params?.limit) searchParams.set('limit', String(params.limit));
+  if (params?.limit) searchParams.set('page_size', String(params.limit));
   if (params?.dataset) searchParams.set('dataset', params.dataset);
   if (params?.riskLevel) searchParams.set('risk_level', params.riskLevel);
   if (params?.keyword) searchParams.set('keyword', params.keyword);
+  if (params?.status) searchParams.set('status', params.status);
 
   const endpoint = `/api/users?${searchParams.toString()}`;
-  const data = await request<ArchiveListResponse>(endpoint);
-  return data;
+  const data = await request<any>(endpoint);
+  return {
+    archives: (data.archives || []).map((a: any) => ({
+      id: a.id || a.userId || '',
+      userId: a.userId || a.id || '',
+      dataSource: a.datasetSource || a.dataset_source || 'reddit',
+      postCount: a.postCount ?? a.post_count ?? 0,
+      riskOverview: _mapRiskLevelToChinese(a.riskLevel ?? a.risk_level ?? 'low'),
+      importTime: a.importTime || a.assessmentTime || a.created_at || new Date().toISOString(),
+      lastActive: a.lastActive || a.updated_at,
+      status: a.status || 'ready',
+      userStats: a.userStats || a.user_stats || { male: 0, female: 0, unknown: 1 },
+      hasTimestamp: a.hasTimestamp ?? a.has_timestamp ?? false,
+      hasEmojis: a.hasEmojis ?? a.has_emojis ?? false,
+      riskLevel: a.riskLevel ?? a.risk_level ?? 'low',
+      riskValue: a.riskValue ?? a.risk_value ?? 0,
+    })),
+    total: data.total ?? 0,
+    page: data.page ?? params?.page ?? 1,
+    pageSize: data.pageSize ?? data.page_size ?? params?.limit ?? 20,
+    totalPages: data.totalPages ?? data.total_pages ?? 0,
+  };
 }
 
 export async function fetchArchiveDetail(userHash: string): Promise<{
@@ -907,10 +903,7 @@ export interface KnowledgeDocument {
 
 export async function fetchKnowledgeTopics(): Promise<{ topics: KnowledgeTopic[]; total: number }> {
   const endpoint = '/api/knowledge/topics';
-  // 后端返回 { success, data: { topics: [...], total: N } }
-  const data = await request<{ success: boolean; data: { topics: KnowledgeTopic[]; total: number } }>(endpoint);
-  // 兼容处理：直接返回 data 对象或空对象
-  return data?.data || { topics: [], total: 0 };
+  return request<{ topics: KnowledgeTopic[]; total: number }>(endpoint);
 }
 
 export async function fetchKnowledgeSubTopics(
@@ -1021,8 +1014,8 @@ export async function updateKnowledgeDocument(
     title?: string;
     topic_id?: number | string;
     sub_topic_id?: number | string;
-    keywords?: string;
-    summary?: string;
+    keywords?: string[];
+    description?: string;
   }
 ): Promise<{ success: boolean; document?: KnowledgeDocument; message?: string }> {
   const endpoint = `/api/knowledge/documents/${docId}`;
@@ -1090,9 +1083,6 @@ export interface ChatMessage {
   role: 'user' | 'ai' | 'system';
   content: string;
   contentType?: 'text' | 'html' | 'markdown';
-  attachments?: any[];
-  hasImage?: boolean;
-  hasFile?: boolean;
   aiModel?: string;
   aiMode?: string;
   tokensUsed?: number;
@@ -1109,65 +1099,6 @@ export interface ChatMessage {
   referencesJson?: any;
   parentMessageId?: number;
   createdAt: string;
-}
-
-// ============================================================
-// 聊天附件上传 API
-// ============================================================
-
-export interface UploadResponse {
-  id: string;
-  filename: string;
-  saved_name: string;
-  url: string;
-  file_type: string;
-  size: number;
-  content_type?: string;
-}
-
-/**
- * 上传单个附件到 backend/uploads 目录
- */
-export async function uploadAttachment(file: File): Promise<UploadResponse> {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const response = await fetch('/api/chat/upload', {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.detail || `上传失败: HTTP ${response.status}`);
-  }
-
-  const result = await response.json();
-  return result.data;
-}
-
-/**
- * 批量上传多个附件
- */
-export async function uploadAttachments(files: File[]): Promise<{
-  uploaded: UploadResponse[];
-  failed: { filename: string; error: string }[];
-}> {
-  const formData = new FormData();
-  for (const file of files) {
-    formData.append('files', file);
-  }
-
-  const response = await fetch('/api/chat/upload-multiple', {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!response.ok) {
-    throw new Error(`批量上传失败: HTTP ${response.status}`);
-  }
-
-  return (await response.json()).data;
 }
 
 export async function fetchChatSessions(params?: {
@@ -1245,25 +1176,14 @@ export async function fetchChatMessages(
 export async function sendChatMessage(
   sessionId: number,
   content: string,
-  attachments?: any[],
   aiMode?: string
 ): Promise<ChatMessage> {
   const endpoint = `/api/chat/sessions/${sessionId}/messages`;
   const data = await request<ChatMessage>(endpoint, {
     method: 'POST',
-    body: JSON.stringify({ content, attachments, aiMode }),
+    body: JSON.stringify({ content, aiMode }),
   });
   return data;
-}
-
-// 附件类型（用于聊天上传）
-export interface Attachment {
-  id: string;
-  type: 'image' | 'file';
-  name: string;
-  url?: string;
-  content?: string;
-  saved_name?: string;
 }
 
 // 文档来源类型（用于 RAG 检索）
@@ -1279,7 +1199,6 @@ export async function sendChatMessageStream(
   sessionId: number,
   content: string,
   aiMode?: string,
-  attachments?: Attachment[] | undefined,
   onChunk?: (chunk: string) => void,
   onDone?: () => void,
   onError?: (err: Error) => void,
@@ -1297,7 +1216,7 @@ export async function sendChatMessageStream(
       'Cache-Control': 'no-cache',
       'X-Requested-With': 'XMLHttpRequest',
     },
-    body: JSON.stringify({ content, aiMode, attachments }),
+    body: JSON.stringify({ content, aiMode }),
   });
 
   if (!resp.ok) {
@@ -2343,7 +2262,6 @@ export const api = {
 
   // 数据集
   fetchDatasets,
-  fetchDatasetCSVInfo,
   fetchCSVArchives,
   fetchCSVPUserPosts,
   fetchCSVUserKeywords,
@@ -2398,8 +2316,6 @@ export const api = {
   fetchChatMessages,
   sendChatMessage,
   sendChatMessageStream,
-  uploadAttachment,
-  uploadAttachments,
   fetchRecommendedQuestions,
 
   // 模型中心

@@ -89,6 +89,14 @@ async def get_nearby_institutions(
     }
 
 
+@router.get("/institutions/statistics")
+async def get_institution_statistics(request: Request):
+    """获取机构统计信息"""
+    svc = _get_map_service(request)
+    data = await svc.get_statistics()
+    return {"success": True, "data": data}
+
+
 @router.get("/institutions/{institution_id}")
 async def get_institution(request: Request, institution_id: int):
     """获取机构详情"""
@@ -130,14 +138,6 @@ async def get_institution_types(request: Request):
     """获取机构类型列表"""
     svc = _get_map_service(request)
     data = await svc.get_institution_types()
-    return {"success": True, "data": data}
-
-
-@router.get("/institutions/statistics")
-async def get_institution_statistics(request: Request):
-    """获取机构统计信息"""
-    svc = _get_map_service(request)
-    data = await svc.get_statistics()
     return {"success": True, "data": data}
 
 
@@ -657,6 +657,14 @@ async def get_local_hotlines(request: Request, city: str = Query(..., descriptio
     return {"success": True, "data": data}
 
 
+@router.get("/hotlines/statistics")
+async def get_hotline_statistics(request: Request):
+    """获取热线统计信息"""
+    svc = _get_map_service(request)
+    data = await svc.get_hotline_statistics()
+    return {"success": True, "data": data}
+
+
 @router.get("/hotlines/{hotline_id}")
 async def get_hotline(request: Request, hotline_id: int):
     """获取热线详情"""
@@ -682,12 +690,4 @@ async def get_regions(request: Request):
     """获取区域列表"""
     svc = _get_map_service(request)
     data = await svc.get_regions()
-    return {"success": True, "data": data}
-
-
-@router.get("/hotlines/statistics")
-async def get_hotline_statistics(request: Request):
-    """获取热线统计信息"""
-    svc = _get_map_service(request)
-    data = await svc.get_hotline_statistics()
     return {"success": True, "data": data}

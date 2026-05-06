@@ -994,14 +994,17 @@ class KnowledgeService:
             backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
             # 规范化路径分隔符
-            normalized_path = file_path.replace("\\", "/")
+            normalized_path = file_path.replace("\\", "/").lstrip("/")
 
             # rag-skill/knowledge 路径转换
-            if "/rag-skill/knowledge/" in normalized_path:
+            if normalized_path.startswith("rag-skill/knowledge/"):
+                relative_path = normalized_path[len("rag-skill/knowledge/"):]
+                actual_path = os.path.normpath(os.path.join(backend_dir, "SuiAgent-main", "rag-skill", "knowledge", relative_path))
+            elif "/rag-skill/knowledge/" in normalized_path:
                 relative_path = normalized_path.split("/rag-skill/knowledge/")[-1]
                 actual_path = os.path.normpath(os.path.join(backend_dir, "SuiAgent-main", "rag-skill", "knowledge", relative_path))
             else:
-                actual_path = os.path.normpath(os.path.join(backend_dir, normalized_path.lstrip("/")))
+                actual_path = os.path.normpath(os.path.join(backend_dir, normalized_path))
 
             if os.path.isfile(actual_path):
                 try:

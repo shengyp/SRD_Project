@@ -7,6 +7,7 @@ import json
 import re
 import os
 import sys
+import hashlib
 import aiomysql
 
 router = APIRouter(prefix="", tags=["risk"])
@@ -164,12 +165,14 @@ async def _call_llm_for_fusion_analysis(
             http_client=http_client
         )
         
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": user_prompt})
+
         response = client.chat.completions.create(
             model=model_name,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
+            messages=messages,
             temperature=temperature,
             max_tokens=max_tokens
         )
@@ -261,6 +264,9 @@ async def _call_llm_api(
     posts: List[str],
     api_key: str,
     model_name: str = "qwen-flash",
+    base_url: Optional[str] = None,
+    system_prompt: Optional[str] = None,
+    user_prompt: Optional[str] = None,
     temperature: float = 0.7,
     max_tokens: int = 2048
 ) -> dict:
@@ -277,7 +283,8 @@ async def _call_llm_api(
     Returns:
         包含检测结果的字典
     """
-    system_prompt = """你是一位专业的心理健康评估专家，专注于自杀风险检测。
+    if system_prompt is None:
+        system_prompt = """你是一位专业的心理健康评估专家，专注于自杀风险检测。
 你的任务是分析用户的社交媒体帖子内容，评估其自杀风险水平。
 
 【重要原则】
@@ -289,8 +296,9 @@ async def _call_llm_api(
 请以 JSON 格式输出评估结果。"""
 
     posts_text = "\n".join([f"- {p}" for p in posts[:20]])
-    
-    user_prompt = f"""请分析以下用户的社交媒体帖子内容，进行自杀风险检测：
+
+    if user_prompt is None:
+        user_prompt = f"""请分析以下用户的社交媒体帖子内容，进行自杀风险检测：
 
 【用户近期贴文】（共{len(posts)}条）:
 {posts_text}
@@ -311,8 +319,8 @@ async def _call_llm_api(
         import httpx
         from openai import OpenAI
 
-        # 使用环境变量中的 base URL
-        base_url = _get_llm_api_base_url()
+        # 优先使用模型配置中的 base URL
+        resolved_base_url = base_url or _get_llm_api_base_url()
 
         # 创建禁用 SSL 验证的 httpx 客户端
         import ssl
@@ -324,7 +332,7 @@ async def _call_llm_api(
 
         client = OpenAI(
             api_key=api_key,
-            base_url=base_url,
+            base_url=resolved_base_url,
             http_client=http_client
         )
         
@@ -340,15 +348,8 @@ async def _call_llm_api(
         
         reply = response.choices[0].message.content.strip()
         
-        # 解析 JSON 响应
-        try:
-            json_match = re.search(r'\{[^{}]*\}', reply, re.DOTALL)
-            if json_match:
-                result_data = json.loads(json_match.group())
-            else:
-                result_data = json.loads(reply)
-        except json.JSONDecodeError:
-            # 尝试修复 JSON
+        result_data = _extract_json_object(reply)
+        if result_data is None:
             result_data = _parse_risk_response(reply)
         
         return {
@@ -577,32 +578,42 @@ async def _call_llm_for_risk_detection(
         }
 
 
-async def _get_user_posts_from_csv(user_hash: str, data_source: str) -> tuple:
-    """
-    从 CSV 获取用户贴文
-    
-    Returns:
-        (posts: List[str], total: int)
-    """
-    try:
-        # 延迟导入避免循环依赖
-        from src.services.dataset_csv_service import DatasetCSVService
-        
-        csv_svc = DatasetCSVService()
-        posts, total = csv_svc.get_user_posts(
-            user_hash=user_hash,
-            dataset_key=data_source,
-            page=1,
-            page_size=50  # 获取最多50条帖子
-        )
-        
-        # 转换为文本列表
-        post_texts = [p.content for p in posts if p.content]
-        return post_texts, total
-        
-    except Exception as e:
-        print(f"[WARNING] 从CSV获取用户帖子失败: {e}")
-        return [], 0
+def _generate_user_hash(dataset_key: str, user_id: str) -> str:
+    """生成与数据导入阶段一致的用户哈希。"""
+    raw = f"{dataset_key}_{user_id}"
+    return hashlib.md5(raw.encode()).hexdigest()[:12]
+
+
+async def _get_user_posts_from_db(pool, user_hash: str, data_source: str, page_size: int = 50) -> tuple[list[dict], int]:
+    """从 MySQL 获取用户帖子。"""
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cursor:
+            await cursor.execute("SET NAMES utf8mb4")
+            await cursor.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM user_posts up
+                INNER JOIN psychological_archives pa ON up.archive_id = pa.id
+                WHERE pa.user_id = %s AND pa.dataset_source = %s
+                """,
+                (user_hash, data_source),
+            )
+            count_row = await cursor.fetchone()
+            total = count_row["cnt"] if count_row else 0
+            await cursor.execute(
+                """
+                SELECT up.post_index, up.content, up.emoji_sequence, up.post_timestamp, up.fine_risk_value,
+                       pa.risk_level
+                FROM user_posts up
+                INNER JOIN psychological_archives pa ON up.archive_id = pa.id
+                WHERE pa.user_id = %s AND pa.dataset_source = %s
+                ORDER BY up.post_index ASC
+                LIMIT %s
+                """,
+                (user_hash, data_source, page_size),
+            )
+            rows = await cursor.fetchall()
+    return rows, total
 
 
 async def _get_model_config(pool, model_id: int) -> Optional[Dict[str, Any]]:
@@ -630,6 +641,151 @@ async def _get_template_config(pool, template_id: int) -> Optional[Dict[str, Any
                 (template_id,)
             )
             return await cursor.fetchone()
+
+
+def _to_json_text(value: Any) -> str:
+    """将模板变量统一转为可读文本。"""
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False)
+    return str(value)
+
+
+def _summarize_posts(posts: List[str], limit: int = 5, snippet_len: int = 120) -> str:
+    """生成帖文摘要与样本，供模板变量注入。"""
+    summary_lines = []
+    for idx, post in enumerate(posts[:limit], start=1):
+        clean_post = " ".join(str(post).split())
+        if len(clean_post) > snippet_len:
+            clean_post = clean_post[:snippet_len].rstrip() + "..."
+        summary_lines.append(f"[帖子{idx}] {clean_post}")
+    return "\n".join(summary_lines)
+
+
+def _build_prompt_context(posts: List[str], user_hash: str = "", data_source: str = "") -> Dict[str, Any]:
+    """为风险检测模板构建基础变量上下文。"""
+    negative_keywords = [
+        "suicide", "kill myself", "self-harm", "hopeless", "worthless", "die",
+        "depressed", "depression", "end my life", "绝望", "自杀", "轻生", "活不下去", "痛苦"
+    ]
+    emotion_keywords = [
+        "sad", "cry", "depressed", "anxious", "afraid", "angry", "lonely",
+        "难过", "焦虑", "害怕", "崩溃", "痛苦", "孤独", "绝望"
+    ]
+    joined_posts = "\n".join([f"[帖子{i + 1}] {p}" for i, p in enumerate(posts[:20])])
+    lowered_posts = "\n".join(posts).lower()
+
+    risk_keyword_count = sum(lowered_posts.count(keyword.lower()) for keyword in negative_keywords)
+    emotion_keyword_count = sum(lowered_posts.count(keyword.lower()) for keyword in emotion_keywords)
+
+    if risk_keyword_count >= 3:
+        emotion_state = "高危消极情绪"
+        emotion_intensity = "高"
+    elif emotion_keyword_count >= 3:
+        emotion_state = "明显消极情绪"
+        emotion_intensity = "中"
+    elif posts:
+        emotion_state = "轻度波动"
+        emotion_intensity = "低"
+    else:
+        emotion_state = "未知"
+        emotion_intensity = "未知"
+
+    return {
+        "user_hash": user_hash,
+        "data_source": data_source or "unknown",
+        "post_count": len(posts),
+        "posts_text": joined_posts,
+        "posts_summary": _summarize_posts(posts, limit=8, snippet_len=150),
+        "posts_sample": _summarize_posts(posts, limit=5, snippet_len=120),
+        "time_range": "近期历史贴文",
+        "risk_keyword_count": risk_keyword_count,
+        "emotion_keyword_count": emotion_keyword_count,
+        "emotion_state": emotion_state,
+        "emotion_intensity": emotion_intensity,
+        "emotion_volatility": "中",
+        "emotion_trend": "待进一步观察",
+        "emotion_alerts": "暂无结构化异常标记",
+        "negative_word_frequency": risk_keyword_count,
+        "stress_word_frequency": emotion_keyword_count,
+        "anxiety_keyword_count": emotion_keyword_count,
+        "depression_keyword_count": risk_keyword_count,
+        "primary_emotions": emotion_state,
+        "avg_sentiment_score": "-0.3" if emotion_keyword_count else "0.0",
+        "sentiment_volatility": "中",
+        "emotional_stability": "中",
+        "emotion_pattern": "存在负性表达",
+        "negative_expression_frequency": risk_keyword_count,
+        "stress_keyword_count": emotion_keyword_count,
+        "fea_risk_level": "unknown",
+        "fea_risk_score": "",
+        "fea_confidence": "",
+        "fea_risk_features": "",
+        "phq9_score": "",
+        "gad7_score": "",
+        "sas_score": "",
+        "sds_score": "",
+    }
+
+
+def _render_prompt_template(template_content: str, context: Dict[str, Any]) -> str:
+    """同时兼容 {var} 和 {{var}} 占位符。"""
+    rendered = template_content or ""
+    for key, value in context.items():
+        text = _to_json_text(value)
+        rendered = rendered.replace(f"{{{{{key}}}}}", text)
+        rendered = rendered.replace(f"{{{key}}}", text)
+
+    # 将剩余未替换变量清空，避免原样传给模型。
+    rendered = re.sub(r"\{\{\s*[\w_]+\s*\}\}", "", rendered)
+    rendered = re.sub(r"\{[\w_]+\}", "", rendered)
+    return rendered.strip()
+
+
+def _extract_json_object(text: str) -> Optional[Dict[str, Any]]:
+    """从模型回复中提取首个完整 JSON 对象，兼容嵌套结构。"""
+    if not text:
+        return None
+
+    stripped = text.strip()
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError:
+        pass
+
+    start = stripped.find("{")
+    if start < 0:
+        return None
+
+    depth = 0
+    in_string = False
+    escape = False
+    for idx in range(start, len(stripped)):
+        ch = stripped[idx]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                candidate = stripped[start:idx + 1]
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError:
+                    return None
+
+    return None
 
 
 # ========================
@@ -857,17 +1013,10 @@ async def create_risk_task(task: RiskTaskCreate = Body(...), request: Request = 
     post_count = 0
     if user_hash and data_source:
         try:
-            from src.services.dataset_csv_service import DatasetCSVService
-            csv_svc = DatasetCSVService()
-            csv_posts, _ = csv_svc.get_user_posts(
-                user_hash=user_hash,
-                dataset_key=data_source,
-                page=1,
-                page_size=50
-            )
-            post_count = len([p for p in csv_posts if p.content])
+            db_posts, _ = await _get_user_posts_from_db(pool, user_hash=user_hash, data_source=data_source, page_size=50)
+            post_count = len([p for p in db_posts if p.get("content")])
         except Exception as e:
-            print(f"[WARNING] 从CSV获取帖子失败: {e}")
+            print(f"[WARNING] 从数据库获取帖子失败: {e}")
     
     # 2. 获取模型配置（仅用于记录到 detection_configs，供 execute 使用）
     model_type = "api"  # 默认类型
@@ -1277,7 +1426,7 @@ async def _execute_api_task(pool, task: dict, app_state: Any = None) -> dict:
         raise ValueError(f"无法获取用户 {user_hash} 的数据")
 
     posts = user_data["posts"]
-    posts_text = "\n".join([f"[帖子{i+1}] {p}" for i, p in enumerate(posts[:20])])
+    prompt_context = _build_prompt_context(posts, user_hash=user_hash, data_source=data_source)
 
     # 获取模型配置
     model_config = None
@@ -1323,20 +1472,31 @@ async def _execute_api_task(pool, task: dict, app_state: Any = None) -> dict:
   "summary": "简要总结"
 }"""
 
-    # 填充提示词
-    prompt = template_content.replace("{posts_text}", posts_text)
+    # 填充提示词。若用户选了模板，则只使用模板本身，不再叠加固定系统提示词。
+    prompt = _render_prompt_template(template_content, prompt_context)
+    has_custom_template = bool(prompt_template_id and template_content)
+    if has_custom_template:
+        system_prompt = ""
+        user_prompt = prompt
+    else:
+        system_prompt = "你是一位专业的心理健康评估专家，专注于自杀风险检测。请严格按照用户提供的模板和输出格式完成评估。"
+        user_prompt = prompt
 
     # 调用 LLM
     try:
-        api_key = _get_llm_api_key()
+        api_key = model_config.get("api_key") or _get_llm_api_key()
         model_name = model_config.get("model_code", "qwen-flash")
+        base_url = model_config.get("api_base_url") or _get_llm_api_base_url()
         temperature = model_config.get("temperature", 0.7)
-        
+
         # 直接调用 _call_llm_api
         response = await _call_llm_api(
             posts=posts,
             api_key=api_key,
             model_name=model_name,
+            base_url=base_url,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
             temperature=temperature,
             max_tokens=2048
         )
@@ -1372,7 +1532,7 @@ async def _execute_ollama_task(pool, task: dict) -> dict:
         raise ValueError(f"无法获取用户 {user_hash} 的数据")
 
     posts = user_data["posts"]
-    posts_text = "\n".join([f"[帖子{i+1}] {p}" for i, p in enumerate(posts[:20])])
+    prompt_context = _build_prompt_context(posts, user_hash=user_hash, data_source=data_source)
 
     # 获取 Ollama 模型配置（优先使用任务指定的模型）
     model_config = None
@@ -1412,9 +1572,10 @@ async def _execute_ollama_task(pool, task: dict) -> dict:
 
     # 构建提示词
     if template_content:
-        prompt = template_content.replace("{posts_text}", posts_text)
+        prompt = _render_prompt_template(template_content, prompt_context)
     else:
         # Ollama 本地模型使用更简洁的提示词
+        posts_text = prompt_context["posts_text"]
         prompt = f"""分析以下帖子的自杀风险。只输出JSON，不要其他内容。
 帖子：{posts_text}
 
@@ -1505,16 +1666,10 @@ async def _execute_ollama_task(pool, task: dict) -> dict:
 
 async def _get_user_data_for_api(user_hash: str, data_source: str, pool) -> Optional[dict]:
     """获取用户数据用于 API 模型检测"""
-    # 直接从 CSV 数据获取
-    if data_source == "reddit":
-        from src.services.dataset_csv_service import DatasetCSVService
-        csv_svc = DatasetCSVService()
-        posts, total = csv_svc.get_user_posts(user_hash=user_hash, dataset_key=data_source, page=1, page_size=50)
-        if posts:
-            # PostInfo 是 dataclass，有 content 字段
-            return {"posts": [p.content if hasattr(p, 'content') else str(p) for p in posts]}
-    
-    return None
+    rows, _ = await _get_user_posts_from_db(pool, user_hash=user_hash, data_source=data_source, page_size=50)
+    if not rows:
+        return None
+    return {"posts": [row["content"] for row in rows if row.get("content")]}
 
 
 @router.get("/api/risk/predict/{user_hash}")
@@ -1572,24 +1727,14 @@ async def _get_user_data_for_emocc(user_hash: str, data_source: str, pool) -> Op
         }
     """
     try:
-        from src.services.dataset_csv_service import DatasetCSVService
         import pickle
         from pathlib import Path
 
-        csv_svc = DatasetCSVService()
-
-        # 获取用户帖子
-        posts, _ = csv_svc.get_user_posts(
-            user_hash=user_hash,
-            dataset_key=data_source,
-            page=1,
-            page_size=50
-        )
-
-        if not posts:
+        rows, _ = await _get_user_posts_from_db(pool, user_hash=user_hash, data_source=data_source, page_size=50)
+        if not rows:
             return None
 
-        post_texts = [p.content for p in posts]
+        post_texts = [row["content"] for row in rows if row.get("content")]
 
         # 尝试加载BERT嵌入（从Emocc/data目录）
         bert_embeddings = None
@@ -1605,22 +1750,17 @@ async def _get_user_data_for_emocc(user_hash: str, data_source: str, pool) -> Op
                 # 查找该用户的嵌入
                 # 注意：user_hash是通过md5生成的
                 for item in bert_data:
-                    from src.services.dataset_csv_service import DatasetCSVService
-                    import hashlib
-                    svc = DatasetCSVService()
-                    expected_hash = svc._generate_user_hash(data_source, item['user'])
+                    expected_hash = _generate_user_hash(data_source, item['user'])
                     if expected_hash == user_hash:
                         bert_embeddings = item['embeddings']
                         break
             except Exception as e:
                 print(f"[Emocc] 加载BERT嵌入失败: {e}")
 
-        # 获取Emoji序列
         emoji_sequences = []
-
-        # 从emoji CSV中获取（从Emocc/data目录）
-        emoji_csv_path = project_root / "Emocc" / "data" / "reddit_500_emoji.csv"
-        emoji_sequences = _parse_emoji_from_csv(str(emoji_csv_path), user_hash, data_source)
+        for row in rows:
+            emoji_str = row.get("emoji_sequence") or ""
+            emoji_sequences.append([part.strip() for part in emoji_str.split(",") if part.strip()] if emoji_str else [])
 
         return {
             'user_hash': user_hash,
@@ -1635,37 +1775,6 @@ async def _get_user_data_for_emocc(user_hash: str, data_source: str, pool) -> Op
         import traceback
         traceback.print_exc()
         return None
-
-
-def _parse_emoji_from_csv(csv_path: str, user_hash: str, dataset_key: str) -> List[List[str]]:
-    """从emoji CSV中解析用户的emoji序列"""
-    import csv
-    import hashlib
-    
-    emoji_sequences = []
-    try:
-        with open(csv_path, 'r', encoding='utf-8-sig') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                # 检查User列
-                user_id = row.get('User', '')
-                expected_hash = hashlib.md5(f"{dataset_key}_{user_id}".encode()).hexdigest()[:12]
-                
-                if expected_hash == user_hash:
-                    # 获取Post列中的emoji序列
-                    emoji_str = row.get('Post', '')
-                    if emoji_str:
-                        # 假设emoji用逗号分隔
-                        emojis = [e.strip() for e in emoji_str.split(',') if e.strip()]
-                        emoji_sequences.append(emojis)
-                    else:
-                        emoji_sequences.append([])
-    except Exception as e:
-        print(f"[Emocc] 解析emoji CSV失败: {e}")
-    
-    return emoji_sequences
-
-
 async def _save_emocc_task_to_db(pool, task_data: dict) -> int:
     """保存Emocc检测任务到数据库"""
     async with pool.acquire() as conn:
@@ -1929,12 +2038,10 @@ async def create_emocc_detection_task(
     # 获取帖子数量（不执行模型，仅获取数量）
     post_count = 0
     try:
-        from src.services.dataset_csv_service import DatasetCSVService
-        csv_svc = DatasetCSVService()
-        posts, total = csv_svc.get_user_posts(user_hash=user_hash, dataset_key=data_source, page=1, page_size=50)
+        posts, total = await _get_user_posts_from_db(pool, user_hash=user_hash, data_source=data_source, page_size=50)
         post_count = total if total > 0 else len(posts) if posts else 0
     except Exception as e:
-        print(f"[Emocc Create] 获取帖子数量失败: {e}")
+        print(f"[Emocc Create] 从数据库获取帖子数量失败: {e}")
         return {"success": False, "error": f"无法获取用户数据: {str(e)}"}
     
     if post_count == 0:

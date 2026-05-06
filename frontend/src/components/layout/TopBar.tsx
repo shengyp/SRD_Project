@@ -473,18 +473,16 @@ export default function TopBar({ isCollapsed, setIsCollapsed }: TopBarProps) {
 
   const headerContent = (
     <>
-      <header className="flex items-center justify-between px-6 py-3 sticky top-0 z-20" style={{
-        background: 'rgba(250,252,255,.88)',
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-[#E2E8F0] bg-white/92 px-6 py-3" style={{
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        borderBottom: '1px solid rgba(245,217,192,.6)'
       }}>
         <div className="flex items-center gap-4">
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="p-2 rounded-lg transition-colors cursor-pointer"
             style={{ color: '#6B7A90' }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(242,147,90,.1)'}
+            onMouseEnter={(e) => e.currentTarget.style.background = '#EEF4FF'}
             onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
           >
             <Menu className="w-5 h-5" />

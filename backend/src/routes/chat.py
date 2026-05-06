@@ -15,22 +15,8 @@ from collections import OrderedDict
 current_dir = os.path.dirname(os.path.abspath(__file__))
 _backend_root = os.path.dirname(os.path.dirname(current_dir))
 _sui_agent_root = os.path.join(_backend_root, "SuiAgent-main")
-_uploads_dir = os.path.join(_backend_root, "uploads")
 sys.path.insert(0, _sui_agent_root)
 from agent import SuicideAgent
-
-# 导入附件服务（仅用于文件上传，解析由 LLM 原生处理）
-_service_dir = os.path.dirname(os.path.abspath(__file__))  # backend/src/routes/
-_src_dir = os.path.dirname(_service_dir)                    # backend/src/
-_backend_root = os.path.dirname(_src_dir)                   # backend/
-if _src_dir not in sys.path:
-    sys.path.insert(0, _src_dir)
-try:
-    from src.services.attachment_service import resolve_attachment_path
-except ImportError:
-    # 降级：附件功能不可用
-    def resolve_attachment_path(saved_name: str) -> Optional[str]:
-        return None
 
 router = APIRouter(prefix="", tags=["chat"])
 
@@ -197,20 +183,10 @@ class ChatMessageSend(BaseModel):
     ai_mode: Optional[str] = Field(None, alias="aiMode")
 
 
-class AttachmentInfo(BaseModel):
-    """附件信息（从前端发送的结构）"""
-    id: Optional[str] = None
-    name: Optional[str] = None
-    type: Optional[str] = None
-    url: Optional[str] = None
-    saved_name: Optional[str] = None  # 后端保存的文件名（核心字段）
-
-
 class PostSessionMessageBody(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
     content: str
-    attachments: Optional[List[AttachmentInfo]] = None
     ai_mode: Optional[str] = Field(None, alias="aiMode")
 
 
@@ -238,105 +214,24 @@ def _persisted_llm_model_name() -> str:
     return name or "deepseek-chat"
 
 
-def _resolve_attachment_file_path(saved_name: Optional[str]) -> Optional[str]:
-    """根据 saved_name 解析 uploads 目录中的完整文件路径"""
-    if not saved_name:
-        return None
-    path = os.path.join(_uploads_dir, saved_name)
-    if os.path.isfile(path):
-        return path
-    return None
-
-
-def _build_attachments_for_llm(attachments: Optional[List[AttachmentInfo]]) -> List[Dict]:
-    """
-    构建附件列表，用于直接传给 LLM 的多模态接口。
-    仅返回文件路径，文件内容由 LLM.py 读取并编码。
-    """
-    if not attachments:
-        return []
-
-    result = []
-    for att in attachments:
-        saved_name = att.saved_name
-        if not saved_name:
-            continue
-
-        file_path = _resolve_attachment_file_path(saved_name)
-        if not file_path:
-            continue
-
-        result.append({
-            "path": file_path,
-            "name": att.name or saved_name,
-            "type": att.type or "file"
-        })
-
-    return result
-
-
-def _enrich_user_content_with_attachments(user_content: str, attachments: Optional[List[AttachmentInfo]]) -> str:
-    """
-    简化版：将附件信息以提示形式添加到用户消息中。
-    注意：实际文件内容由 LLM.py 的多模态接口直接处理，这里仅添加说明文本。
-    """
-    if not attachments:
-        return user_content
-
-    attachment_descs = []
-    for att in attachments:
-        saved_name = att.saved_name
-        if not saved_name:
-            continue
-
-        file_path = _resolve_attachment_file_path(saved_name)
-        if not file_path:
-            continue
-
-        # 根据文件类型生成描述
-        ext = os.path.splitext(file_path)[1].lower()
-        if ext in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
-            desc = f"[用户上传了一张图片: {att.name or saved_name}]"
-        elif ext in [".pdf", ".doc", ".docx"]:
-            desc = f"[用户上传了一个文档: {att.name or saved_name}]"
-        elif ext in [".xls", ".xlsx"]:
-            desc = f"[用户上传了一个表格: {att.name or saved_name}]"
-        else:
-            desc = f"[用户上传了文件: {att.name or saved_name}]"
-
-        attachment_descs.append(desc)
-
-    if attachment_descs:
-        return f"{user_content}\n\n{'；'.join(attachment_descs)}"
-    return user_content
-
-
 async def _run_suicide_agent_reply(
     session_id_str: str, user_content: str, preset_intent: str,
-    attachments: Optional[List[AttachmentInfo]] = None
 ) -> str:
     """使用 Agent 池复用实例，提升响应速度。"""
-    enriched_content = _enrich_user_content_with_attachments(user_content, attachments)
-    # 构建附件列表用于传给 Agent（支持多模态）
-    attachments_for_llm = _build_attachments_for_llm(attachments)
     agent = _get_agent(session_id_str, preset_intent)
-    res = await agent.process_message(enriched_content, attachments=attachments_for_llm)
+    res = await agent.process_message(user_content)
     return res["LLM_ans"]
 
 
 async def _stream_suicide_agent_reply(
     session_id_str: str, user_content: str, preset_intent: str,
-    attachments: Optional[List[AttachmentInfo]] = None
 ) -> AsyncIterator[str]:
     """流式调用 Agent，实时 yield LLM 输出片段（支持 SSE）。"""
-    enriched_content = _enrich_user_content_with_attachments(user_content, attachments)
-    # 构建附件列表用于传给 Agent（支持多模态）
-    attachments_for_llm = _build_attachments_for_llm(attachments)
     try:
         agent = _get_agent(session_id_str, preset_intent)
         print(f"[_stream_suicide_agent_reply] 开始流式处理会话 {session_id_str}")
         chunk_count = 0
-        async for chunk in agent.stream_process_message(enriched_content, attachments=attachments_for_llm):
+        async for chunk in agent.stream_process_message(user_content):
             chunk_count += 1
             yield chunk
         print(f"[_stream_suicide_agent_reply] 流式处理完成，共 {chunk_count} 个 chunk")
@@ -356,9 +251,6 @@ def _msg_row_to_response(row: dict) -> dict:
         "role": row.get("role"),
         "content": row.get("content"),
         "contentType": row.get("content_type"),
-        "attachments": row.get("attachments"),
-        "hasImage": row.get("has_image"),
-        "hasFile": row.get("has_file"),
         "aiModel": row.get("ai_model"),
         "aiMode": row.get("ai_mode"),
         "tokensUsed": row.get("tokens_used"),
@@ -712,13 +604,14 @@ async def post_session_message_stream(
         full_response = ""
         rag_sources_data = []
         rag_evidence_data = []
+        mind_map_data = None
         context_sources_data = []
         references_json = None
         chunk_count = 0
         print(f"[event_generator] 开始处理会话 {session_int}")
         try:
             async for chunk in _stream_suicide_agent_reply(
-                str(session_int), content, preset_intent, attachments=body.attachments
+                str(session_int), content, preset_intent
             ):
                 chunk_count += 1
                 if not isinstance(chunk, str):
@@ -746,8 +639,9 @@ async def post_session_message_stream(
                     print(f"[event_generator] 收到 rag_sources 事件，来源数: {len(sources)}")
                     yield f"data: {json.dumps({'type': 'rag_sources', 'sources': sources}, ensure_ascii=False)}\n\n".encode("utf-8")
                 elif event_type == "mind_map":
+                    mind_map_data = parsed.get("mindMap")
                     print(f"[event_generator] 收到 mind_map 事件")
-                    yield f"data: {json.dumps({'type': 'mind_map', 'mindMap': parsed.get('mindMap')}, ensure_ascii=False)}\n\n".encode("utf-8")
+                    yield f"data: {json.dumps({'type': 'mind_map', 'mindMap': mind_map_data}, ensure_ascii=False)}\n\n".encode("utf-8")
                 elif event_type == "rag_evidence":
                     evidence = parsed.get("evidence", [])
                     rag_evidence_data = evidence
@@ -790,7 +684,11 @@ async def post_session_message_stream(
                     "error_message": error_msg,
                     "references_json": references_json,
                     "retrieval_sources": rag_sources_data if rag_sources_data else None,
-                    "rag_context": json.dumps(rag_evidence_data, ensure_ascii=False) if rag_evidence_data else None,
+                    "rag_context": {
+                        "evidence": rag_evidence_data,
+                        "mindMap": mind_map_data,
+                        "contextSources": context_sources_data,
+                    } if (rag_evidence_data or mind_map_data or context_sources_data) else None,
                 }
                 await chat_svc.create_message(assistant_msg_data)
                 await chat_svc.update_session(session_int, {"status": "active"}, message_count_delta=2)
@@ -825,7 +723,11 @@ async def post_session_message_stream(
             "ai_mode": ai_mode,
             "references_json": references_json,
             "retrieval_sources": retrieval_sources,
-            "rag_context": json.dumps(rag_evidence_data, ensure_ascii=False) if rag_evidence_data else None,
+            "rag_context": {
+                "evidence": rag_evidence_data,
+                "mindMap": mind_map_data,
+                "contextSources": context_sources_data,
+            } if (rag_evidence_data or mind_map_data or context_sources_data) else None,
         }
         await chat_svc.create_message(assistant_msg_data)
         await chat_svc.update_session(session_int, {"status": "active"}, message_count_delta=2)
@@ -879,7 +781,7 @@ async def post_session_message(
 
     try:
         assistant_content = await _run_suicide_agent_reply(
-            str(session_int), content, preset_intent, attachments=body.attachments
+            str(session_int), content, preset_intent
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"消息处理失败：{str(e)}")

@@ -162,6 +162,13 @@ function getCityMaxRadius(city: string): number {
   return CITY_MAX_RADIUS_METERS[city] || 220000;
 }
 
+function getReasonableSortRadiusMeters(selectedCity: string, hasLocation: boolean): number {
+  if (selectedCity) {
+    return Math.min(getCityMaxRadius(selectedCity), 50000);
+  }
+  return hasLocation ? 50000 : Infinity;
+}
+
 // 加载高德地图 SDK（带重试机制）
 let amapScriptLoaded = false;
 let amapLoadPromise: Promise<void> | null = null;
@@ -458,6 +465,7 @@ export default function MapPage() {
   const userMarkerRef = useRef<any>(null);
   const effectiveLocation = selectedCity ? getCityCenter(selectedCity, cityCoords) : userLocation;
   const distanceLabel = selectedCity ? `距${selectedCity}中心约` : '距离您约';
+  const locationDisplayText = userAddress || userCity || '点击定位获取当前位置';
 
   // ==================== 计算属性 ====================
   const filteredInstitutions = (() => {
@@ -502,7 +510,17 @@ export default function MapPage() {
     if (sortBy === 'distance' && loc) {
       mappedList = [...mappedList].sort((a, b) => (a._distance ?? Infinity) - (b._distance ?? Infinity));
     } else if (sortBy === 'rating') {
-      mappedList = [...mappedList].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+      const reasonableRadius = getReasonableSortRadiusMeters(selectedCity, Boolean(loc));
+      mappedList = [...mappedList].sort((a, b) => {
+        const aInRange = (a._distance ?? Infinity) <= reasonableRadius ? 1 : 0;
+        const bInRange = (b._distance ?? Infinity) <= reasonableRadius ? 1 : 0;
+        if (aInRange !== bInRange) return bInRange - aInRange;
+
+        const ratingDelta = (b.rating ?? 0) - (a.rating ?? 0);
+        if (ratingDelta !== 0) return ratingDelta;
+
+        return (a._distance ?? Infinity) - (b._distance ?? Infinity);
+      });
     } else if (sortBy === 'comprehensive') {
       mappedList = [...mappedList].sort((a, b) => {
         const sA = (a.rating ?? 3) * 1000 - (a._distance ?? 99999);
@@ -1129,14 +1147,6 @@ export default function MapPage() {
     }
   }, []);
 
-  // 监听城市变化，自动重新获取机构数据和热线
-  useEffect(() => {
-    if (initRef.current && selectedCity !== undefined) {
-      fetchInstitutions(selectedCity);
-      fetchHotlines(selectedCity);
-    }
-  }, [selectedCity]);
-
   // 当筛选条件变化时更新地图标记
   useEffect(() => {
     updateMapMarkers(filteredInstitutions);
@@ -1256,7 +1266,7 @@ export default function MapPage() {
             <div className="p-4 border-b border-[#E2E8F0] bg-gradient-to-r from-[#F7FAFD] to-white">
               <div className="flex items-center gap-2 text-[#64748B] text-xs mb-3">
                 <Locate className="w-3.5 h-3.5 shrink-0 text-[#2F6BFF]" />
-                <span className="truncate">{userAddress || userCity || '点击定位获取当前位置'}</span>
+                <span className="truncate">{locationDisplayText}</span>
               </div>
               <button
                 onClick={handleLocate}

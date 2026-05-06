@@ -1,0 +1,337 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - generic [ref=e6] [cursor=pointer]:
+      - generic [ref=e7]:
+        - img [ref=e8]
+        - img [ref=e11]
+      - generic [ref=e14]: VIS4SRD
+    - navigation [ref=e15]:
+      - button "首页" [ref=e16] [cursor=pointer]:
+        - img [ref=e18]
+        - generic [ref=e21]: 首页
+      - button "模型中心" [ref=e22] [cursor=pointer]:
+        - img [ref=e24]
+        - generic [ref=e27]: 模型中心
+      - button "知识库" [ref=e28] [cursor=pointer]:
+        - img [ref=e30]
+        - generic [ref=e33]: 知识库
+      - button "智能问答" [ref=e34] [cursor=pointer]:
+        - img [ref=e37]
+        - generic [ref=e39]: 智能问答
+      - button "心理档案" [ref=e40] [cursor=pointer]:
+        - img [ref=e42]
+        - generic [ref=e46]: 心理档案
+      - button "心理量表" [ref=e47] [cursor=pointer]:
+        - img [ref=e49]
+        - generic [ref=e52]: 心理量表
+      - button "自杀风险检测" [ref=e53] [cursor=pointer]:
+        - img [ref=e55]
+        - generic [ref=e58]: 自杀风险检测
+      - button "心理援助地图" [ref=e59] [cursor=pointer]:
+        - img [ref=e61]
+        - generic [ref=e64]: 心理援助地图
+    - generic [ref=e66]:
+      - generic [ref=e67]: 心
+      - generic [ref=e68]:
+        - paragraph [ref=e69]: 系统在线
+        - paragraph [ref=e70]: 风险识别与证据推理已就绪
+    - generic [ref=e72]: Demo Paper · 风险检测研究系统 v1.0
+  - generic [ref=e73]:
+    - banner [ref=e74]:
+      - generic [ref=e75]:
+        - button [ref=e76] [cursor=pointer]:
+          - img [ref=e77]
+        - generic [ref=e78]:
+          - generic [ref=e80] [cursor=pointer]: 智能问答
+          - img [ref=e81]
+          - generic [ref=e83]: 心灵守护助手
+      - button "Demo" [ref=e86] [cursor=pointer]:
+        - img [ref=e88]
+        - generic [ref=e92]: Demo
+    - main [ref=e93]:
+      - generic [ref=e95]:
+        - complementary [ref=e96]:
+          - generic [ref=e97]:
+            - generic [ref=e98]:
+              - generic [ref=e99]:
+                - generic [ref=e100]: VIS4SRD Chat
+                - generic [ref=e101]: 风险研判与知识推理会话
+              - button "收起会话侧栏" [ref=e102] [cursor=pointer]:
+                - img [ref=e103]
+            - button "开启新对话" [ref=e105] [cursor=pointer]:
+              - img [ref=e106]
+              - generic [ref=e107]: 开启新对话
+          - generic [ref=e151]:
+            - generic [ref=e152]: 今天
+            - button "请用一句话回复：收到。 请用一句话回复：收到。 深度思考 条消息" [ref=e154] [cursor=pointer]:
+              - img [ref=e156]
+              - generic [ref=e159]:
+                - generic [ref=e160]: 请用一句话回复：收到。
+                - generic [ref=e161]: 请用一句话回复：收到。
+                - generic [ref=e162]:
+                  - generic [ref=e163]: 深度思考
+                  - generic [ref=e165]: 条消息
+              - button "更多操作" [ref=e167]:
+                - img [ref=e168]
+        - generic [ref=e109]:
+          - generic [ref=e110]:
+            - generic [ref=e111]:
+              - generic [ref=e112]:
+                - generic [ref=e113]: 请用一句话回复：收到。
+                - generic [ref=e114]: 请用一句话回复：收到。
+              - generic [ref=e116]: "会话 #1"
+            - generic [ref=e117]: 2026-05-05 14:30
+            - generic [ref=e172]:
+              - generic [ref=e174]: 请用一句话回复：收到。
+              - generic [ref=e175]:
+                - generic [ref=e176]:
+                  - generic [ref=e177]:
+                    - img [ref=e178]
+                    - text: 深度思考
+                  - generic [ref=e181]: (用时4.28秒)
+                - paragraph [ref=e183]: 收到，感谢你的回应，我会在这里陪着你。
+                - generic [ref=e185]:
+                  - generic [ref=e186]:
+                    - img [ref=e188]
+                    - text: 参考资料
+                  - generic [ref=e191]: "2"
+                  - generic [ref=e192]: 百
+                  - generic [ref=e193]: 馆
+                - generic [ref=e194]:
+                  - button "知识清单" [ref=e195] [cursor=pointer]:
+                    - img [ref=e196]
+                    - text: 知识清单
+                  - button "第一期仅做展示" [ref=e200] [cursor=pointer]:
+                    - img [ref=e201]
+                  - button [ref=e205] [cursor=pointer]:
+                    - img [ref=e206]
+                  - button [ref=e209] [cursor=pointer]:
+                    - img [ref=e210]
+                  - button "第一期仅做展示" [ref=e215] [cursor=pointer]:
+                    - img [ref=e216]
+                  - button [ref=e220] [cursor=pointer]:
+                    - img [ref=e221]
+                  - button [ref=e223] [cursor=pointer]:
+                    - img [ref=e224]
+                - generic [ref=e226]:
+                  - button "这段对话里最需要立即核实的危险细节是什么？" [ref=e227] [cursor=pointer]:
+                    - generic [ref=e228]: 这段对话里最需要立即核实的危险细节是什么？
+                    - img [ref=e229]
+                  - button "如果今晚只能安排一次现实干预，最优先应该做哪三步？" [ref=e231] [cursor=pointer]:
+                    - generic [ref=e232]: 如果今晚只能安排一次现实干预，最优先应该做哪三步？
+                    - img [ref=e233]
+                  - button "哪些迹象一旦出现，就必须从普通支持升级为紧急转介？" [ref=e235] [cursor=pointer]:
+                    - generic [ref=e236]: 哪些迹象一旦出现，就必须从普通支持升级为紧急转介？
+                    - img [ref=e237]
+                - generic [ref=e239]:
+                  - button "百 支持网络可用性 支持网络可用性" [ref=e240] [cursor=pointer]:
+                    - generic [ref=e241]:
+                      - generic [ref=e242]: 百
+                      - text: 支持网络可用性
+                    - generic [ref=e243]: 支持网络可用性
+                  - button "馆 干预升级路径 干预升级路径" [ref=e244] [cursor=pointer]:
+                    - generic [ref=e245]:
+                      - generic [ref=e246]: 馆
+                      - text: 干预升级路径
+                    - generic [ref=e247]: 干预升级路径
+          - generic [ref=e118]:
+            - generic [ref=e119]:
+              - textbox "请输入你的问题跟我聊聊～" [ref=e120]
+              - generic [ref=e121]:
+                - generic:
+                  - button "深度思考" [ref=e122] [cursor=pointer]
+                  - button "风险识别" [ref=e123] [cursor=pointer]
+                  - button "干预建议" [ref=e124] [cursor=pointer]
+                  - button "量表解读" [ref=e125] [cursor=pointer]
+                - generic [ref=e126]:
+                  - button "语音入口" [ref=e127] [cursor=pointer]:
+                    - img [ref=e128]
+                  - button "上传附件" [ref=e131] [cursor=pointer]:
+                    - img [ref=e132]
+                  - button [ref=e135] [cursor=pointer]:
+                    - img [ref=e136]
+            - generic [ref=e139]: 内容为AI生成，使用请注意辨别
+        - complementary [ref=e141]:
+          - generic [ref=e142]:
+            - generic [ref=e143]: 知识清单
+            - button [ref=e144] [cursor=pointer]:
+              - img [ref=e145]
+          - generic [ref=e149]:
+            - generic [ref=e248]:
+              - generic [ref=e250]: 知识清单
+              - button "结构化预览 放大节点间距，先看结构，再进完整图谱查看细节。 7 节点 知识图谱 7 个节点 请用一句话回复：收到。 请用一句话回复 收到 情绪耗竭程度 支持网络可用性 保护性因素 干预升级路径 点击查看完整图谱，当前预览已放大节点间距并隐藏冗余说明，优先保证结构可读性。 当前问题 请用一句话回复：收到。" [ref=e251] [cursor=pointer]:
+                - generic [ref=e252]:
+                  - generic [ref=e253]:
+                    - generic [ref=e254]:
+                      - generic [ref=e255]:
+                        - img [ref=e256]
+                        - text: 结构化预览
+                      - generic [ref=e261]: 放大节点间距，先看结构，再进完整图谱查看细节。
+                    - generic [ref=e262]: 7 节点
+                  - generic [ref=e264]:
+                    - generic [ref=e267]:
+                      - generic [ref=e268]: 知识图谱
+                      - generic [ref=e269]: 7 个节点
+                    - img [ref=e270]
+                    - button "请用一句话回复：收到。" [active] [ref=e279]:
+                      - generic [ref=e283]: 请用一句话回复：收到。
+                    - button "请用一句话回复" [ref=e285]:
+                      - generic [ref=e289]: 请用一句话回复
+                    - button "收到" [ref=e291]:
+                      - generic [ref=e295]: 收到
+                    - button "情绪耗竭程度" [ref=e297]:
+                      - generic [ref=e301]: 情绪耗竭程度
+                    - button "支持网络可用性" [ref=e303]:
+                      - generic [ref=e307]: 支持网络可用性
+                    - button "保护性因素" [ref=e309]:
+                      - generic [ref=e313]: 保护性因素
+                    - button "干预升级路径" [ref=e315]:
+                      - generic [ref=e319]: 干预升级路径
+                    - generic [ref=e321]: 点击查看完整图谱，当前预览已放大节点间距并隐藏冗余说明，优先保证结构可读性。
+                  - generic [ref=e322]:
+                    - generic [ref=e323]:
+                      - generic [ref=e324]:
+                        - img [ref=e325]
+                        - text: 当前问题
+                      - generic [ref=e329]: 请用一句话回复：收到。
+                    - img [ref=e331]
+              - generic [ref=e334]:
+                - generic [ref=e335]:
+                  - generic [ref=e336]: 主题
+                  - generic [ref=e337]: 知识
+                  - generic [ref=e338]: 描述
+                - generic [ref=e339]:
+                  - generic [ref=e340]: 风险判断
+                  - generic [ref=e341]: 意念强度、行动距离、情绪耗竭
+                  - generic [ref=e342]: 先把对话中的危险表达、计划细节和情绪状态拆开看，明确风险究竟停留在想法、准备还是行动边缘。
+                - generic [ref=e343]:
+                  - generic [ref=e344]: 证据依据
+                  - generic [ref=e345]: 对话片段、量表档案、家校观察
+                  - generic [ref=e346]: 把结论落回原始证据，避免只给情绪化安慰而没有依据，便于老师或辅导员后续接手。
+                - generic [ref=e347]:
+                  - generic [ref=e348]: 处置动作
+                  - generic [ref=e349]: 陪伴看护、校内协同、紧急转介
+                  - generic [ref=e350]: 根据风险层级决定是继续稳定情绪、立即联系家属辅导员，还是直接进入医疗与应急处置。
+            - generic [ref=e351]:
+              - generic [ref=e352]:
+                - img [ref=e353]
+                - text: 前置知识
+              - generic [ref=e361]:
+                - button "即时危险表达 先抓最硬的信号：是否直接说出不想活、想结束生命、想消失、像在告别，或者已经开始交代后事。" [ref=e362] [cursor=pointer]:
+                  - generic [ref=e363]: 即时危险表达
+                  - generic [ref=e364]: 先抓最硬的信号：是否直接说出不想活、想结束生命、想消失、像在告别，或者已经开始交代后事。
+                - button "情绪耗竭轨迹 系统不只看一句“想不开”，还要看绝望、空心感、持续失眠、强烈羞耻或无助是否在持续堆积。" [ref=e365] [cursor=pointer]:
+                  - generic [ref=e366]: 情绪耗竭轨迹
+                  - generic [ref=e367]: 系统不只看一句“想不开”，还要看绝望、空心感、持续失眠、强烈羞耻或无助是否在持续堆积。
+                - button "现实安全约束核验 还要确认他现在是不是独处、身边有没有危险工具、今晚有没有人陪、能不能联系到现实中的看护人。" [ref=e368] [cursor=pointer]:
+                  - generic [ref=e369]: 现实安全约束核验
+                  - generic [ref=e370]: 还要确认他现在是不是独处、身边有没有危险工具、今晚有没有人陪、能不能联系到现实中的看护人。
+            - generic [ref=e371]:
+              - generic [ref=e372]:
+                - img [ref=e373]
+                - text: 关联知识
+              - generic [ref=e381]:
+                - button "保护性因素核验 除了危险信号，也要核验还有没有牵挂家人、学业目标、求助意愿、宗教伦理或同伴支持等保护因素。" [ref=e382] [cursor=pointer]:
+                  - generic [ref=e383]: 保护性因素核验
+                  - generic [ref=e384]: 除了危险信号，也要核验还有没有牵挂家人、学业目标、求助意愿、宗教伦理或同伴支持等保护因素。
+                - button "量表与档案交叉验证 PHQ-9、GAD-7、既往危机记录和辅导档案是辅助证据，用来校正判断，而不是替代对话本身。" [ref=e385] [cursor=pointer]:
+                  - generic [ref=e386]: 量表与档案交叉验证
+                  - generic [ref=e387]: PHQ-9、GAD-7、既往危机记录和辅导档案是辅助证据，用来校正判断，而不是替代对话本身。
+                - button "校园协同响应 对高校场景来说，辅导员、班主任、宿舍同伴、家属和心理中心是否能快速联动，决定了方案能不能真正落地。" [ref=e388] [cursor=pointer]:
+                  - generic [ref=e389]: 校园协同响应
+                  - generic [ref=e390]: 对高校场景来说，辅导员、班主任、宿舍同伴、家属和心理中心是否能快速联动，决定了方案能不能真正落地。
+            - generic [ref=e391]:
+              - generic [ref=e392]:
+                - img [ref=e393]
+                - text: 深入理解
+              - generic [ref=e401]:
+                - button "风险分层与升级阈值 系统最终要把状态落到明确层级，不然老师看完回答还是不知道该不该马上找人、要不要升级。" [ref=e402] [cursor=pointer]:
+                  - generic [ref=e403]: 风险分层与升级阈值
+                  - generic [ref=e404]: 系统最终要把状态落到明确层级，不然老师看完回答还是不知道该不该马上找人、要不要升级。
+                - button "陪伴看护执行单 回答里不能只说“多陪陪他”，而要细化到谁来陪、多久复核一次、哪些话能说、哪些动作要立刻做。" [ref=e405] [cursor=pointer]:
+                  - generic [ref=e406]: 陪伴看护执行单
+                  - generic [ref=e407]: 回答里不能只说“多陪陪他”，而要细化到谁来陪、多久复核一次、哪些话能说、哪些动作要立刻做。
+                - button "紧急转介闭环 一旦出现明确计划、工具到手、拒绝保证安全、无法联系陪护人等情况，就不能停留在普通安抚层面。" [ref=e408] [cursor=pointer]:
+                  - generic [ref=e409]: 紧急转介闭环
+                  - generic [ref=e410]: 一旦出现明确计划、工具到手、拒绝保证安全、无法联系陪护人等情况，就不能停留在普通安抚层面。
+        - generic [ref=e412]:
+          - generic [ref=e413]:
+            - generic [ref=e414]:
+              - generic [ref=e415]:
+                - generic [ref=e416]:
+                  - img [ref=e417]
+                  - generic [ref=e422]: 请用一句话回复：收到。
+                - generic [ref=e423]:
+                  - generic [ref=e424]: 完整图谱视图
+                  - generic [ref=e425]: 7 个节点
+                  - generic [ref=e426]: 6 条关系
+              - button [ref=e427] [cursor=pointer]:
+                - img [ref=e428]
+            - generic [ref=e432]:
+              - generic [ref=e435]:
+                - generic [ref=e436]: 知识图谱
+                - generic [ref=e437]: 风险判断路径
+              - img [ref=e438]
+              - button "请用一句话回复：收到。 当前问题 请用一句话回复：收到。 这是当前对话的风险研判中心点。系统会把问答证据、支持资源和干预动作都挂接到这个问题上。" [ref=e447] [cursor=pointer]:
+                - generic [ref=e448]:
+                  - generic [ref=e451]: 请用一句话回复：收到。
+                  - generic [ref=e452]:
+                    - generic [ref=e453]: 当前问题
+                    - generic [ref=e454]: 请用一句话回复：收到。
+                    - generic [ref=e455]: 这是当前对话的风险研判中心点。系统会把问答证据、支持资源和干预动作都挂接到这个问题上。
+              - button "请用一句话回复 风险判断 请用一句话回复 先判断对方回应背后是否仍有高危表达，避免把表面配合误判为风险解除。" [ref=e456] [cursor=pointer]:
+                - generic [ref=e457]:
+                  - generic [ref=e460]: 请用一句话回复
+                  - generic [ref=e461]:
+                    - generic [ref=e462]: 风险判断
+                    - generic [ref=e463]: 请用一句话回复
+                    - generic [ref=e464]: 先判断对方回应背后是否仍有高危表达，避免把表面配合误判为风险解除。
+              - button "收到 风险判断 收到 继续核查这句回应是敷衍、礼貌答复，还是愿意接受现实支持的信号。" [ref=e465] [cursor=pointer]:
+                - generic [ref=e466]:
+                  - generic [ref=e469]: 收到
+                  - generic [ref=e470]:
+                    - generic [ref=e471]: 风险判断
+                    - generic [ref=e472]: 收到
+                    - generic [ref=e473]: 继续核查这句回应是敷衍、礼貌答复，还是愿意接受现实支持的信号。
+              - button "情绪耗竭程度 风险判断 情绪耗竭程度 把绝望、麻木、崩溃、失眠、强烈自责等体验串起来，看它是短时波动还是持续恶化。" [ref=e474] [cursor=pointer]:
+                - generic [ref=e475]:
+                  - generic [ref=e478]: 情绪耗竭程度
+                  - generic [ref=e479]:
+                    - generic [ref=e480]: 风险判断
+                    - generic [ref=e481]: 情绪耗竭程度
+                    - generic [ref=e482]: 把绝望、麻木、崩溃、失眠、强烈自责等体验串起来，看它是短时波动还是持续恶化。
+              - button "支持网络可用性 支持要素 支持网络可用性 确认家属、室友、辅导员、班主任等是否真实在线，能否承担持续陪伴和限制独处。" [ref=e483] [cursor=pointer]:
+                - generic [ref=e484]:
+                  - generic [ref=e487]: 支持网络可用性
+                  - generic [ref=e488]:
+                    - generic [ref=e489]: 支持要素
+                    - generic [ref=e490]: 支持网络可用性
+                    - generic [ref=e491]: 确认家属、室友、辅导员、班主任等是否真实在线，能否承担持续陪伴和限制独处。
+              - button "保护性因素 支持要素 保护性因素 除了风险信号，也要识别求生意愿、责任牵挂和主动求助，这些会影响处置级别。" [ref=e492] [cursor=pointer]:
+                - generic [ref=e493]:
+                  - generic [ref=e496]: 保护性因素
+                  - generic [ref=e497]:
+                    - generic [ref=e498]: 支持要素
+                    - generic [ref=e499]: 保护性因素
+                    - generic [ref=e500]: 除了风险信号，也要识别求生意愿、责任牵挂和主动求助，这些会影响处置级别。
+              - button "干预升级路径 干预动作 干预升级路径 把当前状态落到继续观察、重点预警、立即看护、紧急转介中的某一层，并给出执行动作。" [ref=e501] [cursor=pointer]:
+                - generic [ref=e502]:
+                  - generic [ref=e505]: 干预升级路径
+                  - generic [ref=e506]:
+                    - generic [ref=e507]: 干预动作
+                    - generic [ref=e508]: 干预升级路径
+                    - generic [ref=e509]: 把当前状态落到继续观察、重点预警、立即看护、紧急转介中的某一层，并给出执行动作。
+              - generic [ref=e510]: 围绕当前问答同步研判危险表达、行动准备、支持资源与干预升级路径，形成可执行的处置判断。
+          - generic [ref=e511]:
+            - generic [ref=e512]: 节点详情
+            - generic [ref=e513]:
+              - generic [ref=e514]:
+                - generic [ref=e515]: 当前选中
+                - generic [ref=e516]: 请用一句话回复：收到。
+                - generic [ref=e517]: 这是当前对话的风险研判中心点。系统会把问答证据、支持资源和干预动作都挂接到这个问题上。
+              - generic [ref=e518]:
+                - generic [ref=e519]: 关联证据
+                - generic [ref=e520]: 确认家属、室友、辅导员、班主任等是否真实在线，能否承担持续陪伴和限制独处。
+              - generic [ref=e521]:
+                - generic [ref=e522]: 结构摘要
+                - generic [ref=e523]: 围绕当前问答同步研判危险表达、行动准备、支持资源与干预升级路径，形成可执行的处置判断。

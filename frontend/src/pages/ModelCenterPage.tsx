@@ -11,7 +11,104 @@ import {
   createModel, updateModel, deleteModel, updateModelApiKey,
   type PromptTemplate,
 } from '../api';
+import ActionCapsuleButton from '../components/ActionCapsuleButton';
 import type { UnifiedModel } from '../types';
+
+type PresetOption = {
+  value: string;
+  label: string;
+  hint?: string;
+};
+
+const COMMON_OLLAMA_VARIANTS = ['0.5b', '1.5b', '3b', '7b', '8b', '14b', '27b', '30b', '32b', '70b', 'latest'];
+
+const OLLAMA_BASE_MODEL_PRESETS: Array<{
+  value: string;
+  label: string;
+  variants: string[];
+  note?: string;
+}> = [
+  { value: 'granite4.1', label: 'granite4.1', variants: ['3b', '8b', '30b'], note: '官方页面提供 3b / 8b / 30b 三种规格。' },
+  { value: 'qwen2', label: 'qwen2', variants: ['1.5b', '7b', '72b'] },
+  { value: 'qwen2.5', label: 'qwen2.5', variants: ['0.5b', '1.5b', '3b', '7b', '14b', '32b', '72b'] },
+  { value: 'deepseek-r1', label: 'deepseek-r1', variants: ['1.5b', '7b', '8b', '14b', '32b', '70b'] },
+  { value: 'deepseek-coder', label: 'deepseek-coder', variants: ['1.3b', '6.7b', '33b', 'latest'] },
+  { value: 'llama3', label: 'llama3', variants: ['8b', '70b'] },
+];
+
+const API_MODEL_ID_PRESETS: Record<string, PresetOption[]> = {
+  openai: [
+    { value: 'gpt-4.1', label: 'gpt-4.1' },
+    { value: 'gpt-4.1-mini', label: 'gpt-4.1-mini' },
+    { value: 'gpt-4o-mini', label: 'gpt-4o-mini' },
+  ],
+  zhipu: [
+    { value: 'glm-4.6', label: 'glm-4.6' },
+    { value: 'glm-4.7', label: 'glm-4.7' },
+    { value: 'glm-5', label: 'glm-5' },
+    { value: 'glm-5.1', label: 'glm-5.1' },
+  ],
+  deepseek: [
+    { value: 'deepseek-chat', label: 'deepseek-chat' },
+    { value: 'deepseek-reasoner', label: 'deepseek-reasoner' },
+  ],
+  dashscope: [
+    { value: 'qwen3.6-max-preview', label: 'qwen3.6-max-preview', hint: '更强推理' },
+    { value: 'qwen3-max', label: 'qwen3-max', hint: '旗舰通用' },
+    { value: 'qwen3-max-preview', label: 'qwen3-max-preview', hint: '思考模式' },
+    { value: 'qwen3.6-plus', label: 'qwen3.6-plus', hint: '均衡版' },
+    { value: 'qwen3.5-plus', label: 'qwen3.5-plus' },
+    { value: 'qwen3.6-flash', label: 'qwen3.6-flash', hint: '更快' },
+    { value: 'qwen3.5-flash', label: 'qwen3.5-flash' },
+    { value: 'qwen-plus-latest', label: 'qwen-plus-latest' },
+    { value: 'qwen-flash', label: 'qwen-flash' },
+  ],
+  moonshot: [
+    { value: 'moonshot-v1-8k', label: 'moonshot-v1-8k' },
+    { value: 'moonshot-v1-32k', label: 'moonshot-v1-32k' },
+    { value: 'moonshot-v1-128k', label: 'moonshot-v1-128k' },
+  ],
+  google: [
+    { value: 'gemini-2.0-flash', label: 'gemini-2.0-flash' },
+    { value: 'gemini-2.5-flash', label: 'gemini-2.5-flash' },
+    { value: 'gemini-2.5-pro', label: 'gemini-2.5-pro' },
+  ],
+  hunyuan: [
+    { value: 'hunyuan-lite', label: 'hunyuan-lite' },
+    { value: 'hunyuan-standard', label: 'hunyuan-standard' },
+    { value: 'hunyuan-turbo', label: 'hunyuan-turbo' },
+  ],
+};
+
+function parseOllamaModelIdentifier(value?: string): { base: string; variant: string } {
+  const raw = String(value || '').trim();
+  const lastColonIndex = raw.lastIndexOf(':');
+  if (lastColonIndex <= 0 || lastColonIndex === raw.length - 1) {
+    return { base: raw, variant: '' };
+  }
+  return {
+    base: raw.slice(0, lastColonIndex),
+    variant: raw.slice(lastColonIndex + 1),
+  };
+}
+
+function buildOllamaModelIdentifier(base: string, variant: string): string {
+  const normalizedBase = base.trim();
+  const normalizedVariant = variant.trim();
+  if (!normalizedBase) return '';
+  return normalizedVariant ? `${normalizedBase}:${normalizedVariant}` : normalizedBase;
+}
+
+function getVariantBadge(model: UnifiedModel): string {
+  if (model.modelCategory === 'local_llm') {
+    const parsed = parseOllamaModelIdentifier(model.ollamaModelName || '');
+    return parsed.variant;
+  }
+  if (model.modelCategory === 'api') {
+    return model.modelCode || '';
+  }
+  return '';
+}
 
 // ==================== API Key 配置弹窗 ====================
 function ApiKeyConfigModal({
@@ -116,14 +213,12 @@ function ApiKeyConfigModal({
           )}
         </div>
         <div className="flex justify-end gap-3 p-5 border-t border-[#E2E8F0] bg-[#F7FAFD]">
-          <button onClick={onClose}
-            className="px-5 py-2.5 rounded-xl bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] text-sm font-medium transition-colors border border-[#E2E8F0]">
+          <ActionCapsuleButton onClick={onClose} variant="neutral" size="lg">
             取消
-          </button>
-          <button onClick={handleSubmit} disabled={saving}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-medium transition-all shadow-sm disabled:opacity-50">
+          </ActionCapsuleButton>
+          <ActionCapsuleButton onClick={handleSubmit} disabled={saving} variant="solid" size="lg">
             {saving ? '保存中...' : '确认配置'}
-          </button>
+          </ActionCapsuleButton>
         </div>
       </div>
     </div>
@@ -150,13 +245,12 @@ function ConfirmModal({
           <p className="text-sm text-[#64748B]">{message}</p>
         </div>
         <div className="flex border-t border-[#E2E8F0]">
-          <button onClick={onClose} className="flex-1 py-3 text-sm font-medium text-[#415168] hover:bg-[#F7FAFD] transition-colors border-r border-[#E2E8F0]">
+          <ActionCapsuleButton onClick={onClose} variant="neutral" className="flex-1 rounded-none border-y-0 border-l-0 border-r border-[#E2E8F0] shadow-none">
             取消
-          </button>
-          <button onClick={onConfirm} disabled={loading}
-            className="flex-1 py-3 text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors disabled:opacity-50">
+          </ActionCapsuleButton>
+          <ActionCapsuleButton onClick={onConfirm} disabled={loading} variant="solid" tone="red" className="flex-1 rounded-none border-0 shadow-none">
             {loading ? '删除中...' : confirmText}
-          </button>
+          </ActionCapsuleButton>
         </div>
       </div>
     </div>
@@ -242,7 +336,9 @@ function AddModelModal({
   const [llmDeployType] = useState<'ollama' | 'transformers'>('ollama');
   const [formData, setFormData] = useState({
     modelName: '', description: '', apiKey: '', baseUrl: '',
-    provider: '', configTemplate: '', ollamaModelName: '', modelPath: '', enabled: true,
+    provider: '', configTemplate: '', apiModelId: '',
+    ollamaModelName: '', ollamaBaseModel: '', ollamaVariant: '',
+    modelPath: '', enabled: true,
   });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -269,6 +365,9 @@ function AddModelModal({
       const inferredTemplate = m.configTemplate || inferApiTemplateKey(m.provider, m.apiBaseUrl || m.api_base_url);
       const modelCategory = m.modelCategory || m.model_category || '';
       const modelTypeValue = m.modelType || m.model_type || '';
+      const ollamaIdentifier = m.ollamaModelName || m.ollama_model_name || '';
+      const parsedOllama = parseOllamaModelIdentifier(ollamaIdentifier);
+      const apiModelId = m.modelCode || m.model_code || m.modelName || m.name || '';
       setFormData({
         modelName: m.modelName || m.name || '',
         description: m.description || '',
@@ -276,7 +375,10 @@ function AddModelModal({
         baseUrl: m.apiBaseUrl || m.api_base_url || '',
         provider: m.provider || '',
         configTemplate: inferredTemplate,
-        ollamaModelName: m.ollamaModelName || m.ollama_model_name || '',
+        apiModelId,
+        ollamaModelName: ollamaIdentifier,
+        ollamaBaseModel: parsedOllama.base,
+        ollamaVariant: parsedOllama.variant,
         modelPath: m.modelPath || m.model_path || m.modelFilePath || '',
         enabled: m.status === 'active',
       });
@@ -300,7 +402,12 @@ function AddModelModal({
         }
       }
     } else {
-      setFormData({ modelName: '', description: '', apiKey: '', baseUrl: '', provider: '', configTemplate: '', ollamaModelName: '', modelPath: '', enabled: true });
+      setFormData({
+        modelName: '', description: '', apiKey: '', baseUrl: '',
+        provider: '', configTemplate: '', apiModelId: '',
+        ollamaModelName: '', ollamaBaseModel: '', ollamaVariant: '',
+        modelPath: '', enabled: true,
+      });
       setModelType('api'); setLocalModelSubType('llm'); setDetectionModelType('emoji');
     }
     setSaveError(null);
@@ -317,8 +424,27 @@ function AddModelModal({
       ...prev,
       baseUrl: templateConfig.baseUrl,
       provider: templateConfig.provider,
+      apiModelId: prev.apiModelId || API_MODEL_ID_PRESETS[formData.configTemplate]?.[0]?.value || '',
     }));
   }, [formData.configTemplate, modelType]);
+
+  useEffect(() => {
+    if (modelType !== 'local' || localModelSubType !== 'llm') return;
+    setFormData((prev) => ({
+      ...prev,
+      ollamaModelName: buildOllamaModelIdentifier(prev.ollamaBaseModel, prev.ollamaVariant),
+    }));
+  }, [modelType, localModelSubType, formData.ollamaBaseModel, formData.ollamaVariant]);
+
+  useEffect(() => {
+    if (modelType !== 'local' || localModelSubType !== 'llm') return;
+    const matchedPreset = OLLAMA_BASE_MODEL_PRESETS.find((item) => item.value === formData.ollamaBaseModel);
+    if (!matchedPreset || formData.ollamaVariant) return;
+    setFormData((prev) => ({
+      ...prev,
+      ollamaVariant: matchedPreset.variants[0] || '',
+    }));
+  }, [modelType, localModelSubType, formData.ollamaBaseModel, formData.ollamaVariant]);
 
   if (!isOpen) return null;
 
@@ -331,18 +457,31 @@ function AddModelModal({
         isAvailable: formData.enabled, status: formData.enabled ? 'active' : 'inactive',
       };
       if (modelType === 'api') {
+        const finalApiModelId = formData.apiModelId.trim();
+        if (!finalApiModelId) {
+          setSaveError('请选择或输入实际调用的模型 ID');
+          setSaving(false);
+          return;
+        }
         Object.assign(payload, {
           modelType: 'api', modelCategory: 'api',
+          modelCode: finalApiModelId,
           apiKey: formData.apiKey, apiBaseUrl: formData.baseUrl,
           provider: formData.provider,
           configTemplate: formData.configTemplate || undefined,
         });
       } else {
         if (localModelSubType === 'llm') {
+          const finalOllamaModelName = buildOllamaModelIdentifier(formData.ollamaBaseModel, formData.ollamaVariant);
+          if (!finalOllamaModelName) {
+            setSaveError('请选择或输入 Ollama 基座模型与规格');
+            setSaving(false);
+            return;
+          }
           Object.assign(payload, {
             modelType: llmDeployType, modelCategory: 'local_llm',
             ollamaBaseUrl: 'http://localhost:11434',
-            ollamaModelName: formData.ollamaModelName,
+            ollamaModelName: finalOllamaModelName,
             description: formData.description,
           });
         } else {
@@ -387,6 +526,9 @@ function AddModelModal({
   const needsApiKeyHint = isApiModelEditing && editData?.modelCategory === 'api' && !editData?.hasApiKey;
   const isEditing = !!editData?.id;
   const selectedTemplate = formData.configTemplate ? apiTemplateConfigs[formData.configTemplate] : null;
+  const currentApiModelPresets = API_MODEL_ID_PRESETS[formData.configTemplate || formData.provider || ''] || [];
+  const selectedOllamaBasePreset = OLLAMA_BASE_MODEL_PRESETS.find((item) => item.value === formData.ollamaBaseModel);
+  const currentOllamaVariants = selectedOllamaBasePreset?.variants?.length ? selectedOllamaBasePreset.variants : COMMON_OLLAMA_VARIANTS;
   const lockApiStructure = isEditing && modelType === 'api';
   const lockModelType = isEditing;
   const lockLocalSubType = isEditing && modelType === 'local';
@@ -400,6 +542,8 @@ function AddModelModal({
     : localModelSubType === 'llm'
     ? '例如：本地 Ollama 模型，用于离线推理'
     : '例如：情绪识别检测模型，输出风险辅助特征';
+  const apiModelIdPlaceholder = selectedTemplate?.modelNameExample || '例如：qwen3.6-plus / gpt-4.1-mini';
+  const ollamaIdentifierPreview = buildOllamaModelIdentifier(formData.ollamaBaseModel, formData.ollamaVariant);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -484,6 +628,36 @@ function AddModelModal({
                   </select>
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-[#162033] mb-1.5">模型调用 ID <span className="text-red-500">*</span></label>
+                  {currentApiModelPresets.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {currentApiModelPresets.map((item) => (
+                        <button
+                          key={item.value}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, apiModelId: item.value })}
+                          className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
+                            formData.apiModelId === item.value
+                              ? 'border-[#2F6BFF] bg-[#E8F0FF] text-[#2F6BFF]'
+                              : 'border-[#DCE7F5] bg-white text-[#64748B] hover:border-[#93C5FD] hover:text-[#2F6BFF]'
+                          }`}
+                        >
+                          {item.label}
+                          {item.hint ? <span className="ml-1 text-[10px] opacity-80">{item.hint}</span> : null}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <input
+                    type="text"
+                    value={formData.apiModelId}
+                    onChange={(e) => setFormData({ ...formData, apiModelId: e.target.value })}
+                    placeholder={apiModelIdPlaceholder}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#2F6BFF] outline-none text-sm font-mono"
+                  />
+                  <p className="mt-1.5 text-xs text-[#64748B]">这里填写实际调用的模型 ID。可以点官方预设，也可以手动输入自定义版本。</p>
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-[#162033] mb-1.5">Base URL</label>
                   <input type="text" value={formData.baseUrl} readOnly={lockApiStructure} onChange={(e) => setFormData({...formData, baseUrl: e.target.value})} placeholder={selectedTemplate?.baseUrl || '例如：https://api.example.com/v1'}
                     className={`w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none text-sm ${lockApiStructure ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : 'focus:border-[#2F6BFF]'}`} />
@@ -531,10 +705,70 @@ function AddModelModal({
                 {localModelSubType === 'llm' && (
                   <div className="space-y-3 pl-3 border-l-2 border-[#DCE7F5]">
                     <div>
-                      <label className="block text-sm font-medium text-[#162033] mb-1.5">Ollama 模型名称</label>
-                      <input type="text" value={formData.ollamaModelName} onChange={(e) => setFormData({...formData, ollamaModelName: e.target.value})}
-                        placeholder="例如：qwen2:1.5b / deepseek-r1:7b / llama3:8b"
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#2F6BFF] outline-none text-sm" />
+                      <label className="block text-sm font-medium text-[#162033] mb-1.5">基座模型</label>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {OLLAMA_BASE_MODEL_PRESETS.map((item) => (
+                          <button
+                            key={item.value}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, ollamaBaseModel: item.value })}
+                            className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
+                              formData.ollamaBaseModel === item.value
+                                ? 'border-[#2F6BFF] bg-[#E8F0FF] text-[#2F6BFF]'
+                                : 'border-[#DCE7F5] bg-white text-[#64748B] hover:border-[#93C5FD] hover:text-[#2F6BFF]'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        type="text"
+                        value={formData.ollamaBaseModel}
+                        onChange={(e) => setFormData({ ...formData, ollamaBaseModel: e.target.value })}
+                        placeholder="例如：granite4.1 / qwen2.5 / deepseek-r1"
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#2F6BFF] outline-none text-sm font-mono"
+                      />
+                      {selectedOllamaBasePreset?.note && (
+                        <p className="mt-1.5 text-xs text-[#64748B]">{selectedOllamaBasePreset.note}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[#162033] mb-1.5">参数规格 / Tag</label>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {currentOllamaVariants.map((item) => (
+                          <button
+                            key={item}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, ollamaVariant: item })}
+                            className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
+                              formData.ollamaVariant === item
+                                ? 'border-[#2F6BFF] bg-[#E8F0FF] text-[#2F6BFF]'
+                                : 'border-[#DCE7F5] bg-white text-[#64748B] hover:border-[#93C5FD] hover:text-[#2F6BFF]'
+                            }`}
+                          >
+                            {item}
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        type="text"
+                        value={formData.ollamaVariant}
+                        onChange={(e) => setFormData({ ...formData, ollamaVariant: e.target.value })}
+                        placeholder="例如：3b / 8b / 30b，也可手动输入自定义 tag"
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#2F6BFF] outline-none text-sm font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[#162033] mb-1.5">生成的 Ollama 模型名</label>
+                      <input
+                        type="text"
+                        value={ollamaIdentifierPreview}
+                        readOnly
+                        placeholder="例如：granite4.1:3b"
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50 text-sm text-gray-500 font-mono"
+                      />
+                      <p className="mt-1.5 text-xs text-[#64748B]">系统会按这个名称去调用 Ollama。你可以点预设规格，也可以手动输入自定义参数 tag。</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-[#162033] mb-1.5">服务地址</label>
@@ -574,11 +808,10 @@ function AddModelModal({
           )}
         </div>
         <div className="flex justify-end gap-3 p-5 border-t border-gray-100">
-          <button onClick={onClose} className="px-5 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">取消</button>
-          <button onClick={handleSubmit} disabled={saving}
-            className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm disabled:opacity-50">
+          <ActionCapsuleButton onClick={onClose} variant="neutral">取消</ActionCapsuleButton>
+          <ActionCapsuleButton onClick={handleSubmit} disabled={saving} variant="solid">
             {saving ? '保存中...' : '确认'}
-          </button>
+          </ActionCapsuleButton>
         </div>
       </div>
     </div>
@@ -673,11 +906,10 @@ function TemplateModal({
           )}
         </div>
         <div className="flex justify-end gap-3 p-5 border-t border-gray-100">
-          <button onClick={onClose} className="px-5 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">取消</button>
-          <button onClick={handleSubmit} disabled={saving}
-            className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm disabled:opacity-50">
+          <ActionCapsuleButton onClick={onClose} variant="neutral">取消</ActionCapsuleButton>
+          <ActionCapsuleButton onClick={handleSubmit} disabled={saving} variant="solid">
             {saving ? '保存中...' : '保存'}
-          </button>
+          </ActionCapsuleButton>
         </div>
       </div>
     </div>
@@ -763,6 +995,9 @@ function ModelDetailModal({
         </div>
         <div className="p-6 space-y-4 text-sm">
           <div className="flex items-center gap-3"><span className="text-[#64748B] font-medium w-20">模型名称</span><span className="font-semibold text-[#162033]">{m.modelName}</span></div>
+          {m.modelCode && (
+            <div className="flex items-center gap-3"><span className="text-[#64748B] font-medium w-20">调用 ID</span><span className="text-[#415168] font-mono text-xs">{m.modelCode}</span></div>
+          )}
           <div className="flex items-center gap-3">
             <span className="text-[#64748B] font-medium w-20">类型</span>
             {m.modelType === 'emoji'
@@ -914,6 +1149,7 @@ export default function ModelCenterPage() {
     const m = model;
     const isBuiltin = !!m.isBuiltin;
     const apiNeedsKey = needsApiKey(m);
+    const variantBadge = getVariantBadge(m);
 
     return (
       <div className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#F7FAFD] transition-colors border-b border-[#E2E8F0] last:border-0">
@@ -931,6 +1167,11 @@ export default function ModelCenterPage() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="font-semibold text-sm text-[#162033] truncate">{m.modelName}</p>
+            {variantBadge && (
+              <span className="shrink-0 inline-flex items-center max-w-[180px] px-2 py-0.5 rounded-md text-[10px] font-medium bg-[#F3F8FF] border border-[#DCE7F5] text-[#2F6BFF] truncate">
+                {variantBadge}
+              </span>
+            )}
             {isBuiltin && (
               <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-50 border border-teal-200 text-teal-600">
                 <Shield className="w-2.5 h-2.5" />预置
@@ -945,12 +1186,13 @@ export default function ModelCenterPage() {
           <p className="text-xs text-gray-400 truncate">
             {m.provider ? `${m.provider} · ` : ''}
             {m.ollamaModelName ? `Ollama: ${m.ollamaModelName}` :
+             m.modelCode ? `模型ID: ${m.modelCode}` :
              m.modelFilePath || m.modelPath || m.modelType}
           </p>
         </div>
 
         {/* 操作按钮组 */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           {/* 可用状态 */}
           <button
             type="button"
@@ -964,27 +1206,30 @@ export default function ModelCenterPage() {
           </button>
 
           {/* 编辑 */}
-          <button type="button"
+          <ActionCapsuleButton type="button"
             onClick={() => requestAnimationFrame(() => handleEditModel(m))}
-            className="px-3 py-1.5 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-600 rounded-full text-xs font-medium border border-blue-200 transition-all flex items-center gap-1">
-            <Edit className="w-3 h-3" />
+            tone="blue"
+            tableAction
+            icon={<Edit className="w-3 h-3" />}>
             编辑
-          </button>
+          </ActionCapsuleButton>
           {/* 详情 */}
-          <button type="button"
+          <ActionCapsuleButton type="button"
             onClick={() => requestAnimationFrame(() => handleViewModel(m))}
-            className="px-3 py-1.5 bg-gradient-to-r from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-200 text-slate-600 rounded-full text-xs font-medium border border-slate-200 transition-all flex items-center gap-1">
-            <Eye className="w-3 h-3" />
+            tone="slate"
+            tableAction
+            icon={<Eye className="w-3 h-3" />}>
             详情
-          </button>
+          </ActionCapsuleButton>
           {/* 删除 */}
           {!isBuiltin && (
-            <button type="button"
+            <ActionCapsuleButton type="button"
               onClick={() => requestAnimationFrame(() => setDeleteId({ type: 'model', id: m.id }))}
-              className="px-3 py-1.5 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 text-red-500 rounded-full text-xs font-medium border border-red-200 transition-all flex items-center gap-1">
-              <Trash2 className="w-3 h-3" />
+              tone="red"
+              tableAction
+              icon={<Trash2 className="w-3 h-3" />}>
               删除
-            </button>
+            </ActionCapsuleButton>
           )}
         </div>
       </div>
@@ -1000,18 +1245,15 @@ export default function ModelCenterPage() {
         <td className="px-4 py-3.5 text-xs text-gray-400">{formatDate(template.createdAt)}</td>
         <td className="px-4 py-3.5">
           <div className="flex items-center justify-center gap-1.5">
-            <button onClick={() => handleEditTemplate(template)}
-              className="px-2.5 py-1.5 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-600 rounded-lg text-xs font-medium border border-blue-200 transition-all">
-              <Edit className="w-3.5 h-3.5 inline" />
-            </button>
-            <button onClick={() => handleViewTemplate(template)}
-              className="px-2.5 py-1.5 bg-gradient-to-r from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-200 text-slate-600 rounded-lg text-xs font-medium border border-slate-200 transition-all">
-              <Eye className="w-3.5 h-3.5 inline" />
-            </button>
-            <button onClick={() => setDeleteId({ type: 'template', id: template.id })}
-              className="px-2.5 py-1.5 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 text-red-500 rounded-lg text-xs font-medium border border-red-200 transition-all">
-              <Trash2 className="w-3.5 h-3.5 inline" />
-            </button>
+            <ActionCapsuleButton onClick={() => handleEditTemplate(template)} tone="blue" tableAction icon={<Edit className="w-3.5 h-3.5" />}>
+              编辑
+            </ActionCapsuleButton>
+            <ActionCapsuleButton onClick={() => handleViewTemplate(template)} tone="slate" tableAction icon={<Eye className="w-3.5 h-3.5" />}>
+              详情
+            </ActionCapsuleButton>
+            <ActionCapsuleButton onClick={() => setDeleteId({ type: 'template', id: template.id })} tone="red" tableAction icon={<Trash2 className="w-3.5 h-3.5" />}>
+              删除
+            </ActionCapsuleButton>
           </div>
         </td>
       </tr>
@@ -1041,10 +1283,9 @@ export default function ModelCenterPage() {
           <div className="space-y-4">
             {/* 添加工具栏 */}
             <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] p-4 flex items-center justify-between">
-              <button onClick={() => { setEditingModel(null); setShowAddModelModal(true); }}
-                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl text-sm font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm">
-                <Plus className="w-4 h-4" />添加模型
-              </button>
+              <ActionCapsuleButton onClick={() => { setEditingModel(null); setShowAddModelModal(true); }} variant="solid" size="lg" icon={<Plus className="w-4 h-4" />}>
+                添加模型
+              </ActionCapsuleButton>
               <span className="text-sm text-[#64748B]">
                 {modelsLoading ? '加载中...' : `${apiModels.length + localModels.length + detectionModels.length} 个模型`}
               </span>
@@ -1108,10 +1349,9 @@ export default function ModelCenterPage() {
           <div className="space-y-4">
             {/* 模板工具栏 */}
             <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] p-4 flex items-center justify-between">
-              <button onClick={() => { setEditingTemplate(null); setShowTemplateModal(true); }}
-                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl text-sm font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm">
-                <Plus className="w-4 h-4" />创建模板
-              </button>
+              <ActionCapsuleButton onClick={() => { setEditingTemplate(null); setShowTemplateModal(true); }} variant="solid" size="lg" icon={<Plus className="w-4 h-4" />}>
+                创建模板
+              </ActionCapsuleButton>
               <span className="text-sm text-[#64748B]">
                 {templatesLoading ? '加载中...' : `共 ${allTemplates.length} 个模板`}
               </span>

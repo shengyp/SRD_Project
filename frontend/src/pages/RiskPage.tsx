@@ -29,6 +29,7 @@ import type {
   EmoccTaskResult,
 } from '../api';
 import PaperStatCard from '../components/PaperStatCard';
+import ActionCapsuleButton from '../components/ActionCapsuleButton';
 
 // ==================== 类型定义 ====================
 
@@ -176,6 +177,7 @@ function md5(text: string): string {
   };
   return (hex(a) + hex(b) + hex(c) + hex(d)).toLowerCase();
 }
+void md5;
 
 // ==================== 常量 ====================
 
@@ -208,11 +210,10 @@ interface CreateTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreated: (task: RiskTask) => void;
-  availableUsers: { id: string; userHash: string; displayName: string; riskLevel: string; postCount: number }[];
   dataSources: { value: string; label: string }[];
 }
 
-function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSources }: CreateTaskModalProps) {
+function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTaskModalProps) {
   const [modelCategory, setModelCategory] = useState<'api' | 'local_llm' | 'emocc'>('api');
   const [taskName, setTaskName] = useState('');
   const [selectedSource, setSelectedSource] = useState('');
@@ -227,6 +228,10 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
   const [llmModels, setLlmModels] = useState<RiskPageLlmModel[]>([]);
   const [detectionModels, setDetectionModels] = useState<RiskPageLocalModel[]>([]);
   const [promptTemplates, setPromptTemplates] = useState<RiskPagePromptTemplate[]>([]);
+  const [sourceUsers, setSourceUsers] = useState<{ id: string; userHash: string; displayName: string; riskLevel: string; postCount: number }[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  const selectedSourceUsers = sourceUsers;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -247,6 +252,69 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
       }
     });
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!selectedSource) {
+      setSourceUsers([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const loadUsersBySource = async () => {
+      setLoadingUsers(true);
+      try {
+        const pageSize = 100;
+        let page = 1;
+        let totalPages = 1;
+        const users: { id: string; userHash: string; displayName: string; riskLevel: string; postCount: number }[] = [];
+
+        while (page <= totalPages) {
+          const response = await fetch(
+            `${import.meta.env.VITE_API_BASE || ''}/api/users?dataset=${encodeURIComponent(selectedSource)}&page=${page}&page_size=${pageSize}`,
+            { signal: controller.signal }
+          );
+          const result = await response.json();
+          const payload = result?.data;
+          const pageUsers = Array.isArray(payload?.users)
+            ? payload.users
+            : Array.isArray(payload?.archives)
+              ? payload.archives
+              : [];
+
+          if (page === 1) {
+            const total = Number(payload?.total || 0);
+            const currentPageSize = Number(payload?.page_size || payload?.pageSize || pageSize);
+            totalPages = Math.max(1, Math.ceil(total / currentPageSize));
+          }
+
+          users.push(
+            ...pageUsers.map((user: any) => ({
+              id: `${user.source || user.datasetSource || selectedSource}:${user.userId}`,
+              userHash: user.userId,
+              displayName: user.userId,
+              riskLevel: user.riskLevel || 'low',
+              postCount: Number(user.postCount || 0),
+            }))
+          );
+
+          page += 1;
+        }
+
+        setSourceUsers(users);
+      } catch (err) {
+        if (!(err instanceof DOMException && err.name === 'AbortError')) {
+          console.error('按数据源加载心理档案用户列表失败:', err);
+          setSourceUsers([]);
+        }
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+
+    loadUsersBySource();
+    return () => controller.abort();
+  }, [isOpen, selectedSource]);
 
   const handleCreate = async () => {
     if (!selectedUser || !selectedSource) return;
@@ -493,17 +561,20 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
             </label>
             <select
               value={selectedUser?.id ?? ''}
-              onChange={e => setSelectedUser(availableUsers.find(u => u.id === e.target.value) ?? null)}
+              onChange={e => setSelectedUser(selectedSourceUsers.find(u => u.id === e.target.value) ?? null)}
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-300 bg-white"
             >
               <option value="">请选择用户</option>
-              {availableUsers.map(u => (
+              {selectedSourceUsers.map(u => (
                 <option key={u.id} value={u.id}>
                   {u.displayName} | {RISK_LABELS[u.riskLevel] || '未知'} | {u.postCount}条帖子
                 </option>
               ))}
             </select>
-            {availableUsers.length === 0 && (
+            {loadingUsers && (
+              <p className="text-xs text-slate-500 mt-1">正在加载该数据源下的心理档案用户...</p>
+            )}
+            {!loadingUsers && selectedSource && selectedSourceUsers.length === 0 && (
               <p className="text-xs text-amber-600 mt-1">暂无可用用户，请先导入档案数据</p>
             )}
           </div>
@@ -700,18 +771,19 @@ function CreateTaskModal({ isOpen, onClose, onCreated, availableUsers, dataSourc
 
         {/* 底部按钮 */}
         <div className="flex justify-end items-center gap-3 p-5 border-t border-gray-100 bg-[#F7F9FC] shrink-0">
-          <button onClick={handleClose} className="px-5 py-2.5 bg-white hover:bg-gray-100 text-[#415168] rounded-xl transition-colors text-sm font-medium border border-gray-200">
+          <ActionCapsuleButton onClick={handleClose} variant="neutral" size="lg">
             取消
-          </button>
-          <button
+          </ActionCapsuleButton>
+          <ActionCapsuleButton
             type="button"
             onClick={(e) => { e.stopPropagation(); if (!creating && canProceed) handleCreate(); }}
             disabled={!canProceed || creating}
-            className="px-8 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm flex items-center gap-2 shadow-sm"
+            variant="solid"
+            size="lg"
+            icon={creating ? <Loader className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
           >
-            {creating ? <Loader className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
             {creating ? '创建中...' : '创建任务'}
-          </button>
+          </ActionCapsuleButton>
         </div>
       </div>
     </div>
@@ -1188,21 +1260,18 @@ function ResultPage({ task, onBack }: ResultPageProps) {
 
       {/* 操作按钮 */}
       <div className="flex items-center justify-center gap-4 pt-2">
-        <button
+        <ActionCapsuleButton
           onClick={handleGenerateReport}
           disabled={isGeneratingReport || !task.resultSummary}
-          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed text-white rounded-xl transition-all font-semibold shadow-sm">
-          {isGeneratingReport ? (
-            <Loader className="w-5 h-5 animate-spin" />
-          ) : (
-            <FileText className="w-5 h-5" />
-          )}
+          variant="solid"
+          size="lg"
+          icon={isGeneratingReport ? <Loader className="w-5 h-5 animate-spin" /> : <FileText className="w-5 h-5" />}
+        >
           {isGeneratingReport ? '生成中...' : '生成报告'}
-        </button>
-        <button onClick={() => window.location.href = '/map'} className="flex items-center gap-2 px-6 py-3 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#162033] rounded-xl transition-colors font-medium shadow-sm">
-          <TrendingUp className="w-5 h-5" />
+        </ActionCapsuleButton>
+        <ActionCapsuleButton onClick={() => window.location.href = '/map'} variant="neutral" size="lg" icon={<TrendingUp className="w-5 h-5" />}>
           查看资源
-        </button>
+        </ActionCapsuleButton>
       </div>
     </div>
   );
@@ -1228,14 +1297,12 @@ function DeleteConfirmModal({ isOpen, onClose, onConfirm, taskName }: {
           </p>
         </div>
         <div className="flex gap-3 p-4 border-t border-[#E2E8F0] bg-[#F7F9FC]">
-          <button onClick={onClose}
-            className="flex-1 px-4 py-2.5 bg-white hover:bg-gray-100 text-[#415168] rounded-xl transition-colors text-sm font-medium border border-gray-200">
+          <ActionCapsuleButton onClick={onClose} variant="neutral" className="flex-1" size="lg">
             取消
-          </button>
-          <button onClick={onConfirm}
-            className="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-colors text-sm font-medium">
+          </ActionCapsuleButton>
+          <ActionCapsuleButton onClick={onConfirm} variant="solid" tone="red" className="flex-1" size="lg">
             删除
-          </button>
+          </ActionCapsuleButton>
         </div>
       </div>
     </div>
@@ -1263,9 +1330,11 @@ export default function RiskPage() {
 
   // 数据源和配置
   const [dataSources, setDataSources] = useState<{ value: string; label: string }[]>([
-    { value: 'reddit', label: 'Reddit 数据' },
+    { value: 'reddit', label: 'Reddit系列' },
+    { value: 'bigdata', label: 'Bigdata系列' },
+    { value: 'sigir', label: 'SIGIR系列' },
+    { value: 'weibo', label: 'Weibo系列' },
   ]);
-  const [availableUsers, setAvailableUsers] = useState<{ id: string; userHash: string; displayName: string; riskLevel: string; postCount: number }[]>([]);
 
   // 加载数据
   const loadTasks = useCallback(async () => {
@@ -1412,47 +1481,6 @@ export default function RiskPage() {
         }
       } catch {}
 
-      // 加载用户列表（直接从本地 CSV 文件加载全部 500 条）
-      try {
-        const response = await fetch('/reddit_500.csv');
-        const csvText = await response.text();
-        const lines = csvText.trim().split('\n');
-        // 跳过表头，从第2行开始
-        const users = lines.slice(1).map((line) => {
-          const parts = line.split(',');
-          const userName = parts[0]?.trim() || '';
-          const label = parseInt(parts[parts.length - 1]?.trim() || '0', 10);
-          // 计算帖子数量（粗略估算：整个 Post 字段的逗号数量）
-          const postStr = line.substring(line.indexOf('"') + 1, line.lastIndexOf('"'));
-          const commaCount = (postStr.match(/,/g) || []).length;
-          const postCount = Math.max(1, Math.min(100, Math.floor(commaCount / 5)));
-
-          // 生成与后端一致的用户哈希: md5("reddit_" + userName)[:12]
-          const userHash = md5(`reddit_${userName}`).substring(0, 12);
-
-          // Label 转 riskLevel: 0->无风险, 1->极低, 2->低, 3->中, 4->高
-          let riskLevel = 'low';
-          if (label === 0) riskLevel = 'no-risk';
-          else if (label === 1) riskLevel = 'very-low';
-          else if (label === 2) riskLevel = 'low';
-          else if (label === 3) riskLevel = 'medium';
-          else if (label === 4) riskLevel = 'high';
-
-          return {
-            id: userHash,
-            userHash: userHash,
-            displayName: userName,
-            riskLevel,
-            postCount,
-          };
-        }).filter(u => u.userHash);
-
-        if (users.length > 0) {
-          setAvailableUsers(users);
-        }
-      } catch (err) {
-        console.error('加载 CSV 用户列表失败:', err);
-      }
     };
 
     init();
@@ -1720,17 +1748,15 @@ export default function RiskPage() {
             </select>
           </div>
 
-          <button onClick={() => { setFilterStatus(''); setFilterSource(''); setFilterType(''); setCurrentPage(1); }}
-            className="flex items-center gap-2 px-4 py-2 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl transition-colors text-sm font-medium">
-            <RefreshCw className="w-4 h-4" /> 重置
-          </button>
+          <ActionCapsuleButton onClick={() => { setFilterStatus(''); setFilterSource(''); setFilterType(''); setCurrentPage(1); }} variant="neutral" icon={<RefreshCw className="w-4 h-4" />}>
+            重置
+          </ActionCapsuleButton>
 
           {/* 新建按钮 */}
           <div className="ml-auto">
-            <button onClick={() => setIsCreateModalOpen(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white rounded-xl transition-all text-sm font-medium shadow-sm">
-              <Plus className="w-4 h-4" /> 新建任务
-            </button>
+            <ActionCapsuleButton onClick={() => setIsCreateModalOpen(true)} variant="solid" size="lg" icon={<Plus className="w-4 h-4" />}>
+              新建任务
+            </ActionCapsuleButton>
           </div>
         </div>
       </div>
@@ -1823,31 +1849,36 @@ export default function RiskPage() {
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2">
                           {/* 开始执行按钮：始终显示，执行后变灰色 */}
-                          <button
+                          <ActionCapsuleButton
                             onClick={() => handleExecute(task)}
                             disabled={executingTaskId === task.id || task.status === 'completed' || task.status === 'running'}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-green-600 rounded-xl transition-all text-xs font-medium border border-green-200 disabled:border-gray-200"
-                          >
-                            {executingTaskId === task.id ? (
-                              <Loader className="w-3.5 h-3.5 animate-spin" />
+                            tone="green"
+                            tableAction
+                            icon={executingTaskId === task.id ? (
+                              <Loader className="w-4 h-4 animate-spin" />
                             ) : (
-                              <Play className="w-3.5 h-3.5" />
+                              <Play className="w-4 h-4" />
                             )}
+                          >
                             {executingTaskId === task.id ? '执行中...' : '开始执行'}
-                          </button>
-                          <button
+                          </ActionCapsuleButton>
+                          <ActionCapsuleButton
                             onClick={() => handleViewTask(task)}
                             disabled={!task.resultSummary && task.status !== 'completed'}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 disabled:from-gray-100 disabled:to-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-blue-600 rounded-xl transition-all text-xs font-medium border border-blue-200 disabled:border-gray-200"
+                            tone="blue"
+                            tableAction
+                            icon={<Eye className="w-4 h-4" />}
                           >
-                            <Eye className="w-3.5 h-3.5" /> 查看
-                          </button>
-                          <button
+                            查看
+                          </ActionCapsuleButton>
+                          <ActionCapsuleButton
                             onClick={() => setDeleteTarget(task)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 text-red-600 rounded-xl transition-all text-xs font-medium border border-red-200"
+                            tone="red"
+                            tableAction
+                            icon={<Trash2 className="w-4 h-4" />}
                           >
-                            <Trash2 className="w-3.5 h-3.5" /> 删除
-                          </button>
+                            删除
+                          </ActionCapsuleButton>
                         </div>
                       </td>
                     </tr>
@@ -1889,7 +1920,6 @@ export default function RiskPage() {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onCreated={handleTaskCreated}
-        availableUsers={availableUsers}
         dataSources={dataSources}
       />
 

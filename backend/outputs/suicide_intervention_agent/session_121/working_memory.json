@@ -1,0 +1,124 @@
+{
+  "dialogue_phase": "EXPLORING_EMOTION",
+  "risk_trajectory": [
+    {
+      "turn": 1,
+      "risk_label": "中",
+      "timestamp": 1778033888.9475024
+    }
+  ],
+  "explored_topics": [
+    "请描述一下你最近的感受和变化，哪些时刻让你觉得特别沉重？"
+  ],
+  "pending_socratic_nodes": [
+    "情绪状态细节",
+    "生活功能影响",
+    "支持系统状况"
+  ],
+  "accumulated_triples": [
+    {
+      "subject": "抑郁",
+      "predicate": "常见症状",
+      "object": "持续悲伤、焦虑或‘空虚’情绪",
+      "evidence": "Persistent sad, anxious, or “empty” mood most of the day, nearly every day, for at least 2 weeks"
+    },
+    {
+      "subject": "抑郁",
+      "predicate": "常见症状",
+      "object": "兴趣减退",
+      "evidence": "Have you lost interest in activities you used to enjoy?"
+    },
+    {
+      "subject": "抑郁",
+      "predicate": "常见症状",
+      "object": "注意力难以集中或决策困难",
+      "evidence": "Difficulty concentrating, remembering, or making decisions"
+    },
+    {
+      "subject": "抑郁",
+      "predicate": "常见症状",
+      "object": "睡眠或食欲改变",
+      "evidence": "Changes in sleep or appetite or unplanned weight changes"
+    },
+    {
+      "subject": "抑郁",
+      "predicate": "常见症状",
+      "object": "身体疼痛（无明确生理原因）",
+      "evidence": "Physical aches or pains, headaches, cramps, or digestive problems that do not have a clear physical cause and do not go away with treatment"
+    },
+    {
+      "subject": "抑郁",
+      "predicate": "危险因素",
+      "object": "反复出现自杀想法或自杀企图",
+      "evidence": "Thoughts of death or suicide or suicide attempts"
+    },
+    {
+      "subject": "抑郁",
+      "predicate": "推荐干预措施",
+      "object": "寻求专业帮助",
+      "evidence": "Have you had severe symptoms for 2 weeks or more? Seek professional help."
+    },
+    {
+      "subject": "抑郁",
+      "predicate": "推荐干预措施",
+      "object": "向亲友倾诉",
+      "evidence": "Reach out to your friends or family members who help you cope in a positive way."
+    },
+    {
+      "subject": "抑郁",
+      "predicate": "推荐干预措施",
+      "object": "主动询问自杀意图",
+      "evidence": "1. ASK: “Are you thinking about suicide?” It’s not an easy question to ask, but it can help start a conversation. Studies show that asking people if they are suicidal does not increase suicidal behavior or thoughts."
+    },
+    {
+      "subject": "抑郁",
+      "predicate": "推荐干预措施",
+      "object": "无评判倾听",
+      "evidence": "2. BE THERE: Listening without judgment is key to learning what the person is thinking and feeling. Research suggests acknowledging and talking about suicide may reduce suicidal thoughts."
+    },
+    {
+      "subject": "抑郁",
+      "predicate": "高风险表现",
+      "object": "已有明确且成熟的自我伤害计划和准备",
+      "evidence": "3.(cid:31)(cid:30)：已具有明确且成熟的自我伤害计划和准备，或曾多次尝试自杀，存在两项或更多项的风险因素。"
+    },
+    {
+      "subject": "抑郁",
+      "predicate": "高风险表现",
+      "object": "曾多次尝试自杀",
+      "evidence": "5.(cid:29)(cid:28)：多次尝试自杀，存在多项明显的风险因素。必须密切关注并及时采取行动。"
+    }
+  ],
+  "user_profile_facts": {},
+  "last_planner_plan": {
+    "retrieval_queries": [
+      {
+        "type": "knowledge",
+        "query": "抑郁症状识别",
+        "priority": 1
+      },
+      {
+        "type": "emotional_support",
+        "query": "表达共情与接纳",
+        "priority": 2
+      },
+      {
+        "type": "safety_plan",
+        "query": "中风险自杀意念应对策略",
+        "priority": 3
+      }
+    ],
+    "dialogue_strategy": {
+      "phase": "EXPLORING_EMOTION",
+      "tone": "empathic",
+      "socratic_focus": "请描述一下你最近的感受和变化，哪些时刻让你觉得特别沉重？",
+      "pending_nodes": [
+        "情绪状态细节",
+        "生活功能影响",
+        "支持系统状况"
+      ],
+      "interruption": false
+    }
+  },
+  "turn_counter": 2
+}

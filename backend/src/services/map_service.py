@@ -163,7 +163,11 @@ class MapService:
         """获取机构统计信息。"""
         total = await self.pg_pool.fetchval("SELECT COUNT(*) FROM institutions")
         with_location = await self.pg_pool.fetchval(
-            "SELECT COUNT(*) FROM institutions WHERE location IS NOT NULL"
+            """
+            SELECT COUNT(*)
+            FROM institutions
+            WHERE longitude IS NOT NULL AND latitude IS NOT NULL
+            """
         )
 
         # 按类型统计

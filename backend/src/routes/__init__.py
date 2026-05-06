@@ -11,7 +11,6 @@ from .chat import router as chat_router
 from .models import router as models_router
 from .system import router as system_router
 from .auth import router as auth_router
-from .upload import router as upload_router
 from .upload_archive import router as upload_archive_router
 
 __all__ = [
@@ -27,6 +26,5 @@ __all__ = [
     "models_router",
     "system_router",
     "auth_router",
-    "upload_router",
     "upload_archive_router",
 ]

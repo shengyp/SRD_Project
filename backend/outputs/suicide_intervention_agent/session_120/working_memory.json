@@ -1,0 +1,191 @@
+{
+  "dialogue_phase": "EXPLORING_EMOTION",
+  "risk_trajectory": [
+    {
+      "turn": 1,
+      "risk_label": "中",
+      "timestamp": 1777994665.9186637
+    },
+    {
+      "turn": 3,
+      "risk_label": "中",
+      "timestamp": 1777995030.6286173
+    }
+  ],
+  "explored_topics": [
+    "帮助你理解这些感受是否与抑郁有关，以及它们如何影响生活",
+    "帮助你更具体地描述哪些情绪让你最困扰，以及它们如何影响你的日常节奏"
+  ],
+  "pending_socratic_nodes": [
+    "情绪体验描述",
+    "日常功能变化",
+    "持续时间与频率"
+  ],
+  "accumulated_triples": [
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "持续悲伤、焦虑或‘空虚’情绪",
+      "evidence": "Persistent sad, anxious, or “empty” mood most of the day, nearly every day, for at least 2 weeks"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "兴趣丧失",
+      "evidence": "Have you lost interest in activities you used to enjoy?"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "易怒或烦躁",
+      "evidence": "Do you get easily frustrated, irritable, or angry?"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "注意力下降、记忆力减退或决策困难",
+      "evidence": "● Difficulty concentrating, remembering, or making decisions"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "睡眠或食欲改变",
+      "evidence": "● Changes in sleep or appetite or unplanned weight changes"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "体重异常变化",
+      "evidence": "● Changes in sleep or appetite or unplanned weight changes"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "身体疼痛或不适（无明确生理原因）",
+      "evidence": "● Physical aches or pains, headaches, cramps, or digestive problems that do not have a clear physical cause and do not go away with treatment"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "感到无望或无价值",
+      "evidence": "Feeling hopeless or worthless, or thinking about death or suicide"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "有死亡或自杀的念头或行为",
+      "evidence": "● Thoughts of death or suicide or suicide attempts"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "思维迟缓或言语减少",
+      "evidence": "Talking very slowly, feeling unable to find anything to say, or forgetting a lot"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "活动减慢或坐立不安",
+      "evidence": "Feeling slowed down or restless"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "睡眠需求减少",
+      "evidence": "Decreased need for sleep"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "感到悲伤、焦虑或空虚",
+      "evidence": "Do you often feel sad, anxious, worthless, or even “empty”?"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "失去对以往喜爱活动的兴趣",
+      "evidence": "Have you lost interest in activities you used to enjoy?"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "易怒、烦躁或愤怒",
+      "evidence": "Do you get easily frustrated, irritable, or angry?"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "注意力难以集中或决策困难",
+      "evidence": "Trouble concentrating or making decisions"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "睡眠模式改变（如失眠或过度睡眠）",
+      "evidence": "Have your eating or sleeping habits changed?"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "精力下降或行动迟缓",
+      "evidence": "Feeling slowed down or restless"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "说话缓慢、言语减少或遗忘频繁",
+      "evidence": "Talking very slowly, feeling unable to find anything to say, or forgetting a lot"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "食欲变化或体重异常波动",
+      "evidence": "Changes in sleep or appetite or unplanned weight changes"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "社交退缩，感觉像“冬眠”",
+      "evidence": "Social withdrawal (feeling like “hibernating”)"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "有死亡或自杀的念头",
+      "evidence": "Thinking about death or suicide"
+    },
+    {
+      "subject": "抑郁情绪",
+      "predicate": "典型表现",
+      "object": "难以维持工作职责、社交活动或人际关系",
+      "evidence": "Difficulty maintaining work responsibilities, social activities, or relationships"
+    }
+  ],
+  "user_profile_facts": {},
+  "last_planner_plan": {
+    "retrieval_queries": [
+      {
+        "type": "knowledge",
+        "query": "抑郁情绪典型表现",
+        "priority": 1
+      },
+      {
+        "type": "emotional_support",
+        "query": "情绪体验描述 情绪波动 日常功能变化",
+        "priority": 2
+      }
+    ],
+    "dialogue_strategy": {
+      "phase": "EXPLORING_EMOTION",
+      "tone": "empathic",
+      "socratic_focus": "帮助你更具体地描述哪些情绪让你最困扰，以及它们如何影响你的日常节奏",
+      "pending_nodes": [
+        "情绪体验描述",
+        "日常功能变化",
+        "持续时间与频率"
+      ],
+      "interruption": false
+    }
+  },
+  "turn_counter": 4
+}

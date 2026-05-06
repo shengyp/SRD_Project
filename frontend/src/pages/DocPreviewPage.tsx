@@ -1,16 +1,97 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, FileText, Download, Loader2, AlertCircle } from 'lucide-react';
 import { fetchDocumentPreview, fetchKnowledgeDocument, downloadKnowledgeDocument, type KnowledgeDocument } from '../api';
+import DocumentPreview from '../components/knowledge/DocumentPreview';
+
+interface HighlightRange {
+  start: number;
+  end: number;
+}
+
+function normalizeWhitespaceWithMap(text: string): { normalized: string; indexMap: number[] } {
+  let normalized = '';
+  const indexMap: number[] = [];
+  let lastWasSpace = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (/\s/.test(char)) {
+      if (!lastWasSpace && normalized.length > 0) {
+        normalized += ' ';
+        indexMap.push(i);
+        lastWasSpace = true;
+      }
+      continue;
+    }
+    normalized += char;
+    indexMap.push(i);
+    lastWasSpace = false;
+  }
+
+  if (normalized.endsWith(' ')) {
+    normalized = normalized.slice(0, -1);
+    indexMap.pop();
+  }
+
+  return { normalized, indexMap };
+}
+
+function findHighlightRange(content: string, snippet: string | null): HighlightRange | null {
+  const rawSnippet = snippet?.trim();
+  if (!content || !rawSnippet) return null;
+
+  const contentMap = normalizeWhitespaceWithMap(content);
+  const tryMatch = (candidate: string): HighlightRange | null => {
+    const trimmedCandidate = candidate.trim();
+    if (!trimmedCandidate) return null;
+
+    const directIndex = content.indexOf(trimmedCandidate);
+    if (directIndex >= 0) {
+      return { start: directIndex, end: directIndex + trimmedCandidate.length };
+    }
+
+    const snippetMap = normalizeWhitespaceWithMap(trimmedCandidate);
+    if (!snippetMap.normalized) return null;
+
+    const normalizedIndex = contentMap.normalized.indexOf(snippetMap.normalized);
+    if (normalizedIndex >= 0) {
+      const start = contentMap.indexMap[normalizedIndex];
+      const lastCharIndex = normalizedIndex + snippetMap.normalized.length - 1;
+      const end = (contentMap.indexMap[lastCharIndex] ?? start) + 1;
+      return { start, end };
+    }
+
+    return null;
+  };
+
+  const directMatch = tryMatch(rawSnippet);
+  if (directMatch) return directMatch;
+
+  const fallbackFragments = rawSnippet
+    .split(/[\n。！？!?]/)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 16 && item.length < rawSnippet.length)
+    .sort((a, b) => b.length - a.length);
+
+  for (const fragment of fallbackFragments) {
+    const fragmentRange = tryMatch(fragment);
+    if (fragmentRange) return fragmentRange;
+  }
+
+  return null;
+}
 
 export default function DocPreviewPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const docId = searchParams.get('id');
+  const snippet = searchParams.get('snippet');
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [doc, setDoc] = useState<KnowledgeDocument | null>(null);
+  const highlightRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
     if (!docId) {
@@ -30,13 +111,15 @@ export default function DocPreviewPage() {
       }
 
       try {
-        // 后端 API 支持字符串 ID（文件名）和数字 ID，统一传 docId
-        const [docData, previewData] = await Promise.all([
-          fetchKnowledgeDocument(docId),
-          fetchDocumentPreview(docId),
-        ]);
+        const docData = await fetchKnowledgeDocument(docId);
+        const format = docData.format?.toLowerCase();
 
-        // 合并文档详情和预览内容
+        if (format === 'pdf' || format === 'docx' || format === 'doc') {
+          setDoc(docData);
+          return;
+        }
+
+        const previewData = await fetchDocumentPreview(docId);
         setDoc({ ...docData, content: previewData.content } as KnowledgeDocument);
       } catch (err) {
         const msg = err instanceof Error ? err.message : '加载文档失败';
@@ -50,8 +133,34 @@ export default function DocPreviewPage() {
   }, [docId]);
 
   const handleGoBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
     navigate('/chat');
   };
+
+  const highlightRange = useMemo(() => {
+    if (!doc?.content) return null;
+    return findHighlightRange(doc.content, snippet);
+  }, [doc?.content, snippet]);
+
+  useEffect(() => {
+    if (!highlightRange || !highlightRef.current) return;
+    highlightRef.current.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+  }, [highlightRange]);
+
+  const highlightedContent = useMemo(() => {
+    if (!doc?.content || !highlightRange) return null;
+    return {
+      before: doc.content.slice(0, highlightRange.start),
+      match: doc.content.slice(highlightRange.start, highlightRange.end),
+      after: doc.content.slice(highlightRange.end),
+    };
+  }, [doc?.content, highlightRange]);
 
   if (loading) {
     return (
@@ -138,15 +247,24 @@ export default function DocPreviewPage() {
             )}
 
             {/* 文档正文 */}
-            {doc.content ? (
-              <div className="whitespace-pre-wrap">
-                {doc.content.split('\n').map((line, i) => (
-                  line.trim() ? (
-                    <p key={i}>{line}</p>
-                  ) : (
-                    <br key={i} />
-                  )
-                ))}
+            {['pdf', 'docx', 'doc'].includes(doc.format?.toLowerCase() || '') ? (
+              <DocumentPreview documentId={doc.id} fileName={doc.fileName} format={doc.format} />
+            ) : doc.content ? (
+              <div className="rounded-[20px] border border-[#E7EDF5] bg-[#FCFDFE] px-5 py-5 text-[15px] leading-8 text-[#415168] whitespace-pre-wrap break-words">
+                {highlightedContent ? (
+                  <>
+                    {highlightedContent.before}
+                    <span
+                      ref={highlightRef}
+                      className="rounded-[8px] bg-[#FFF2A8] px-1 py-0.5 text-[#223248] shadow-[0_0_0_1px_rgba(233,188,50,0.25)]"
+                    >
+                      {highlightedContent.match}
+                    </span>
+                    {highlightedContent.after}
+                  </>
+                ) : (
+                  doc.content
+                )}
               </div>
             ) : (
               <div className="bg-[#F7FAFD] p-6 rounded-lg border border-[#E2E8F0] text-center text-sm text-[#94A3B8]">

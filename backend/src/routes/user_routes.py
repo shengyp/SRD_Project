@@ -13,6 +13,8 @@ async def get_users(
     request: Request,
     dataset: Optional[str] = Query(None, description="数据集名称"),
     risk_level: Optional[str] = Query(None, description="风险等级"),
+    keyword: Optional[str] = Query(None, description="用户ID关键词"),
+    status: Optional[str] = Query(None, description="档案状态"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
@@ -21,6 +23,8 @@ async def get_users(
         payload = await svc.get_users(
             dataset=dataset,
             risk_level=risk_level,
+            keyword=keyword,
+            status=status,
             page=page,
             page_size=page_size,
         )

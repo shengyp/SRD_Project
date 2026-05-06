@@ -1,10 +1,10 @@
-from typing import List, Any, Optional
+from typing import List, Any, Optional, Union
 from pydantic import BaseModel
 
 
 class DatasetProfile(BaseModel):
     """数据集档案（匹配前端 DatasetProfile 接口）"""
-    id: str
+    id: Union[str, int]
     datasetKey: str
     displayName: str
     description: str
@@ -32,7 +32,7 @@ class DatasetListResponse(BaseModel):
 
 
 class ExternalDatasetItem(BaseModel):
-    id: str
+    id: Union[str, int]
     meta_id: int
     name: str
     table_name: str
@@ -48,7 +48,7 @@ class ExternalDatasetListResponse(BaseModel):
 
 
 class DatasetCompareItem(BaseModel):
-    id: str
+    id: Union[str, int]
     name: str
     type: str  # builtin | external
     total: int

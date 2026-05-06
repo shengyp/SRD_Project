@@ -9,7 +9,6 @@ from .chat_service import ChatService
 from .scale_service import ScaleService
 from .home_service import HomeService
 from .auth_service import AuthService
-from .attachment_service import handle_upload, resolve_attachment_path
 
 __all__ = [
     "MapService",
@@ -22,6 +21,4 @@ __all__ = [
     "ScaleService",
     "HomeService",
     "AuthService",
-    "handle_upload",
-    "resolve_attachment_path",
 ]

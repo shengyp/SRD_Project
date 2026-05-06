@@ -17,5 +17,5 @@ RISK_LEVEL_HIGH = "high"
 CLASS_COUNT_BINARY = 2
 CLASS_COUNT_MULTI = 4
 
-# 内置数据集名称（与 dataset_analysis 一致）
-BUILTIN_DATASETS = ("REDDIT",)
+# 内置数据集名称
+BUILTIN_DATASETS = ("REDDIT", "BIGDATA", "SIGIR", "WEIBO")

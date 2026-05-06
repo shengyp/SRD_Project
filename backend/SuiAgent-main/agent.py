@@ -169,6 +169,83 @@ def _chunk_text(text: str, size: int = 24) -> List[str]:
     return [text[i:i + size] for i in range(0, len(text), size)]
 
 
+def _build_mind_map_from_triples(
+    user_input: str,
+    triples: List[Dict[str, Any]],
+    evidence_objects: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    question_label = user_input[:18] + "..." if len(user_input) > 18 else user_input
+    nodes: List[Dict[str, Any]] = [
+        {
+            "id": "question",
+            "label": question_label or "当前问题",
+            "group": "question",
+            "description": "当前问答中心问题，图谱围绕它展开风险判断、事实依据与行动建议。",
+            "relatedEvidenceIds": [item.get("id") for item in evidence_objects[:3] if item.get("id")],
+        }
+    ]
+    edges: List[Dict[str, Any]] = []
+    seen_labels = {"question"}
+
+    for index, triple in enumerate(triples[:6]):
+        subject = str(triple.get("subject", "")).strip()
+        predicate = str(triple.get("predicate", "")).strip()
+        obj = str(triple.get("object", "")).strip()
+        evidence = str(triple.get("evidence", "")).strip()
+        if not subject or not obj:
+            continue
+
+        node_id = f"triple_{index}"
+        label = obj[:18] + "..." if len(obj) > 18 else obj
+        if label in seen_labels:
+            continue
+        seen_labels.add(label)
+
+        nodes.append(
+            {
+                "id": node_id,
+                "label": label,
+                "group": "core" if index < 3 else "support",
+                "description": evidence or f"{subject} 与 {obj} 存在“{predicate or '相关'}”关系。",
+                "relatedEvidenceIds": [evidence_objects[index]["id"]] if index < len(evidence_objects) else [],
+            }
+        )
+        edges.append(
+            {
+                "source": "question",
+                "target": node_id,
+                "label": predicate or "相关",
+            }
+        )
+
+    if len(nodes) == 1:
+        for index, evidence in enumerate(evidence_objects[:4]):
+            node_id = f"evidence_{index}"
+            nodes.append(
+                {
+                    "id": node_id,
+                    "label": evidence.get("title", f"证据{index + 1}")[:18],
+                    "group": "core" if index < 2 else "support",
+                    "description": evidence.get("snippet", "")[:120] or "检索到的证据片段。",
+                    "relatedEvidenceIds": [evidence.get("id")] if evidence.get("id") else [],
+                }
+            )
+            edges.append(
+                {
+                    "source": "question",
+                    "target": node_id,
+                    "label": "证据支撑",
+                }
+            )
+
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "summary": "图谱展示当前问题与检索证据之间的核心关系，可用于解释回答依据与后续处置方向。",
+        "focusNodeId": "question",
+    }
+
+
 class SuicideAgent:
     def __init__(
         self,
@@ -276,7 +353,7 @@ class SuicideAgent:
                 if current_file and not any(f["path"] == current_file["path"] for f in target_files_info):
                     target_files_info.append(current_file)
 
-            doc_map = {file_info["path"]: f"doc_{idx + 1:03d}" for idx, file_info in enumerate(target_files_info)}
+            doc_map = {file_info["path"]: file_info["name"] for file_info in target_files_info}
 
             evidence_objects = []
             for i, item in enumerate(evidence_items):
@@ -285,9 +362,9 @@ class SuicideAgent:
                     file_name = file["name"]
                     title = file_name.rsplit(".", 1)[0] if "." in file_name else file_name
                     ext = file_name.rsplit(".", 1)[-1] if "." in file_name else ""
-                    doc_id = doc_map.get(file["path"], "doc_000")
+                    doc_id = doc_map.get(file["path"], file_name)
                 else:
-                    title, ext, doc_id = "未知来源", "", "doc_000"
+                    title, ext, doc_id = "未知来源", "", "未知来源"
                 evidence_objects.append(
                     {
                         "id": f"evidence_{i + 1:03d}",
@@ -309,6 +386,7 @@ class SuicideAgent:
 
             all_fragments = [item["snippet"] for item in evidence_items]
             all_triples = self.rag_tool._extract_triples(all_fragments, user_input)
+            mind_map = _build_mind_map_from_triples(user_input, all_triples, evidence_objects)
 
             response = await self.response_gen.generate(
                 user_input=user_input,
@@ -325,8 +403,9 @@ class SuicideAgent:
                 "content": response,
                 "target_file": target_files_info,
                 "references": references,
-                "ragContext.mindMap": all_triples,
+                "ragContext.mindMap": mind_map,
                 "ragContext.evidence": evidence_objects,
+                "ragContext.contextSources": [q.get("query", "") for q in retrieval_queries if q.get("query")],
             }
         except Exception as e:
             print("process_message:", str(e))
@@ -335,8 +414,9 @@ class SuicideAgent:
                 "content": "LLM错误",
                 "target_file": [],
                 "references": [],
-                "ragContext.mindMap": [],
+                "ragContext.mindMap": {"nodes": [], "edges": [], "summary": "", "focusNodeId": None},
                 "ragContext.evidence": [],
+                "ragContext.contextSources": [],
             }
 
     async def stream_process_message(
@@ -345,5 +425,21 @@ class SuicideAgent:
         attachments: Optional[List[Dict]] = None,
     ) -> AsyncIterator[str]:
         result = await self.process_message(user_input, attachments=attachments)
+        references = result.get("references", [])
+        if references:
+            yield json.dumps({"type": "rag_sources", "sources": references}, ensure_ascii=False)
+
+        mind_map = result.get("ragContext.mindMap")
+        if mind_map:
+            yield json.dumps({"type": "mind_map", "mindMap": mind_map}, ensure_ascii=False)
+
+        evidence = result.get("ragContext.evidence", [])
+        if evidence:
+            yield json.dumps({"type": "rag_evidence", "evidence": evidence}, ensure_ascii=False)
+
+        context_sources = result.get("ragContext.contextSources", [])
+        if context_sources:
+            yield json.dumps({"type": "context_sources", "sources": context_sources}, ensure_ascii=False)
+
         for chunk in _chunk_text(result.get("LLM_ans", ""), size=24):
             yield chunk

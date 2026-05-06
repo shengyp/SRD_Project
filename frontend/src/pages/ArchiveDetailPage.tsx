@@ -7,6 +7,7 @@ import {
   FilterX, Info, Star
 } from 'lucide-react';
 import { fetchCSVPUserPosts, fetchCSVUserKeywords, fetchDatasets, DemoPostRecord, DatasetProfile } from '../api';
+import ActionCapsuleButton from '../components/ActionCapsuleButton';
 
 // ==================== 类型定义 ====================
 
@@ -42,14 +43,30 @@ interface PostRecord {
   status: 'pending' | 'accepted' | 'rejected';
 }
 
+function hasUsableTimestamp(post: Pick<PostRecord, 'timestamp' | 'hasTimestamp'>): boolean {
+  return Boolean(post.timestamp && post.timestamp.trim()) || post.hasTimestamp;
+}
+
+function formatTimestampLabel(timestamp?: string): string {
+  if (!timestamp) return '';
+  const [datePart = '', timePart = ''] = timestamp.split(' ');
+  return timePart ? `${datePart}\n${timePart}` : datePart;
+}
+
 // ==================== 常量配置 ====================
 
 const DATA_SOURCES = [
   { value: 'reddit', label: 'Reddit系列' },
+  { value: 'bigdata', label: 'Bigdata系列' },
+  { value: 'sigir', label: 'SIGIR系列' },
+  { value: 'weibo', label: 'Weibo系列' },
 ];
 
 const DATA_SOURCE_COLORS: Record<string, string> = {
   reddit: 'bg-[#E8F0FF] text-[#2F6BFF]',
+  bigdata: 'bg-[#EEF7FF] text-[#0F6CBD]',
+  sigir: 'bg-[#F5F0FF] text-[#7C3AED]',
+  weibo: 'bg-[#FFF4E8] text-[#EA580C]',
 };
 
 const RISK_COLORS = {
@@ -90,6 +107,9 @@ export default function ArchiveDetailPage() {
         if (datasets && datasets.length > 0) {
           const defaultColorMap: Record<string, string> = {
             reddit: 'bg-[#E8F0FF] text-[#2F6BFF]',
+            bigdata: 'bg-[#EEF7FF] text-[#0F6CBD]',
+            sigir: 'bg-[#F5F0FF] text-[#7C3AED]',
+            weibo: 'bg-[#FFF4E8] text-[#EA580C]',
           };
           const colors: Record<string, string> = { ...defaultColorMap };
           datasets.forEach((ds: DatasetProfile) => {
@@ -116,7 +136,7 @@ export default function ArchiveDetailPage() {
       // 从 sessionStorage 获取选中的档案信息
       const savedArchive = sessionStorage.getItem('selectedArchive');
       let userHash: string | null = null;
-      let datasetKey: string = 'reddit';
+      let datasetKey: string | null = null;
       
       if (savedArchive) {
         try {
@@ -173,7 +193,7 @@ export default function ArchiveDetailPage() {
               riskScore: p.riskScore ?? 0.5,
               suicideRisk: p.suicideRisk,
               timestamp: p.timestamp || undefined,
-              hasTimestamp: p.hasTimestamp ?? false,
+              hasTimestamp: p.hasTimestamp ?? Boolean(p.timestamp),
               status: (p.status as 'pending' | 'accepted' | 'rejected') || 'accepted',
               // 微表情序列：直接从 API 传递原始字符串
               microExpressions: p.emojiSequence ? [p.emojiSequence] : undefined,
@@ -220,11 +240,11 @@ export default function ArchiveDetailPage() {
     if (importanceFilter === 'medium' && (post.importanceScore < 0.4 || post.importanceScore >= 0.7)) return false;
     if (importanceFilter === 'high' && post.importanceScore < 0.7) return false;
     // 时间范围筛选
-    if (timeRange.start && post.hasTimestamp) {
+    if (timeRange.start && hasUsableTimestamp(post)) {
       const postDate = new Date(post.timestamp!);
       if (postDate < new Date(timeRange.start)) return false;
     }
-    if (timeRange.end && post.hasTimestamp) {
+    if (timeRange.end && hasUsableTimestamp(post)) {
       const postDate = new Date(post.timestamp!);
       if (postDate > new Date(timeRange.end)) return false;
     }
@@ -242,16 +262,19 @@ export default function ArchiveDetailPage() {
 
   // 按时间/顺序递增排序（用于图表 X 轴：左旧右新）
   const chartPosts = [...filteredPosts].sort((a, b) => {
-    if (a.hasTimestamp && b.hasTimestamp) {
+    const aHasTimestamp = hasUsableTimestamp(a);
+    const bHasTimestamp = hasUsableTimestamp(b);
+    if (aHasTimestamp && bHasTimestamp) {
       return new Date(a.timestamp!).getTime() - new Date(b.timestamp!).getTime();
     }
-    if (a.hasTimestamp && !b.hasTimestamp) return -1;
-    if (!a.hasTimestamp && b.hasTimestamp) return 1;
-  return a.postIndex - b.postIndex;
-});
+    if (aHasTimestamp && !bHasTimestamp) return -1;
+    if (!aHasTimestamp && bHasTimestamp) return 1;
+    return a.postIndex - b.postIndex;
+  });
 
 // 可见帖子（用于图表显示，默认前15条）
 const visiblePosts = chartPosts.slice(0, visiblePostCount);
+const chartUsesTimestamp = visiblePosts.some(post => hasUsableTimestamp(post));
 
 // 风险颜色
   const riskKey = selectedArchive?.riskOverview === '高风险' ? 'high' : selectedArchive?.riskOverview === '中风险' ? 'medium' : 'low';
@@ -298,12 +321,9 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
       <div className="flex flex-1 items-center justify-center">
         <div className="text-center">
           <p className="text-[#64748B] mb-4">正在加载档案数据...</p>
-          <button
-            onClick={() => navigate('/archive')}
-            className="px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl text-sm font-medium"
-          >
+          <ActionCapsuleButton onClick={() => navigate('/archive')} variant="solid">
             返回列表
-          </button>
+          </ActionCapsuleButton>
         </div>
       </div>
     );
@@ -323,13 +343,13 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
               <span className="text-sm font-semibold text-[#162033]">{selectedArchive.userId}</span>
             </div>
 
-            <button
+            <ActionCapsuleButton
               onClick={() => navigate('/archive')}
-              className="flex items-center gap-2 px-4 py-2 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl transition-colors text-sm font-medium"
+              variant="neutral"
+              icon={<ArrowLeft className="w-4 h-4" />}
             >
-              <ArrowLeft className="w-4 h-4" />
               返回列表
-            </button>
+            </ActionCapsuleButton>
           </div>
 
           <div className="flex items-center gap-3">
@@ -382,12 +402,18 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
                 grid: { left: 50, right: 30, top: 40, bottom: 60 },
                 xAxis: {
                   type: 'category',
-                  data: visiblePosts.map(p =>
-                    p.hasTimestamp ? (p.timestamp?.split(' ')[0] || '') : `#${p.postIndex}`
-                  ),
+                  data: visiblePosts.map(p => (
+                    hasUsableTimestamp(p) ? formatTimestampLabel(p.timestamp) : `#${p.postIndex}`
+                  )),
                   axisLine: { lineStyle: { color: '#DCE7F5' } },
-                  axisLabel: { color: '#64748B', fontSize: 11 },
-                  name: '时间轴 / 帖子顺序',
+                  axisLabel: {
+                    color: '#64748B',
+                    fontSize: 11,
+                    interval: 'auto',
+                    hideOverlap: true,
+                    lineHeight: 14,
+                  },
+                  name: chartUsesTimestamp ? '时间戳' : '帖子顺序',
                   nameLocation: 'middle',
                   nameGap: 35,
                   nameTextStyle: { color: '#64748B', fontSize: 11 },
@@ -415,6 +441,7 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
                     const topIdx = topPosts.findIndex(t => t.id === p.id);
                     const rank = topIdx >= 0 ? ` (Top ${topIdx + 1})` : '';
                     return `<div style="padding:4px 0">
+                      <div><b>${hasUsableTimestamp(p) ? '时间戳' : '帖子序号'}</b>: ${hasUsableTimestamp(p) ? (p.timestamp || '-') : `#${p.postIndex}`}</div>
                       <div><b>重要性分数</b>: ${p.importanceScore.toFixed(4)}</div>
                       <div><b>重要性排名</b>: ${rank || '其他'}</div>
                       <div style="margin-top:6px;font-size:11px;color:#888;max-width:200px;overflow:hidden;text-overflow:ellipsis">${p.content.slice(0, 50)}...</div>
@@ -483,14 +510,15 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
           {/* 查看更多按钮 */}
           {filteredPosts.length > visiblePostCount && (
             <div className="flex justify-center mt-4">
-              <button
+              <ActionCapsuleButton
                 onClick={() => setVisiblePostCount(prev => Math.min(prev + 15, filteredPosts.length))}
                 disabled={isLoadingMore}
-                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl text-sm font-medium transition-all shadow-sm disabled:opacity-50"
+                variant="solid"
+                size="lg"
+                icon={<MessageSquare className="w-4 h-4" />}
               >
-                <MessageSquare className="w-4 h-4" />
                 {isLoadingMore ? '加载中...' : `查看更多帖子（还剩 ${filteredPosts.length - visiblePostCount} 条）`}
-              </button>
+              </ActionCapsuleButton>
             </div>
           )}
 
@@ -562,17 +590,16 @@ const visiblePosts = chartPosts.slice(0, visiblePostCount);
                 className="px-4 py-2 border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 w-28"
               />
             </div>
-            <button
-              className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-700 text-white rounded-xl text-sm font-medium transition-all shadow-sm"
-            >
-              <Search className="w-4 h-4" /> 筛选
-            </button>
-            <button
+            <ActionCapsuleButton variant="solid" icon={<Search className="w-4 h-4" />}>
+              筛选
+            </ActionCapsuleButton>
+            <ActionCapsuleButton
               onClick={handleReset}
-              className="flex items-center gap-2 px-5 py-2 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl text-sm transition-colors"
+              variant="neutral"
+              icon={<FilterX className="w-4 h-4" />}
             >
-              <FilterX className="w-4 h-4" /> 重置
-            </button>
+              重置
+            </ActionCapsuleButton>
           </div>
         </div>
 

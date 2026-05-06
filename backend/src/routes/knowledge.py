@@ -330,8 +330,8 @@ async def get_document_preview_stream(
     request: Request,
 ):
     """
-    获取文档的流式预览数据（用于 PDF 渲染）
-    返回 PDF 文件的二进制流，前端通过 Blob URL 方式显示
+    获取文档的流式预览数据（用于 PDF / DOCX 渲染）
+    返回原始文件二进制流，前端根据格式决定渲染方式
     """
     knowledge_svc = _get_knowledge_service(request)
 
@@ -364,14 +364,19 @@ async def get_document_preview_stream(
         raise HTTPException(status_code=404, detail="文件不存在")
 
     ext = os.path.splitext(actual_path)[1].lower()
-    if ext != ".pdf":
-        raise HTTPException(status_code=400, detail="仅支持 PDF 文件")
+    media_types = {
+        ".pdf": "application/pdf",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".doc": "application/msword",
+    }
+    media_type = media_types.get(ext)
+    if not media_type:
+        raise HTTPException(status_code=400, detail="当前格式不支持流式预览")
 
-    # 返回 PDF 二进制流
     return FileResponse(
         path=actual_path,
-        filename=doc.get("file_name", "document.pdf"),
-        media_type="application/pdf",
+        filename=doc.get("file_name", "document"),
+        media_type=media_type,
         content_disposition_type="inline",
     )
 

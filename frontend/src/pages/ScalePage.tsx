@@ -12,7 +12,9 @@ import {
   createScaleTask,
   deleteScaleTask,
   fetchCSVArchives,
+  fetchDatasets,
   type DemoArchiveRecord,
+  type DatasetProfile,
 } from '../api';
 import {
   SCALES_META,
@@ -20,6 +22,7 @@ import {
   type ScaleMeta,
 } from '../scales';
 import { formatDateTime } from '../utils/dateFormat';
+import ActionCapsuleButton from '../components/ActionCapsuleButton';
 
 // ==================== 类型定义 ====================
 
@@ -93,7 +96,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const DATA_SOURCE_LABELS: Record<string, string> = {
-  reddit: 'Reddit',
+  reddit: 'Reddit系列',
+  bigdata: 'Bigdata系列',
+  sigir: 'SIGIR系列',
+  weibo: 'Weibo系列',
 };
 
 // ==================== 创建任务模态框 ====================
@@ -103,11 +109,13 @@ function CreateTaskModal({
   onClose,
   onCreate,
   scales = [],
+  dataSourceOptions,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (task: CreateTaskInput) => void;
   scales?: ScaleMeta[];
+  dataSourceOptions: { value: string; label: string }[];
 }) {
   const [selectedDataSource, setSelectedDataSource] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
@@ -198,7 +206,7 @@ function CreateTaskModal({
           <div>
             <label className="block text-sm font-medium text-[#415168] mb-2">步骤1：选择数据源</label>
             <div className="grid grid-cols-4 gap-2">
-              {Object.entries(DATA_SOURCE_LABELS).map(([value, label]) => (
+              {dataSourceOptions.map(({ value, label }) => (
                 <label key={value} className={`flex flex-col items-center gap-1 p-3 border-2 rounded-xl cursor-pointer transition-all ${
                   selectedDataSource === value ? 'border-[#2F6BFF] bg-[#F3F8FF]' : 'border-[#E2E8F0] hover:border-[#8FB4FF]'
                 }`}>
@@ -206,6 +214,9 @@ function CreateTaskModal({
                     onChange={(e) => { setSelectedDataSource(e.target.value); setSelectedUser(null); }} className="sr-only" />
                   <span className="text-lg">
                     {value === 'reddit' && '🌐'}
+                    {value === 'bigdata' && '📚'}
+                    {value === 'sigir' && '🧪'}
+                    {value === 'weibo' && '🪶'}
                   </span>
                   <span className="text-xs text-[#415168]">{label}</span>
                 </label>
@@ -299,14 +310,12 @@ function CreateTaskModal({
 
         {/* 模态框底部 */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E2E8F0] bg-[#F7FAFD]">
-          <button onClick={onClose}
-            className="px-5 py-2.5 border border-[#E2E8F0] rounded-xl text-[#415168] hover:bg-[#F1F5FA] transition-colors font-medium">
+          <ActionCapsuleButton onClick={onClose} variant="neutral" size="lg">
             取消
-          </button>
-          <button onClick={handleCreate} disabled={!selectedDataSource || !selectedUser || !selectedScale}
-            className="px-5 py-2.5 bg-[#2F6BFF] hover:bg-[#2458D6] disabled:bg-gray-300 text-white rounded-xl transition-colors font-medium disabled:cursor-not-allowed">
+          </ActionCapsuleButton>
+          <ActionCapsuleButton onClick={handleCreate} disabled={!selectedDataSource || !selectedUser || !selectedScale} variant="solid" size="lg">
             创建任务
-          </button>
+          </ActionCapsuleButton>
         </div>
       </div>
     </div>
@@ -321,6 +330,9 @@ export default function ScalePage() {
   const [scales] = useState<ScaleMeta[]>(SCALES_META);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [tasksLoading, setTasksLoading] = useState(true);
+  const [dataSourceOptions, setDataSourceOptions] = useState<{ value: string; label: string }[]>(
+    Object.entries(DATA_SOURCE_LABELS).map(([value, label]) => ({ value, label }))
+  );
 
   // 加载任务列表
   const loadTasks = () => {
@@ -355,6 +367,21 @@ export default function ScalePage() {
   };
 
   useEffect(() => { loadTasks(); }, []);
+
+  useEffect(() => {
+    fetchDatasets()
+      .then((datasets: DatasetProfile[]) => {
+        if (datasets?.length) {
+          setDataSourceOptions(datasets.map((dataset) => ({
+            value: dataset.datasetKey,
+            label: dataset.displayName,
+          })));
+        }
+      })
+      .catch(() => {
+        // 使用默认值回退
+      });
+  }, []);
 
   // 计算统计数据
   const stats = {
@@ -464,12 +491,14 @@ export default function ScalePage() {
         {/* 列表头部 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#E2E8F0]">
           <h3 className="text-base font-bold text-[#162033]">量表评估任务列表</h3>
-          <button
+          <ActionCapsuleButton
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#2F6BFF] hover:bg-[#2458D6] text-white rounded-xl transition-colors font-medium text-sm">
-            <Plus className="w-4 h-4" />
+            variant="solid"
+            size="lg"
+            icon={<Plus className="w-4 h-4" />}
+          >
             创建任务
-          </button>
+          </ActionCapsuleButton>
         </div>
 
         {/* 表格区域 */}
@@ -545,26 +574,32 @@ export default function ScalePage() {
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2">
-                          <button
+                          <ActionCapsuleButton
                             onClick={() => handleStartTask(task.id)}
                             disabled={task.status === 'completed'}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 disabled:from-gray-100 disabled:to-gray-100 text-green-600 disabled:text-gray-400 disabled:cursor-not-allowed rounded-xl transition-all text-sm font-medium border border-green-200 disabled:border-gray-200">
-                            <Play className="w-4 h-4" />
+                            tone="green"
+                            tableAction
+                            icon={<Play className="w-4 h-4" />}
+                          >
                             {task.status === 'in_progress' ? '继续' : '开始'}
-                          </button>
-                          <button
+                          </ActionCapsuleButton>
+                          <ActionCapsuleButton
                             onClick={() => handleViewResult(task.id)}
                             disabled={task.status !== 'completed'}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 disabled:from-gray-100 disabled:to-gray-100 text-blue-600 disabled:text-gray-400 disabled:cursor-not-allowed rounded-xl transition-all text-sm font-medium border border-blue-200 disabled:border-gray-200">
-                            <Eye className="w-4 h-4" />
+                            tone="blue"
+                            tableAction
+                            icon={<Eye className="w-4 h-4" />}
+                          >
                             查看
-                          </button>
-                          <button
+                          </ActionCapsuleButton>
+                          <ActionCapsuleButton
                             onClick={() => handleDeleteTask(task.id)}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 text-red-600 rounded-xl transition-all text-sm font-medium border border-red-200">
-                            <X className="w-4 h-4" />
+                            tone="red"
+                            tableAction
+                            icon={<X className="w-4 h-4" />}
+                          >
                             删除
-                          </button>
+                          </ActionCapsuleButton>
                         </div>
                       </td>
                     </tr>
@@ -582,6 +617,7 @@ export default function ScalePage() {
         onClose={() => setShowCreateModal(false)}
         onCreate={handleCreateTask}
         scales={scales}
+        dataSourceOptions={dataSourceOptions}
       />
     </div>
   );

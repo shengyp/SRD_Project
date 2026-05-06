@@ -4,6 +4,11 @@ from pathlib import Path
 
 # 项目根目录：backend/
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+ENV_PATH = BASE_DIR / ".env"
+
+if ENV_PATH.exists():
+    from dotenv import load_dotenv
+    load_dotenv(ENV_PATH)
 
 
 def _env(key: str, default: str = "") -> str:

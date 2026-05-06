@@ -18,6 +18,8 @@ import {
   type KnowledgeDocument,
 } from '../api';
 import { useAuthStore } from '../store/authStore';
+import ActionCapsuleButton from '../components/ActionCapsuleButton';
+import DocumentPreview from '../components/knowledge/DocumentPreview';
 
 // 文件大小格式化
 function getSizeDisplay(bytes: number): string {
@@ -34,115 +36,6 @@ function getFormatIcon(format: string) {
     case 'md': return <FileCode className="w-6 h-6 text-green-500" />;
     default: return <File className="w-6 h-6 text-gray-500" />;
   }
-}
-
-// PDF 预览组件：使用 Blob URL 方式预览（兼容现代浏览器）
-function PDFPreview({ documentId, fileName }: { documentId: number | string; fileName: string }) {
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let objectUrl: string | null = null;
-
-    const loadPdf = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // 优先使用流式端点获取 PDF 数据（推荐）
-        const url = `/api/knowledge/documents/${documentId}/preview-stream`;
-
-        console.log('[PDFPreview] 加载 PDF from:', url);
-
-        const response = await fetch(url);
-
-        if (!response.ok) {
-          // 如果流式端点失败，尝试 base64 端点作为备用
-          console.log('[PDFPreview] 流式端点失败，尝试 base64 端点');
-          const base64Url = `/api/knowledge/documents/${documentId}/base64`;
-          const base64Response = await fetch(base64Url);
-
-          if (!base64Response.ok) {
-            throw new Error(`加载失败: ${base64Response.status} ${base64Response.statusText}`);
-          }
-
-          const result = await base64Response.json();
-
-          if (result.success && result.data && result.data.dataUrl) {
-            // base64 方式 - 使用 data URL
-            setPdfUrl(result.data.dataUrl);
-          } else {
-            throw new Error('无法获取 PDF 数据');
-          }
-          return;
-        }
-
-        const blob = await response.blob();
-        console.log('[PDFPreview] Blob size:', blob.size, 'type:', blob.type);
-
-        if (blob.size === 0) {
-          throw new Error('PDF 文件为空');
-        }
-
-        // 创建 Blob URL 并设置 PDF MIME 类型
-        objectUrl = URL.createObjectURL(blob);
-        setPdfUrl(objectUrl);
-      } catch (err) {
-        console.error('PDF 加载失败:', err);
-        setError(err instanceof Error ? err.message : '加载失败');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadPdf();
-
-    return () => {
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [documentId]);
-
-  if (loading) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center p-8 text-center">
-        <Loader className="w-12 h-12 text-blue-500 animate-spin mb-4" />
-        <p className="text-gray-600 font-medium">正在加载 PDF...</p>
-        <p className="text-gray-400 text-sm mt-2">请耐心等待...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center p-8 text-center">
-        <FileText className="w-16 h-16 text-red-400 mb-4" />
-        <p className="text-gray-600 font-medium mb-2">PDF 加载失败</p>
-        <p className="text-gray-400 text-sm mb-4">{error}</p>
-        <button
-          onClick={() => downloadKnowledgeDocument(Number(documentId), fileName)}
-          className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors text-sm font-medium"
-        >
-          <Download className="w-4 h-4 inline mr-2" />
-          下载查看
-        </button>
-      </div>
-    );
-  }
-
-  if (pdfUrl) {
-    return (
-      <iframe
-        src={pdfUrl}
-        className="w-full h-full min-h-[600px]"
-        title={`${fileName} 预览`}
-      />
-    );
-  }
-
-  return null;
 }
 
 export default function KnowledgeDocDetailPage() {
@@ -185,6 +78,10 @@ export default function KnowledgeDocDetailPage() {
   useEffect(() => {
     if (!doc) return;
     if (activeTab === 'preview') {
+      if (['pdf', 'docx', 'doc'].includes((doc.format || '').toLowerCase())) {
+        setPreviewContent('');
+        return;
+      }
       fetchDocumentPreview(doc.id as string)
         .then((preview) => {
           const content = typeof preview === 'string' ? preview : ((preview as any)?.content || (preview as any)?.preview || '');
@@ -288,148 +185,194 @@ export default function KnowledgeDocDetailPage() {
   const keywords = doc.keywords || [];
   const format = (doc.format || 'txt') as string;
   const uploadTime = formatDocTime(doc.uploadedAt, doc.createdAt);
+  const docStatusLabel =
+    doc.uploadStatus === 'uploaded'
+      ? '已入库'
+      : doc.uploadStatus === 'uploading'
+        ? '处理中'
+        : doc.uploadStatus === 'failed'
+          ? '失败'
+          : '待确认';
+  const metaLine = [topicName, subTopicName].filter(Boolean).join(' / ');
+
+  const infoCards = [
+    {
+      title: '文档信息',
+      content: (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+          <div className="sm:col-span-2 lg:col-span-1">
+            <label className="text-[11px] font-semibold tracking-wide text-[#64748B]">文档标题</label>
+            <p className="mt-1.5 text-[15px] font-semibold leading-7 text-[#162033]">{doc.title}</p>
+          </div>
+          {topicName && (
+            <div>
+              <label className="text-[11px] font-semibold tracking-wide text-[#64748B]">主题</label>
+              <p className="mt-1.5 text-sm text-[#162033]">{topicName}</p>
+            </div>
+          )}
+          {subTopicName && (
+            <div>
+              <label className="text-[11px] font-semibold tracking-wide text-[#64748B]">子主题</label>
+              <p className="mt-1.5 text-sm text-[#162033]">{subTopicName}</p>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    keywords.length > 0
+      ? {
+          title: '关键词',
+          content: (
+            <div className="flex flex-wrap gap-2.5">
+              {keywords.map((kw, i) => (
+                <span
+                  key={i}
+                  className="rounded-full border border-[#CFE0FF] bg-white px-3 py-1.5 text-sm font-medium text-[#2F6BFF]"
+                >
+                  {kw}
+                </span>
+              ))}
+            </div>
+          ),
+        }
+      : null,
+    doc.description
+      ? {
+          title: '文档描述',
+          content: <p className="text-sm leading-7 text-[#415168]">{doc.description}</p>,
+        }
+      : null,
+    {
+      title: '文件信息',
+      content: (
+        <div className="grid grid-cols-2 gap-x-5 gap-y-4">
+          <div>
+            <label className="text-[11px] font-semibold tracking-wide text-[#64748B]">文件名</label>
+            <p className="mt-1.5 break-all text-sm font-medium leading-6 text-[#162033]">{doc.fileName || '-'}</p>
+          </div>
+          <div>
+            <label className="text-[11px] font-semibold tracking-wide text-[#64748B]">文件大小</label>
+            <p className="mt-1.5 text-sm font-medium text-[#162033]">{sizeDisplay}</p>
+          </div>
+          <div>
+            <label className="text-[11px] font-semibold tracking-wide text-[#64748B]">文件格式</label>
+            <p className="mt-1.5 text-sm font-medium uppercase text-[#162033]">{format}</p>
+          </div>
+          <div>
+            <label className="text-[11px] font-semibold tracking-wide text-[#64748B]">上传时间</label>
+            <p className="mt-1.5 text-sm font-medium text-[#162033]">{uploadTime}</p>
+          </div>
+        </div>
+      ),
+    },
+  ].filter(Boolean) as { title: string; content: React.ReactNode }[];
 
   return (
-    <div className="flex flex-1 flex-col min-h-0 w-full gap-4 md:gap-6 animate-fade-in">
-      <div className="shrink-0 flex items-center justify-end">
-        <button
-          onClick={handleBack}
-          className="flex items-center gap-2 px-4 py-2 bg-[#F1F5FA] hover:bg-[#E2E8F0] text-[#415168] rounded-xl transition-colors text-sm"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          返回列表
-        </button>
-      </div>
-
-      <div className="flex-1 min-h-0 bg-white rounded-[28px] shadow-[0_10px_28px_rgba(15,23,42,0.04)] border border-[#E2E8F0] overflow-hidden">
-        <div className="h-full flex flex-col lg:flex-row">
-          <div className="w-full lg:w-2/5 p-6 border-b lg:border-b-0 lg:border-r border-[#E2E8F0] overflow-y-auto">
-            <div className="space-y-6">
-              <div className="bg-[#F7FAFD] rounded-2xl p-5 border border-[#E2E8F0]">
-                <h3 className="text-lg font-semibold text-[#162033] mb-4 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-[#2F6BFF]" />
-                  文档信息
-                </h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-xs text-[#64748B] font-semibold uppercase tracking-wide">文档标题</label>
-                    <p className="text-[#162033] font-medium mt-1">{doc.title}</p>
-                  </div>
+    <div className="flex flex-1 flex-col min-h-0 w-full animate-fade-in">
+      <div className="flex flex-1 min-h-0 flex-col overflow-hidden rounded-[28px] border border-[#E2E8F0] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
+        <div className="border-b border-[#E8EEF6] bg-[#FCFDFF] px-5 py-4 lg:px-7">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#EEF4FF] text-[#2F6BFF] shadow-[0_8px_18px_rgba(47,107,255,0.12)]">
+                {getFormatIcon(format)}
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className="rounded-full bg-[#EEF4FF] px-2.5 py-1 text-xs font-semibold text-[#1D4ED8]">
+                    {format.toUpperCase()}
+                  </span>
+                  <span className="rounded-full bg-[#F5F7FB] px-2.5 py-1 text-xs font-medium text-[#64748B]">
+                    {docStatusLabel}
+                  </span>
                   {topicName && (
-                    <div>
-                      <label className="text-xs text-[#64748B] font-semibold uppercase tracking-wide">主题</label>
-                      <p className="text-[#162033] font-medium mt-1">{topicName}</p>
-                    </div>
+                    <span className="rounded-full bg-[#F5F8FF] px-2.5 py-1 text-xs font-medium text-[#4B5EAA]">
+                      {topicName}
+                    </span>
                   )}
+                </div>
+                <div className="mt-2 flex flex-col gap-1.5 lg:flex-row lg:items-center lg:gap-3">
+                  <h1 className="min-w-0 text-[24px] font-bold leading-tight text-[#162033]">{doc.title}</h1>
                   {subTopicName && (
-                    <div>
-                      <label className="text-xs text-[#64748B] font-semibold uppercase tracking-wide">子主题</label>
-                      <p className="text-[#162033] font-medium mt-1">{subTopicName}</p>
-                    </div>
+                    <span className="w-fit rounded-full bg-[#F5F7FB] px-2.5 py-1 text-xs font-medium text-[#64748B]">
+                      {subTopicName}
+                    </span>
                   )}
                 </div>
+                <p className="mt-1.5 text-sm text-[#6B7B8F]">
+                  {metaLine || '未分类'}{uploadTime ? ` · 上传于 ${uploadTime}` : ''}
+                </p>
               </div>
+            </div>
 
-              {/* 关键词 */}
-              {keywords.length > 0 && (
-                <div className="bg-[#F7FAFD] rounded-2xl p-5 border border-[#E2E8F0]">
-                  <h3 className="text-lg font-semibold text-[#162033] mb-4 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-[#2F6BFF]" />
-                    关键词
+            <ActionCapsuleButton
+              onClick={handleBack}
+              variant="neutral"
+              className="shrink-0"
+              icon={<ArrowLeft className="h-4 w-4" />}
+            >
+              返回列表
+            </ActionCapsuleButton>
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+          <aside className="w-full overflow-y-auto border-b border-[#E2E8F0] bg-[#FBFCFE] p-4 lg:w-[360px] lg:border-b-0 lg:border-r lg:p-5 xl:w-[380px]">
+            <div className="space-y-4">
+              {infoCards.map((card) => (
+                <section key={card.title} className="rounded-[22px] border border-[#E7EDF7] bg-[#F7FAFD] p-4">
+                  <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-[#162033]">
+                    <FileText className="h-4.5 w-4.5 text-[#2F6BFF]" />
+                    {card.title}
                   </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {keywords.map((kw, i) => (
-                      <span
-                        key={i}
-                        className="px-3 py-1.5 bg-white text-blue-700 text-sm rounded-full border border-blue-200 font-medium"
-                      >
-                        {kw}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+                  {card.content}
+                </section>
+              ))}
 
-              {/* 文档描述 */}
-              {doc.description && (
-                <div className="bg-[#F7FAFD] rounded-2xl p-5 border border-[#E2E8F0]">
-                  <h3 className="text-lg font-semibold text-[#162033] mb-4 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-[#2F6BFF]" />
-                    文档描述
-                  </h3>
-                  <p className="text-[#415168] leading-relaxed">{doc.description}</p>
-                </div>
-              )}
-
-              <div className="bg-[#F7FAFD] rounded-2xl p-5 border border-[#E2E8F0]">
-                <h3 className="text-lg font-semibold text-[#162033] mb-4 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-[#2F6BFF]" />
-                  文件信息
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-[#64748B] font-semibold uppercase tracking-wide">文件名</label>
-                    <p className="text-[#162033] font-medium mt-1 text-sm break-all">{doc.fileName || '-'}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-[#64748B] font-semibold uppercase tracking-wide">文件大小</label>
-                    <p className="text-[#162033] font-medium mt-1">{sizeDisplay}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-[#64748B] font-semibold uppercase tracking-wide">文件格式</label>
-                    <p className="text-[#162033] font-medium mt-1 uppercase">{format}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-[#64748B] font-semibold uppercase tracking-wide">上传时间</label>
-                    <p className="text-[#162033] font-medium mt-1 text-sm">{uploadTime}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* RAG存储路径 */}
               {doc.ragPath && (
-                <div className="bg-[#F7FAFD] rounded-2xl p-5 border border-[#E2E8F0]">
-                  <h3 className="text-lg font-semibold text-[#162033] mb-4 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-[#2F6BFF]" />
+                <section className="rounded-[22px] border border-[#E7EDF7] bg-[#F7FAFD] p-4">
+                  <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-[#162033]">
+                    <FileText className="h-4.5 w-4.5 text-[#2F6BFF]" />
                     RAG存储路径
                   </h3>
-                  <p className="text-[#415168] text-sm font-mono bg-white px-3 py-2 rounded-lg border border-[#DCE7F5] break-all">
+                  <p className="break-all rounded-2xl border border-[#DCE7F5] bg-white px-3 py-3 text-sm leading-6 text-[#415168]">
                     {doc.ragPath}
                   </p>
-                </div>
+                </section>
               )}
 
-              {/* 操作按钮 */}
-              <div className="flex gap-3 pt-2">
-                <button
+              <div className="space-y-3 pt-1">
+                <ActionCapsuleButton
                   onClick={() => downloadKnowledgeDocument(doc.id, doc.fileName)}
-                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors font-semibold"
+                  variant="solid"
+                  size="lg"
+                  className="w-full"
+                  icon={<Download className="h-5 w-5" />}
                 >
-                  <Download className="w-5 h-5" />
                   下载文档
-                </button>
+                </ActionCapsuleButton>
                 {isAdmin && (
-                  <button
+                  <ActionCapsuleButton
                     onClick={handleDelete}
-                    className="flex items-center justify-center gap-2 px-6 py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition-colors font-medium"
+                    tone="red"
+                    variant="soft"
+                    size="lg"
+                    className="w-full"
+                    icon={<Trash2 className="h-5 w-5" />}
                   >
-                    <Trash2 className="w-5 h-5" />
-                    删除
-                  </button>
+                    删除文档
+                  </ActionCapsuleButton>
                 )}
               </div>
             </div>
-          </div>
+          </aside>
 
-          {/* 右侧：文档预览面板 */}
-          <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm overflow-hidden">
-            {/* 标签页切换 */}
-            <div className="flex border-b border-[#E2E8F0]">
+          <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
+            <div className="flex border-b border-[#E2E8F0] bg-white px-4 lg:px-5">
               <button
-                className={`px-6 py-4 font-semibold transition-colors flex items-center gap-2 ${
+                className={`inline-flex items-center gap-2 border-b-2 px-4 py-4 text-sm font-semibold transition-colors ${
                   activeTab === 'preview'
-                    ? 'text-blue-600 border-b-2 border-blue-500'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
                 onClick={() => setActiveTab('preview')}
               >
@@ -437,10 +380,10 @@ export default function KnowledgeDocDetailPage() {
                 文档预览
               </button>
               <button
-                className={`px-6 py-4 font-semibold transition-colors flex items-center gap-2 ${
+                className={`inline-flex items-center gap-2 border-b-2 px-4 py-4 text-sm font-semibold transition-colors ${
                   activeTab === 'info'
-                    ? 'text-blue-600 border-b-2 border-blue-500'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
                 onClick={() => setActiveTab('info')}
               >
@@ -449,17 +392,16 @@ export default function KnowledgeDocDetailPage() {
               </button>
             </div>
 
-            {/* 内容区域 */}
-            <div className="flex-1 p-6 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto bg-white p-4 lg:p-5">
               {activeTab === 'preview' ? (
-                format === 'pdf' ? (
-                  <div className="w-full h-full min-h-[600px] flex flex-col">
-                    <div className="flex-1 border border-gray-200 rounded-xl overflow-hidden bg-gray-50">
-                      <PDFPreview documentId={doc.id} fileName={doc.fileName} />
+                ['pdf', 'docx', 'doc'].includes(format) ? (
+                  <div className="flex h-full min-h-0 w-full flex-col">
+                    <div className="flex-1 overflow-hidden rounded-[22px] border border-[#DCE5F2] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+                      <DocumentPreview documentId={doc.id} fileName={doc.fileName} format={format} />
                     </div>
                   </div>
                 ) : previewContent ? (
-                  <div className="prose max-w-none text-[#162033]">
+                  <div className="prose max-w-none rounded-[22px] border border-[#E2E8F0] bg-white p-6 text-[#162033] shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
                     {format === 'md' ? (
                       <div className="space-y-1">{renderMarkdown(previewContent)}</div>
                     ) : (
@@ -468,22 +410,22 @@ export default function KnowledgeDocDetailPage() {
                   </div>
                 ) : (
                   <div className="h-full flex items-center justify-center min-h-[400px]">
-                    <div className="bg-gray-50 rounded-xl p-12 text-center">
+                    <div className="rounded-2xl border border-[#E2E8F0] bg-white p-12 text-center">
                       {getFormatIcon(format)}
                       <p className="text-gray-500 mt-4">暂无可预览内容</p>
-                      <p className="text-sm text-gray-400 mt-2">该文档可能为 DOCX 格式，需要下载后查看</p>
-                      <button
+                      <ActionCapsuleButton
                         onClick={() => downloadKnowledgeDocument(doc.id, doc.fileName)}
-                        className="mt-4 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors text-sm font-medium"
+                        className="mt-4"
+                        icon={<Download className="w-4 h-4" />}
+                        variant="solid"
                       >
-                        <Download className="w-4 h-4 inline mr-2" />
                         下载查看
-                      </button>
+                      </ActionCapsuleButton>
                     </div>
                   </div>
                 )
               ) : (
-                <div className="bg-gray-50 rounded-xl p-6">
+                <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
                   <pre className="text-sm text-[#415168] whitespace-pre-wrap">
 {JSON.stringify({
   id: doc.id,
@@ -506,7 +448,7 @@ export default function KnowledgeDocDetailPage() {
                 </div>
               )}
             </div>
-          </div>
+          </section>
         </div>
       </div>
     </div>

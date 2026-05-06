@@ -1,10 +1,10 @@
-# 数据集 CSV 文件读取服务：直接从 datasets/ 目录读取原始数据
-# 后端数据库仅存储元信息，实际档案/贴文数据由前端从 CSV 读取
+# 数据集原始文件服务：从 datasets/ 目录读取原始数据，仅用于初始化同步入库
 import os
 import csv
 import json
 import hashlib
 import random
+import re
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
@@ -34,7 +34,7 @@ class DatasetCSVInfo:
 
 @dataclass
 class ArchiveInfo:
-    """单个档案的元信息（从 CSV 聚合）"""
+    """单个档案的元信息（从原始文件聚合）"""
     user_id: str
     dataset_key: str
     post_count: int
@@ -93,7 +93,7 @@ _IMPORTANCE_KEYWORDS = {
 
 
 class DatasetCSVService:
-    """直接从 datasets/ 目录读取 CSV 文件，提供元信息和数据查询"""
+    """直接从 datasets/ 目录读取原始数据，供初始化同步与离线构造使用。"""
 
     def __init__(self, base_dir: Optional[str] = None):
         # datasets 目录的基础路径（容器内挂载路径）
@@ -129,6 +129,51 @@ class DatasetCSVService:
             "class_count": 5,
             "fine_labels": {"0": "无风险", "1": "极低风险", "2": "低风险", "3": "中风险", "4": "高风险"},
             "coarse_risk_mapping": {"0": "low", "1": "low", "2": "low", "3": "medium", "4": "high"},
+        },
+        "bigdata": {
+            "csv_path": "bigdata/bigdata.csv",
+            "emoji_csv_path": "bigdata/bigdata_emoji_batch.csv",
+            "user_id_column": "user_id",
+            "post_column": "post_sequence",
+            "risk_column": "suicide_risk",
+            "emoji_column": "emjio_sequenc",
+            "timestamp_column": "created_utc",
+            "display_name": "Bigdata系列",
+            "language": "en",
+            "class_system": "multi-class",
+            "class_count": 5,
+            "fine_labels": {"0": "无风险", "1": "极低风险", "2": "低风险", "3": "中风险", "4": "高风险"},
+            "coarse_risk_mapping": {"0": "low", "1": "low", "2": "low", "3": "medium", "4": "high"},
+        },
+        "sigir": {
+            "csv_path": "sigir/sigir.csv",
+            "emoji_csv_path": "sigir/sigir_emojis.csv",
+            "user_id_column": None,
+            "post_column": "Post",
+            "risk_column": "Label",
+            "emoji_column": "Post",
+            "timestamp_column": None,
+            "display_name": "SIGIR系列",
+            "language": "en",
+            "class_system": "binary",
+            "class_count": 2,
+            "fine_labels": {"0": "无风险", "1": "高风险"},
+            "coarse_risk_mapping": {"0": "low", "1": "high"},
+        },
+        "weibo": {
+            "csv_path": "weibo/weibo_1000.csv",
+            "emoji_csv_path": "weibo/weibo_1000_emoji_batch.csv",
+            "user_id_column": "user_id",
+            "post_column": "Post",
+            "risk_column": "label",
+            "emoji_column": "emoji_sequence",
+            "timestamp_column": None,
+            "display_name": "Weibo系列",
+            "language": "zh",
+            "class_system": "binary",
+            "class_count": 2,
+            "fine_labels": {"0": "无风险", "1": "高风险"},
+            "coarse_risk_mapping": {"0": "low", "1": "high"},
         },
     }
 
@@ -186,6 +231,68 @@ class DatasetCSVService:
 
         return [post_str]
 
+    def _parse_timestamps(self, timestamp_str: Optional[str]) -> List[str]:
+        """解析时间戳列表，支持 bigdata 中的 Timestamp(...) 序列。"""
+        if not timestamp_str:
+            return []
+
+        text = str(timestamp_str).strip()
+        if not text:
+            return []
+
+        matches = re.findall(r"Timestamp\('([^']+)'\)", text)
+        if matches:
+            return matches
+
+        if text.startswith("[") and text.endswith("]"):
+            try:
+                import ast
+                items = ast.literal_eval(text)
+                if isinstance(items, list):
+                    return [str(i).strip() for i in items if str(i).strip()]
+            except Exception:
+                pass
+
+        if "\n" in text:
+            return [part.strip() for part in text.split("\n") if part.strip()]
+
+        return [text]
+
+    def _get_row_user_id(self, dataset_key: str, row: Dict[str, str], row_index: int) -> str:
+        """获取行级用户标识。对于没有用户ID列的数据集，使用行号构造稳定ID。"""
+        config = self.DATASET_CONFIG.get(dataset_key, {})
+        user_id_column = config.get("user_id_column")
+
+        if user_id_column:
+            value = row.get(user_id_column, "")
+            user_id = str(value).strip()
+            if user_id:
+                return user_id
+
+        return f"row_{row_index}"
+
+    def _normalize_emoji_user_key(self, dataset_key: str, user_id: str) -> str:
+        """归一化 emoji 文件中的用户键，兼容 bigdata 的 user_0 / 0。"""
+        if dataset_key == "bigdata":
+            if user_id.startswith("user_"):
+                return user_id.split("user_", 1)[1]
+            return user_id
+        return user_id
+
+    def _resolve_emoji_sequence(self, emoji_data: Dict[str, str], dataset_key: str, user_id: str, row_index: int) -> str:
+        """按数据集规则解析当前行对应的 emoji 序列。"""
+        row_key = f"row_{row_index}"
+
+        # bigdata 的 emoji 批次文件 user_id 列存在大量重复，实际应按行顺序与主 CSV 对齐
+        if dataset_key == "bigdata":
+            return emoji_data.get(row_key, "")
+
+        if dataset_key == "sigir":
+            return emoji_data.get(row_key, "")
+
+        normalized_user_id = self._normalize_emoji_user_key(dataset_key, user_id)
+        return emoji_data.get(normalized_user_id, "") or emoji_data.get(row_key, "")
+
     def _get_coarse_risk(self, dataset_key: str, risk_value: int) -> str:
         """获取粗粒度风险等级"""
         config = self.DATASET_CONFIG.get(dataset_key, {})
@@ -215,20 +322,24 @@ class DatasetCSVService:
             # 使用 surrogateescape 来保留无法解码的字节
             with open(full_path, "r", encoding="utf-8-sig", errors='surrogateescape') as f:
                 reader = csv.DictReader(f)
-                for row in reader:
+                for row_index, row in enumerate(reader):
                     # 规范化字段名（移除 BOM）
                     row = {self._normalize_fieldname(k): v for k, v in row.items()}
-                    uid_raw = row.get(config.get("user_id_column") or "User", "")
-                    uid = str(uid_raw).strip()
-                    if not uid:
-                        continue
                     # 尝试获取 emoji_sequence
                     emoji_col = config.get("emoji_column") or "Post"
                     emoji_seq = row.get(emoji_col)
                     if emoji_seq:
                         # 清理不可见字符，但保留 emoji
                         cleaned = emoji_seq.replace(chr(0x200B), '').replace(chr(0x200C), '').replace(chr(0x200D), '').replace(chr(0xFEFF), '').replace(chr(0xFFFD), '')
-                        emoji_data[uid] = cleaned
+                        row_key = f"row_{row_index + 1}"
+                        emoji_data[row_key] = cleaned
+
+                        user_id_column = config.get("user_id_column")
+                        if user_id_column and dataset_key != "bigdata":
+                            uid_raw = row.get(user_id_column, row.get("User", ""))
+                            uid = self._normalize_emoji_user_key(dataset_key, str(uid_raw).strip())
+                            if uid:
+                                emoji_data[uid] = cleaned
         except Exception:
             pass
 
@@ -323,8 +434,9 @@ class DatasetCSVService:
             with open(csv_path, "r", encoding="utf-8-sig", errors='replace') as f:
                 reader = csv.DictReader(f)
                 columns = [self._normalize_fieldname(c) for c in (reader.fieldnames or [])]
-                for row in reader:
+                for row_index, row in enumerate(reader, start=1):
                     row_count += 1
+                    row = {self._normalize_fieldname(k): v for k, v in row.items()}
                     if user_id_col:
                         # 有 user_id 列的数据集
                         uid = row.get(user_id_col, "")
@@ -332,7 +444,7 @@ class DatasetCSVService:
                             users_set.add(uid)
                     else:
                         # 没有 user_id 列的数据集，每行算一个用户
-                        users_set.add(f"row_{row_count}")
+                        users_set.add(f"row_{row_index}")
 
                     posts_raw = row.get(post_col, "")
                     posts = self._parse_posts(posts_raw)
@@ -384,15 +496,12 @@ class DatasetCSVService:
                 user_emojis: Dict[str, bool] = {}
                 user_emoji_seqs: Dict[str, str] = {}
 
-                for row in reader:
+                for row_index, row in enumerate(reader, start=1):
                     # 规范化字段名（移除 BOM）
                     row = {self._normalize_fieldname(k): v for k, v in row.items()}
 
                     posts_raw = row.get(cfg["post_column"], "")
-                    uid_raw = row.get(cfg.get("user_id_column") or "user_id", "")
-                    uid = str(uid_raw).strip()
-                    if not uid:
-                        uid = f"anon_{hashlib.md5(posts_raw[:50].encode()).hexdigest()[:8]}"
+                    uid = self._get_row_user_id(dataset_key, row, row_index)
 
                     posts = self._parse_posts(posts_raw)
 
@@ -406,16 +515,18 @@ class DatasetCSVService:
                         user_posts[uid] = posts
                         user_risks[uid] = risk_val
                         user_timestamps[uid] = cfg.get("timestamp_column") is not None
-                        user_emojis[uid] = uid in emoji_data
-                        user_emoji_seqs[uid] = emoji_data.get(uid, "")
+                        emoji_seq = self._resolve_emoji_sequence(emoji_data, dataset_key, uid, row_index)
+                        user_emojis[uid] = bool(emoji_seq)
+                        user_emoji_seqs[uid] = emoji_seq
                     else:
                         user_posts[uid].extend(posts)
                         if risk_val > user_risks[uid]:
                             user_risks[uid] = risk_val
-                        if uid in emoji_data:
+                        emoji_seq = self._resolve_emoji_sequence(emoji_data, dataset_key, uid, row_index)
+                        if emoji_seq:
                             user_emojis[uid] = True
                             if not user_emoji_seqs.get(uid):
-                                user_emoji_seqs[uid] = emoji_data[uid]
+                                user_emoji_seqs[uid] = emoji_seq
 
                 archives = []
                 # 预设随机时间种子，保证每次运行结果一致但分布合理
@@ -630,12 +741,11 @@ class DatasetCSVService:
             try:
                 with open(csv_path, "r", encoding="utf-8-sig", errors='replace') as f:
                     reader = csv.DictReader(f)
-                    for row in reader:
+                    for row_index, row in enumerate(reader, start=1):
                         # 规范化字段名（移除 BOM）
                         row = {self._normalize_fieldname(k): v for k, v in row.items()}
 
-                        uid_raw = row.get(cfg.get("user_id_column") or "user_id", "")
-                        uid = str(uid_raw).strip()
+                        uid = self._get_row_user_id(ds_key, row, row_index)
                         expected_hash = self._generate_user_hash(ds_key, uid)
 
                         if expected_hash != user_hash:
@@ -653,11 +763,16 @@ class DatasetCSVService:
                         coarse = self._get_coarse_risk(ds_key, risk_val)
 
                         # 获取该用户的 emoji 序列
-                        emoji_seq_str = emoji_data.get(uid, "")
+                        emoji_seq_str = self._resolve_emoji_sequence(emoji_data, ds_key, uid, row_index)
                         emoji_list: List[str] = []
                         if emoji_seq_str:
                             # emoji 序列是逗号分隔的字符串，每个元素对应一个帖子
                             emoji_list = [e.strip() for e in emoji_seq_str.split(",") if e.strip()]
+
+                        timestamp_values: List[str] = []
+                        timestamp_column = cfg.get("timestamp_column")
+                        if timestamp_column:
+                            timestamp_values = self._parse_timestamps(row.get(timestamp_column))
 
                         for idx, content in enumerate(posts):
                             # 计算该帖子的重要性分数
@@ -675,7 +790,7 @@ class DatasetCSVService:
                                 risk_value=risk_val,
                                 sentiment_score=None,
                                 importance_score=importance,
-                                timestamp=None,
+                                timestamp=timestamp_values[idx] if idx < len(timestamp_values) else None,
                                 has_emojis=has_emoji,
                                 emoji_sequence=post_emoji,
                             )
@@ -712,14 +827,11 @@ class DatasetCSVService:
             with open(csv_path, "r", encoding="utf-8-sig") as f:
                 reader = csv.DictReader(f)
                 seen = set()
-                for row in reader:
+                for row_index, row in enumerate(reader, start=1):
                     # 规范化字段名（移除 BOM）
                     row = {self._normalize_fieldname(k): v for k, v in row.items()}
 
-                    uid_raw = row.get(cfg.get("user_id_column") or "user_id", "")
-                    uid = str(uid_raw).strip()
-                    if not uid:
-                        continue
+                    uid = self._get_row_user_id(dataset_key, row, row_index)
                     h = self._generate_user_hash(dataset_key, uid)
                     if h not in seen:
                         seen.add(h)
@@ -783,3 +895,179 @@ class DatasetCSVService:
 
         sorted_words = sorted(freq.items(), key=lambda x: x[1], reverse=True)[:top_n]
         return [{"word": word, "count": count} for word, count in sorted_words]
+
+    def build_dataset_import_payload(self, dataset_key: str) -> Optional[dict]:
+        """构建内置数据集的完整导入载荷，供 MySQL 同步使用。"""
+        cfg = self.DATASET_CONFIG.get(dataset_key)
+        if not cfg:
+            return None
+
+        csv_path = self._get_csv_full_path(cfg["csv_path"])
+        if not csv_path.exists():
+            return None
+
+        emoji_data = self._load_emoji_data(dataset_key)
+        aggregated: Dict[str, dict] = {}
+
+        try:
+            with open(csv_path, "r", encoding="utf-8-sig", errors="replace") as f:
+                reader = csv.DictReader(f)
+                for row_index, row in enumerate(reader, start=1):
+                    row = {self._normalize_fieldname(k): v for k, v in row.items()}
+                    raw_user_id = self._get_row_user_id(dataset_key, row, row_index)
+                    user_hash = self._generate_user_hash(dataset_key, raw_user_id)
+                    posts = self._parse_posts(row.get(cfg["post_column"], ""))
+
+                    risk_str = row.get(cfg["risk_column"], "0")
+                    try:
+                        risk_val = int(float(risk_str))
+                    except (TypeError, ValueError):
+                        risk_val = 0
+
+                    timestamp_values: List[str] = []
+                    if cfg.get("timestamp_column"):
+                        timestamp_values = self._parse_timestamps(row.get(cfg["timestamp_column"]))
+
+                    emoji_seq_str = self._resolve_emoji_sequence(emoji_data, dataset_key, raw_user_id, row_index)
+                    emoji_list = [e.strip() for e in emoji_seq_str.split(",") if e.strip()] if emoji_seq_str else []
+
+                    bucket = aggregated.setdefault(user_hash, {
+                        "user_hash": user_hash,
+                        "raw_user_id": raw_user_id,
+                        "dataset_key": dataset_key,
+                        "risk_value": risk_val,
+                        "risk_level": self._get_coarse_risk(dataset_key, risk_val),
+                        "has_timestamp": False,
+                        "has_emojis": False,
+                        "posts": [],
+                    })
+
+                    if risk_val > bucket["risk_value"]:
+                        bucket["risk_value"] = risk_val
+                        bucket["risk_level"] = self._get_coarse_risk(dataset_key, risk_val)
+
+                    for idx, content in enumerate(posts):
+                        timestamp = timestamp_values[idx] if idx < len(timestamp_values) else None
+                        emoji_sequence = emoji_list[idx] if idx < len(emoji_list) else None
+                        bucket["posts"].append({
+                            "content": content,
+                            "timestamp": timestamp,
+                            "emoji_sequence": emoji_sequence,
+                            "risk_value": risk_val,
+                        })
+                        if timestamp:
+                            bucket["has_timestamp"] = True
+                        if emoji_sequence:
+                            bucket["has_emojis"] = True
+        except Exception as exc:
+            print(f"[ERROR] build_dataset_import_payload failed for {dataset_key}: {exc}")
+            return None
+
+        archives = []
+        random.seed(42)
+        start_date = datetime(2026, 1, 1)
+        end_date = datetime(2026, 4, 22, 23, 59, 59)
+        total_seconds = (end_date - start_date).total_seconds()
+        user_count = len(aggregated)
+        import_times: List[datetime] = []
+
+        for i in range(user_count):
+            base_fraction = (i + 0.5) / user_count if user_count else 0.5
+            jitter = random.uniform(-0.4 / max(user_count, 1), 0.4 / max(user_count, 1))
+            fraction = max(0.001, min(0.999, base_fraction + jitter))
+            import_times.append(start_date + timedelta(seconds=fraction * total_seconds))
+        import_times.sort()
+
+        for idx, user_hash in enumerate(sorted(aggregated.keys())):
+            item = aggregated[user_hash]
+            post_infos = []
+            raw_scores: List[float] = []
+            parsed_times: List[datetime] = []
+
+            for post_index, raw_post in enumerate(item["posts"]):
+                raw_score = self._calculate_importance_score(raw_post["content"])
+                raw_scores.append(raw_score)
+                timestamp = raw_post["timestamp"]
+                if timestamp:
+                    try:
+                        parsed_times.append(datetime.fromisoformat(timestamp))
+                    except ValueError:
+                        pass
+                post_infos.append(PostInfo(
+                    user_id=user_hash,
+                    post_index=post_index,
+                    content=raw_post["content"],
+                    risk_level=item["risk_level"],
+                    risk_value=raw_post["risk_value"],
+                    sentiment_score=None,
+                    importance_score=raw_score,
+                    timestamp=timestamp,
+                    has_emojis=bool(raw_post["emoji_sequence"]),
+                    emoji_sequence=raw_post["emoji_sequence"],
+                ))
+
+            post_infos = self._normalize_importance_scores(post_infos)
+
+            high_count = sum(1 for post in post_infos if (post.importance_score or 0) >= 0.7)
+            medium_count = sum(1 for post in post_infos if 0.4 <= (post.importance_score or 0) < 0.7)
+            low_count = len(post_infos) - high_count - medium_count
+            avg_importance = sum((post.importance_score or 0) for post in post_infos) / len(post_infos) if post_infos else 0.0
+            top_posts = sorted(post_infos, key=lambda post: post.importance_score or 0, reverse=True)[:3]
+
+            archives.append({
+                "user_hash": user_hash,
+                "raw_user_id": item["raw_user_id"],
+                "dataset_key": dataset_key,
+                "post_count": len(post_infos),
+                "risk_level": item["risk_level"],
+                "risk_value": item["risk_value"],
+                "label": item["risk_value"],
+                "has_timestamp": item["has_timestamp"],
+                "post_timestamp_start": min(parsed_times).isoformat(sep=" ") if parsed_times else None,
+                "post_timestamp_end": max(parsed_times).isoformat(sep=" ") if parsed_times else None,
+                "has_emojis": item["has_emojis"],
+                "import_timestamp": import_times[idx].isoformat(sep=" ") if idx < len(import_times) else datetime.now().isoformat(sep=" "),
+                "high_importance_count": high_count,
+                "medium_importance_count": medium_count,
+                "low_importance_count": low_count,
+                "avg_importance_score": round(avg_importance, 4),
+                "top_posts_summary": [
+                    {
+                        "postIndex": post.post_index,
+                        "importanceScore": round(post.importance_score or 0, 4),
+                        "contentPreview": post.content[:120],
+                    }
+                    for post in top_posts
+                ],
+                "posts": [
+                    {
+                        "post_index": post.post_index,
+                        "content": post.content,
+                        "importance_score": round(post.importance_score or 0, 4),
+                        "importance_level": "high" if (post.importance_score or 0) >= 0.7 else "medium" if (post.importance_score or 0) >= 0.4 else "low",
+                        "timestamp": post.timestamp,
+                        "emoji_count": len(post.emoji_sequence) if post.emoji_sequence else 0,
+                        "emoji_sequence": post.emoji_sequence,
+                        "fine_risk_value": post.risk_value,
+                    }
+                    for post in post_infos
+                ],
+            })
+
+        info = self.get_dataset_info(dataset_key)
+        return {
+            "dataset": {
+                "dataset_key": dataset_key,
+                "display_name": cfg["display_name"],
+                "description": f"{cfg['display_name']}自杀风险数据集",
+                "language": cfg["language"],
+                "class_system": cfg["class_system"],
+                "class_count": cfg["class_count"],
+                "fine_labels": cfg["fine_labels"],
+                "coarse_risk_mapping": cfg["coarse_risk_mapping"],
+                "total_users": info.total_users if info else len(archives),
+                "total_posts": info.total_posts if info else sum(a["post_count"] for a in archives),
+                "total_archives": len(archives),
+            },
+            "archives": archives,
+        }

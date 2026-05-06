@@ -14,6 +14,7 @@ import {
   loadScalesData,
   type ScaleDefinition,
 } from '../scales';
+import ActionCapsuleButton from '../components/ActionCapsuleButton';
 
 export default function ScaleAnswerPage() {
   const navigate = useNavigate();
@@ -150,10 +151,9 @@ export default function ScaleAnswerPage() {
     <div className="flex flex-1 flex-col min-h-0 w-full animate-fade-in space-y-5">
       {/* 顶部导航 */}
       <div className="flex items-center justify-between">
-        <button onClick={handleBack} className="flex items-center gap-2 text-[#64748B] hover:text-[#162033] transition-colors">
-          <ArrowLeft className="w-5 h-5" />
-          <span className="text-sm">返回任务列表</span>
-        </button>
+        <ActionCapsuleButton onClick={handleBack} variant="neutral" icon={<ArrowLeft className="w-5 h-5" />}>
+          返回任务列表
+        </ActionCapsuleButton>
         <div className="flex items-center gap-3">
           <span className={`px-4 py-1.5 ${getScaleDisplayInfo(scale.code).bgColor} bg-opacity-20 text-[#162033] rounded-full text-sm font-medium`}>{scale.name}</span>
           <span className="text-sm text-[#64748B]">
@@ -219,12 +219,14 @@ export default function ScaleAnswerPage() {
 
       {/* 底部操作 */}
       <div className="flex items-center justify-between bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm">
-        <button onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+        <ActionCapsuleButton onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
           disabled={currentPage === 0}
-          className="flex items-center gap-2 px-6 py-2.5 border border-[#E2E8F0] rounded-xl text-[#415168] hover:bg-[#F1F5FA] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-          <ChevronLeft className="w-5 h-5" />
+          variant="neutral"
+          size="lg"
+          icon={<ChevronLeft className="w-5 h-5" />}
+        >
           上一页
-        </button>
+        </ActionCapsuleButton>
 
         <div className="flex items-center gap-2">
           {Array.from({ length: totalPages }, (_, i) => (
@@ -243,20 +245,13 @@ export default function ScaleAnswerPage() {
         </div>
 
         {currentPage < totalPages - 1 ? (
-          <button onClick={() => setCurrentPage(p => p + 1)}
-            className="flex items-center gap-2 px-6 py-2.5 bg-[#2F6BFF] hover:bg-[#2458D6] text-white rounded-xl transition-colors font-medium">
+          <ActionCapsuleButton onClick={() => setCurrentPage(p => p + 1)} variant="solid" size="lg" icon={<ChevronRight className="w-5 h-5" />}>
             下一页
-            <ChevronRight className="w-5 h-5" />
-          </button>
+          </ActionCapsuleButton>
         ) : (
-          <button onClick={handleSubmit} disabled={!allAnswered || isSubmitting}
-            className="flex items-center gap-2 px-8 py-2.5 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white rounded-xl transition-colors font-semibold disabled:cursor-not-allowed">
-            {isSubmitting ? (
-              <><Loader className="w-5 h-5 animate-spin" /> 提交中...</>
-            ) : (
-              <><Check className="w-5 h-5" /> 提交评估</>
-            )}
-          </button>
+          <ActionCapsuleButton onClick={handleSubmit} disabled={!allAnswered || isSubmitting} variant="solid" tone="green" size="lg" icon={isSubmitting ? <Loader className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}>
+            {isSubmitting ? '提交中...' : '提交评估'}
+          </ActionCapsuleButton>
         )}
       </div>
 

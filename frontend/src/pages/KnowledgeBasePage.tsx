@@ -169,6 +169,71 @@ function getSubTopicName(subTopicId: string | number | undefined): string {
   return subTopicIdToName[key] || key;
 }
 
+function buildModalTopics(topics: { value: string; label: string }[]) {
+  return [
+    { value: '', label: '请选择主题' },
+    ...topics.filter((item) => item.value !== ''),
+  ];
+}
+
+function buildModalSubTopicsMap(subTopicsMap: Record<string, { value: string; label: string }[]>) {
+  const next: Record<string, { value: string; label: string }[]> = {
+    '': [{ value: '', label: '请先选择主题' }],
+  };
+
+  Object.entries(subTopicsMap).forEach(([topicId, items]) => {
+    if (topicId === '') return;
+    next[topicId] = [
+      { value: '', label: '请选择子主题' },
+      ...items.filter((item) => item.value !== ''),
+    ];
+  });
+
+  return next;
+}
+
+function resolveTopicValue(
+  doc: KnowledgeDoc,
+  topics: { value: string; label: string }[],
+): string {
+  if (doc.topicId !== undefined && doc.topicId !== null && doc.topicId !== '') {
+    return String(doc.topicId);
+  }
+
+  const topicName =
+    typeof doc.topic === 'string'
+      ? doc.topic
+      : doc.topic?.topicName || '';
+
+  if (!topicName) return '';
+  return topics.find((item) => item.label === topicName)?.value || '';
+}
+
+function resolveSubTopicValue(
+  doc: KnowledgeDoc,
+  topicValue: string,
+  subTopicsMap: Record<string, { value: string; label: string }[]>,
+): string {
+  if (doc.subTopicId !== undefined && doc.subTopicId !== null && doc.subTopicId !== '') {
+    return String(doc.subTopicId);
+  }
+
+  const subTopicName =
+    typeof doc.subTopic === 'string'
+      ? doc.subTopic
+      : doc.subTopic?.subTopicName || '';
+
+  if (!subTopicName || !topicValue) return '';
+  return subTopicsMap[topicValue]?.find((item) => item.label === subTopicName)?.value || '';
+}
+
+function parseKeywordInput(value: string): string[] {
+  return value
+    .split(/[，,、；;\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function getKeywords(doc: KnowledgeDoc): string[] {
   if (!doc.keywords) return [];
   if (Array.isArray(doc.keywords)) return doc.keywords;
@@ -202,6 +267,8 @@ function UploadModal({
   topics?: { value: string; label: string }[];
   subTopicsMap?: Record<string, { value: string; label: string }[]>;
 }) {
+  const modalTopics = buildModalTopics(topics);
+  const modalSubTopicsMap = buildModalSubTopicsMap(subTopicsMap);
   const [formData, setFormData] = useState({
     title: '',
     topic: '',
@@ -321,7 +388,7 @@ function UploadModal({
                 value={formData.topic}
                 onChange={(e) => setFormData({ ...formData, topic: e.target.value, subTopic: '' })}
               >
-                {topics.map((t) => (
+                {modalTopics.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
                 ))}
               </select>
@@ -334,7 +401,7 @@ function UploadModal({
                 onChange={(e) => setFormData({ ...formData, subTopic: e.target.value })}
                 disabled={!formData.topic}
               >
-                {subTopicsMap[formData.topic]?.map((st) => (
+                {modalSubTopicsMap[formData.topic]?.map((st) => (
                   <option key={st.value} value={st.value}>{st.label}</option>
                 )) || <option value="">请先选择主题</option>}
               </select>
@@ -461,6 +528,8 @@ function EditModal({
   topics?: { value: string; label: string }[];
   subTopicsMap?: Record<string, { value: string; label: string }[]>;
 }) {
+  const modalTopics = buildModalTopics(topics);
+  const modalSubTopicsMap = buildModalSubTopicsMap(subTopicsMap);
   const [formData, setFormData] = useState({
     title: '',
     topic: '',
@@ -474,10 +543,12 @@ function EditModal({
   const resetForm = () => {
     if (document) {
       const docKeywords = getKeywords(document);
+      const topicValue = resolveTopicValue(document, topics);
+      const subTopicValue = resolveSubTopicValue(document, topicValue, subTopicsMap);
       setFormData({
         title: document.title || '',
-        topic: document.topicId ? String(document.topicId) : '',
-        subTopic: document.subTopicId ? String(document.subTopicId) : '',
+        topic: topicValue,
+        subTopic: subTopicValue,
         keywords: docKeywords.join('、'),
         description: document.description || '',
       });
@@ -491,7 +562,7 @@ function EditModal({
     if (isOpen) {
       resetForm();
     }
-  }, [isOpen, document]);
+  }, [isOpen, document, topics, subTopicsMap]);
 
   const handleSubmit = async () => {
     if (!formData.title.trim()) { setSaveError('请输入文档标题'); return; }
@@ -506,8 +577,8 @@ function EditModal({
         title: formData.title.trim(),
         topic_id: Number(formData.topic),
         sub_topic_id: formData.subTopic ? Number(formData.subTopic) : undefined,
-        keywords: formData.keywords.trim(),
-        summary: formData.description.trim(),
+        keywords: parseKeywordInput(formData.keywords),
+        description: formData.description.trim(),
       });
 
       if (result.success) {
@@ -555,7 +626,7 @@ function EditModal({
                 value={formData.topic}
                 onChange={(e) => setFormData({ ...formData, topic: e.target.value, subTopic: '' })}
               >
-                {topics.map((t) => (
+                {modalTopics.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
                 ))}
               </select>
@@ -568,7 +639,7 @@ function EditModal({
                 onChange={(e) => setFormData({ ...formData, subTopic: e.target.value })}
                 disabled={!formData.topic}
               >
-                {subTopicsMap[formData.topic]?.map((st) => (
+                {modalSubTopicsMap[formData.topic]?.map((st) => (
                   <option key={st.value} value={st.value}>{st.label}</option>
                 )) || <option value="">请先选择主题</option>}
               </select>
