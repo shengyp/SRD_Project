@@ -133,13 +133,13 @@ class ScaleService:
         archive_id: Optional[int] = None,
         data_source: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
-        conditions = ["user_id = %s"]
+        conditions = ["pa.user_id = %s"]
         params: List[Any] = [user_hash]
         if archive_id is not None:
-            conditions.append("id = %s")
+            conditions.append("pa.id = %s")
             params.append(archive_id)
         if data_source:
-            conditions.append("dataset_source = %s")
+            conditions.append("pa.dataset_source = %s")
             params.append(data_source)
 
         where_clause = " AND ".join(conditions)

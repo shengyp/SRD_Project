@@ -3,10 +3,33 @@ import base64
 from typing import AsyncIterator, Iterator, List, Dict, Union, Optional
 from openai import OpenAI
 import httpx
+import certifi
 
 
 # 默认附件最大字符数（用于纯文本文件 TXT/MD）
 MAX_TEXT_CHARS = int(os.getenv("LLM_MAX_ATTACHMENT_CHARS", "50000"))
+
+
+def get_ssl_verify_config() -> Union[bool, str]:
+    """返回 SSL 证书校验配置。
+
+    默认开启证书校验，优先使用显式配置的 CA 文件，其次使用 certifi。
+    仅当环境变量明确要求关闭时才禁用。
+    """
+    raw_flag = (os.getenv("LLM_SSL_VERIFY", "true") or "true").strip().lower()
+    if raw_flag in {"0", "false", "no", "off"}:
+        return False
+
+    ca_bundle = (
+        os.getenv("LLM_CA_BUNDLE")
+        or os.getenv("REQUESTS_CA_BUNDLE")
+        or os.getenv("SSL_CERT_FILE")
+        or ""
+    ).strip()
+    if ca_bundle:
+        return ca_bundle
+
+    return certifi.where()
 
 
 def get_llm_config() -> dict:
@@ -256,7 +279,7 @@ def callLLM(
                     "messages": messages,
                 },
                 headers=headers,
-                verify=False,
+                verify=get_ssl_verify_config(),
                 timeout=(30.0, 120.0),  # (connect_timeout, read_timeout)
             )
             response.raise_for_status()
@@ -310,8 +333,10 @@ def callLLM_stream(messages: List[Dict]) -> AsyncIterator[str]:
     cfg = get_llm_config()
     if not cfg["api_key"]:
         raise RuntimeError("未配置 LLM_API_KEY，拒绝模拟流式输出。")
-    # 创建 HTTP 客户端，禁用 SSL 证书验证
-    http_client = httpx.Client(verify=False, timeout=httpx.Timeout(120.0, connect=30.0))
+    http_client = httpx.Client(
+        verify=get_ssl_verify_config(),
+        timeout=httpx.Timeout(120.0, connect=30.0),
+    )
     client = OpenAI(
         api_key=cfg["api_key"],
         base_url=cfg["base_url"],
@@ -385,7 +410,7 @@ def callLLM_stream_multimodal(
             },
             headers=headers,
             stream=True,
-            verify=False,
+            verify=get_ssl_verify_config(),
             timeout=(30.0, 120.0),
         ) as response:
             response.raise_for_status()

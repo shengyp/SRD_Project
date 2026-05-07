@@ -1,8 +1,0 @@
-﻿scale_code,scale_name,question_no,question_text_cn,dimension,reverse_score,option_group,period,text_status
-ISI,ISI 失眠严重程度指数,1,入睡困难的严重程度,insomnia,False,ISI_0_4,最近两周,原型中文改写版；正式部署请核对授权中文版/使用许可
-ISI,ISI 失眠严重程度指数,2,睡眠维持困难的严重程度,insomnia,False,ISI_0_4,最近两周,原型中文改写版；正式部署请核对授权中文版/使用许可
-ISI,ISI 失眠严重程度指数,3,早醒问题的严重程度,insomnia,False,ISI_0_4,最近两周,原型中文改写版；正式部署请核对授权中文版/使用许可
-ISI,ISI 失眠严重程度指数,4,对当前睡眠状况的不满意程度,insomnia,False,ISI_0_4,最近两周,原型中文改写版；正式部署请核对授权中文版/使用许可
-ISI,ISI 失眠严重程度指数,5,睡眠问题对日间功能的影响程度,insomnia,False,ISI_0_4,最近两周,原型中文改写版；正式部署请核对授权中文版/使用许可
-ISI,ISI 失眠严重程度指数,6,他人能察觉到你的睡眠问题对生活质量的影响程度,insomnia,False,ISI_0_4,最近两周,原型中文改写版；正式部署请核对授权中文版/使用许可
-ISI,ISI 失眠严重程度指数,7,你对当前睡眠问题的担心或痛苦程度,insomnia,False,ISI_0_4,最近两周,原型中文改写版；正式部署请核对授权中文版/使用许可

@@ -8,6 +8,7 @@ import re
 import os
 import sys
 import hashlib
+import uuid
 import aiomysql
 
 router = APIRouter(prefix="", tags=["risk"])
@@ -358,9 +359,17 @@ async def _call_llm_api(
             "risk_level": result_data.get("risk_level", "medium"),
             "risk_score": float(result_data.get("risk_score", 0.5)),
             "confidence": float(result_data.get("confidence", 0.8)),
-            "key_risk_factors": result_data.get("key_risk_factors", []),
+            "summary": result_data.get("summary", result_data.get("reason", "")),
+            "risk_factors": result_data.get("risk_factors", result_data.get("key_risk_factors", [])),
+            "key_risk_factors": result_data.get("key_risk_factors", result_data.get("risk_factors", [])),
             "protective_factors": result_data.get("protective_factors", []),
             "professional_advice": result_data.get("professional_advice", ""),
+            "symptom_description": result_data.get("symptom_description", ""),
+            "emotional_analysis": result_data.get("emotional_analysis", ""),
+            "risk_interpretation": result_data.get("risk_interpretation", ""),
+            "key_highlight": result_data.get("key_highlight", ""),
+            "intervention_suggestion": result_data.get("intervention_suggestion", ""),
+            "follow_up_suggestion": result_data.get("follow_up_suggestion", ""),
             "model": model_name,
             "model_type": "dashscope"
         }
@@ -663,6 +672,73 @@ def _summarize_posts(posts: List[str], limit: int = 5, snippet_len: int = 120) -
     return "\n".join(summary_lines)
 
 
+def _score_post_risk(post: str) -> int:
+    text = str(post or "").lower()
+    keyword_weights = {
+        "suicide": 5,
+        "kill myself": 5,
+        "end my life": 5,
+        "die": 4,
+        "death": 4,
+        "self-harm": 4,
+        "cut": 3,
+        "hopeless": 3,
+        "worthless": 3,
+        "depressed": 2,
+        "alone": 2,
+        "empty": 2,
+        "tired": 1,
+        "绝望": 3,
+        "自杀": 5,
+        "轻生": 5,
+        "活不下去": 5,
+        "痛苦": 2,
+    }
+    score = 0
+    for keyword, weight in keyword_weights.items():
+        if keyword in text:
+            score += weight
+    return score
+
+
+def _select_high_signal_posts(posts: List[str], limit: int = 8, snippet_len: int = 220) -> List[Dict[str, Any]]:
+    ranked = []
+    for idx, post in enumerate(posts):
+        clean_post = " ".join(str(post).split())
+        ranked.append({
+            "postIndex": idx,
+            "riskScore": _score_post_risk(clean_post),
+            "text": clean_post,
+        })
+    ranked.sort(key=lambda item: (item["riskScore"], len(item["text"])), reverse=True)
+    selected = ranked[:limit]
+    for item in selected:
+        if len(item["text"]) > snippet_len:
+            item["text"] = item["text"][:snippet_len].rstrip() + "..."
+    return selected
+
+
+def _format_post_evidence(posts: List[str], limit: int = 8, snippet_len: int = 220) -> str:
+    selected = _select_high_signal_posts(posts, limit=limit, snippet_len=snippet_len)
+    if not selected:
+        return ""
+    return "\n".join(
+        f"[高信号帖子{rank}] 风险分={item['riskScore']} | 原序号={item['postIndex'] + 1} | {item['text']}"
+        for rank, item in enumerate(selected, start=1)
+    )
+
+
+def _format_probability_distribution(probabilities: Any) -> str:
+    if isinstance(probabilities, dict):
+        items = []
+        for key, value in probabilities.items():
+            items.append(f"class_{key}={_safe_float(value):.4f}")
+        return ", ".join(items)
+    if isinstance(probabilities, list):
+        return ", ".join(f"class_{idx}={_safe_float(value):.4f}" for idx, value in enumerate(probabilities))
+    return str(probabilities or "")
+
+
 def _build_prompt_context(posts: List[str], user_hash: str = "", data_source: str = "") -> Dict[str, Any]:
     """为风险检测模板构建基础变量上下文。"""
     negative_keywords = [
@@ -699,6 +775,7 @@ def _build_prompt_context(posts: List[str], user_hash: str = "", data_source: st
         "posts_text": joined_posts,
         "posts_summary": _summarize_posts(posts, limit=8, snippet_len=150),
         "posts_sample": _summarize_posts(posts, limit=5, snippet_len=120),
+        "high_signal_posts": _format_post_evidence(posts, limit=8, snippet_len=220),
         "time_range": "近期历史贴文",
         "risk_keyword_count": risk_keyword_count,
         "emotion_keyword_count": emotion_keyword_count,
@@ -786,6 +863,128 @@ def _extract_json_object(text: str) -> Optional[Dict[str, Any]]:
                     return None
 
     return None
+
+
+def _generate_task_code(prefix: str) -> str:
+    """生成更稳的任务编码，避免同秒并发创建冲突。"""
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3]
+    suffix = uuid.uuid4().hex[:6]
+    return f"{prefix}_{timestamp}_{suffix}"
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize_risk_level(level: Any, default: str = "medium") -> str:
+    if level is None:
+        return default
+    text = str(level).strip().lower().replace("-", "_")
+    mapping = {
+        "critical": "high",
+        "very_high": "high",
+        "high": "high",
+        "medium_high": "medium",
+        "medium": "medium",
+        "moderate": "medium",
+        "low": "low",
+        "normal": "low",
+        "none": "low",
+    }
+    return mapping.get(text, default)
+
+
+def _normalize_text_list(value: Any) -> List[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, dict):
+        return [f"{k}: {v}" for k, v in value.items() if str(v).strip()]
+    text = str(value).strip()
+    return [text] if text else []
+
+
+def _normalize_text_block(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, list):
+        return "；".join(str(item).strip() for item in value if str(item).strip())
+    if isinstance(value, dict):
+        return "；".join(f"{k}: {v}" for k, v in value.items() if str(v).strip())
+    return str(value).strip()
+
+
+def _normalize_report_fields(
+    payload: Dict[str, Any],
+    *,
+    fallback_level: str = "medium",
+    fallback_score: float = 0.5,
+    fallback_confidence: float = 0.8,
+    fallback_summary: str = "",
+) -> Dict[str, Any]:
+    """将模型输出统一映射为报告页使用的结构化字段。"""
+    summary_candidates = [
+        payload.get("summary"),
+        payload.get("reason"),
+        payload.get("analysis"),
+        payload.get("risk_interpretation"),
+    ]
+    summary_value = next((item for item in summary_candidates if item not in (None, "", [])), fallback_summary)
+    if isinstance(summary_value, list):
+        summary_text = "；".join(str(item).strip() for item in summary_value if str(item).strip())
+    elif isinstance(summary_value, dict):
+        summary_text = json.dumps(summary_value, ensure_ascii=False)
+    else:
+        summary_text = str(summary_value).strip() if summary_value else fallback_summary
+
+    confidence = _safe_float(payload.get("confidence"), fallback_confidence)
+    if confidence > 1:
+        confidence = confidence / 100.0
+    confidence = max(0.0, min(confidence, 1.0))
+
+    return {
+        "riskLevel": _normalize_risk_level(payload.get("risk_level") or payload.get("riskLevel"), fallback_level),
+        "riskScore": max(0.0, min(_safe_float(payload.get("risk_score") or payload.get("riskScore"), fallback_score), 1.0)),
+        "confidence": round(confidence, 4),
+        "summary": summary_text,
+        "symptomDescription": str(payload.get("symptom_description") or payload.get("symptomDescription") or "").strip(),
+        "emotionalAnalysis": str(payload.get("emotional_analysis") or payload.get("emotionalAnalysis") or "").strip(),
+        "riskInterpretation": str(payload.get("risk_interpretation") or payload.get("riskInterpretation") or "").strip(),
+        "keyHighlight": str(payload.get("key_highlight") or payload.get("keyHighlight") or "").strip(),
+        "riskFactors": _normalize_text_list(payload.get("risk_factors") or payload.get("key_risk_factors") or payload.get("riskFactors")),
+        "protectiveFactors": _normalize_text_list(payload.get("protective_factors") or payload.get("protectiveFactors")),
+        "professionalAdvice": _normalize_text_block(payload.get("professional_advice") or payload.get("professionalAdvice")),
+        "interventionSuggestion": _normalize_text_block(payload.get("intervention_suggestion") or payload.get("interventionSuggestion")),
+        "followUpSuggestion": _normalize_text_block(payload.get("follow_up_suggestion") or payload.get("followUpSuggestion")),
+        "llmResponse": str(payload.get("llm_response") or payload.get("llmResponse") or payload.get("response") or "").strip(),
+        "llmModel": str(payload.get("llmModel") or payload.get("model") or "").strip(),
+    }
+
+
+def _infer_report_model_name(task: Dict[str, Any], result_summary: Dict[str, Any]) -> str:
+    """根据任务类型返回报告展示模型名。"""
+    detection_configs = task.get("detection_model_configs")
+    if isinstance(detection_configs, str):
+        try:
+            detection_configs = json.loads(detection_configs)
+        except json.JSONDecodeError:
+            detection_configs = {}
+    detection_configs = detection_configs or {}
+
+    model_type = detection_configs.get("model_type", "")
+    base_name = detection_configs.get("model_name") or ""
+
+    if result_summary.get("emoccModelResult") or model_type == "emocc_local":
+        return "Emocc-Reddit + qwen-flash"
+    if result_summary.get("fealearnerModelResult") or model_type == "fealearner_local":
+        return "FeaLearner-Reddit + qwen-flash"
+    if base_name:
+        return base_name
+    return "qwen-flash"
 
 
 # ========================
@@ -996,7 +1195,7 @@ async def create_risk_task(task: RiskTaskCreate = Body(...), request: Request = 
     start_time = time.time()
     pool = request.app.state.mysql_db
     
-    task_code = f"risk_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    task_code = _generate_task_code("risk")
     now = datetime.now()
     
     # 兼容驼峰和下划线格式
@@ -1502,17 +1701,20 @@ async def _execute_api_task(pool, task: dict, app_state: Any = None) -> dict:
         )
 
         if response.get("success"):
-            return {
-                "riskLevel": response.get("risk_level", "medium"),
-                "riskScore": float(response.get("risk_score", 0.5)),
-                "confidence": float(response.get("confidence", 0.8)),
-                "summary": response.get("professional_advice", "API模型检测完成"),
-                "riskFactors": response.get("key_risk_factors", []),
-                "protectiveFactors": response.get("protective_factors", []),
+            structured = _normalize_report_fields(
+                response,
+                fallback_level=response.get("risk_level", "medium"),
+                fallback_score=_safe_float(response.get("risk_score"), 0.5),
+                fallback_confidence=_safe_float(response.get("confidence"), 0.8),
+                fallback_summary="API模型检测完成",
+            )
+            structured.update({
                 "modelType": "api_dashscope",
                 "postCount": len(posts),
-                "llmResponse": response.get("response", "")
-            }
+            })
+            if not structured.get("llmModel"):
+                structured["llmModel"] = model_name
+            return structured
         else:
             raise ValueError(f"API模型调用失败: {response.get('error', 'Unknown error')}")
     except Exception as e:
@@ -1574,14 +1776,38 @@ async def _execute_ollama_task(pool, task: dict) -> dict:
     if template_content:
         prompt = _render_prompt_template(template_content, prompt_context)
     else:
-        # Ollama 本地模型使用更简洁的提示词
         posts_text = prompt_context["posts_text"]
-        prompt = f"""分析以下帖子的自杀风险。只输出JSON，不要其他内容。
-帖子：{posts_text}
+        high_signal_posts = prompt_context.get("high_signal_posts", "")
+        prompt = f"""你是一位谨慎的心理健康风险筛查助手。请只依据帖子中的明确证据输出 JSON。
 
-输出格式：{{"risk_level":"low|medium|high","risk_score":0-1,"summary":"一句话总结"}}
+【高信号帖子】
+{high_signal_posts}
 
-直接输出JSON："""
+【原始帖子（补充）】
+{posts_text}
+
+【输出要求】
+1. 先看高信号帖子，再参考原始帖子补充判断
+2. 不要写空话，不要写“模型检测完成”
+3. 每个字段尽量具体，优先引用帖子中可观察到的事实
+4. 只输出一个 JSON 对象，不要输出其他说明
+5. 若证据不足，宁可写“证据有限”，不要编造诊断
+
+【JSON结构】
+{{
+  "risk_level": "low|medium|high",
+  "risk_score": 0.0,
+  "confidence": 0.0,
+  "summary": "一句话总结风险结论与最强证据",
+  "symptom_description": "50-80字，描述帖子中可见的症状或困扰",
+  "emotional_analysis": "40-80字，概括主要情绪及触发因素",
+  "risk_interpretation": "60-120字，解释为什么是这个风险等级，并说明证据是否接近更高等级",
+  "risk_factors": ["2到4个具体风险因素"],
+  "protective_factors": ["0到3个具体保护因素"],
+  "professional_advice": "40-80字，写给专业人员",
+  "intervention_suggestion": "40-80字，写清优先动作",
+  "follow_up_suggestion": "30-60字，写清随访频率和观察点"
+}}"""
 
     # 调用 Ollama
     try:
@@ -1589,7 +1815,7 @@ async def _execute_ollama_task(pool, task: dict) -> dict:
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
                 f"{ollama_url}/api/generate",
-                json={"model": ollama_model, "prompt": prompt}
+                json={"model": ollama_model, "prompt": prompt, "options": {"temperature": 0.2}}
             )
             response_text = response.text
             
@@ -1651,15 +1877,21 @@ async def _execute_ollama_task(pool, task: dict) -> dict:
                     risk_score = 0.5
                 parsed = {"risk_level": risk_level, "risk_score": risk_score, "summary": content[:200]}
 
-        return {
-            "riskLevel": parsed.get("risk_level", "medium"),
-            "riskScore": float(parsed.get("risk_score", 0.5)),
-            "confidence": 0.8,
-            "summary": parsed.get("summary", "Ollama模型检测完成"),
+        structured = _normalize_report_fields(
+            parsed,
+            fallback_level="medium",
+            fallback_score=0.5,
+            fallback_confidence=0.8,
+            fallback_summary="Ollama模型检测完成",
+        )
+        structured.update({
             "modelType": "ollama",
             "modelName": model_config.get("model_name"),
-            "postCount": len(posts)
-        }
+            "postCount": len(posts),
+        })
+        if not structured.get("llmModel"):
+            structured["llmModel"] = model_config.get("model_code") or model_config.get("ollama_model_name") or model_config.get("model_name") or ""
+        return structured
     except Exception as e:
         raise ValueError(f"Ollama模型调用失败: {str(e)}")
 
@@ -1858,15 +2090,14 @@ async def _call_llm_for_emocc_fusion(
     Returns:
         整合后的结果
     """
-    # 优先级：用户选择的模型配置 > 环境变量
+    # 检测模型后的整理模型固定为 qwen-flash
+    model_name = "qwen-flash"
     if fusion_model_config and fusion_model_config.get('api_key'):
         api_key = fusion_model_config.get('api_key')
-        model_name = fusion_model_config.get('model_name', _get_llm_model_name())
-        print(f"[Emocc Fusion] 使用用户选择的融合模型: {model_name}")
+        print(f"[Emocc Fusion] 使用固定整理模型: {model_name}")
     else:
         api_key = _get_llm_api_key()
-        model_name = _get_llm_model_name()
-        print(f"[Emocc Fusion] 使用环境变量配置的融合模型: {model_name}")
+        print(f"[Emocc Fusion] 使用环境变量中的固定整理模型: {model_name}")
     
     if not api_key:
         return {
@@ -1918,8 +2149,15 @@ async def _call_llm_for_emocc_fusion(
 【各类别概率分布】:
 {json.dumps(emocc_result.get('class_probs', []), ensure_ascii=False)}
 
+【分析要求】
+1. 说明 Emocc 的五分类结果、注意力分数和类别概率分别代表什么
+2. 从模型检测证据、帖子文本证据两个角度做互补与增强分析
+3. 判断模型证据与文本证据是否一致，如有矛盾要解释不确定性来源
+4. 输出必须可直接作为检测报告展示
+
 【输出格式】（必须严格遵循JSON格式）
 {{
+    "summary": "综合评估摘要（50字以内）",
     "symptom_description": "临床症状描述：描述用户在社交媒体上表现出的情绪状态、行为特征和主要困扰",
     "emotional_analysis": "情绪分析：分析用户的整体情绪倾向、情绪波动模式和主要情绪类型",
     "risk_level": "high|medium|low",
@@ -1941,7 +2179,9 @@ async def _call_llm_for_emocc_fusion(
         from openai import OpenAI
         import ssl
         
-        base_url = _get_llm_api_base_url()
+        base_url = fusion_model_config.get("api_base_url") if fusion_model_config else None
+        if not base_url:
+            base_url = _get_llm_api_base_url()
         
         ssl_context = ssl.create_default_context()
         ssl_context.check_hostname = False
@@ -2024,7 +2264,7 @@ async def create_emocc_detection_task(
     """
     pool = request.app.state.mysql_db
     
-    task_code = f"emocc_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    task_code = _generate_task_code("emocc")
     now = datetime.now()
     
     user_hash = task_data.get("userHash") or task_data.get("user_hash") or ""
@@ -2251,11 +2491,18 @@ async def execute_emocc_detection_task(
     
     # 4. 构建结果摘要
     fr = fusion_result if fusion_result else {}
+    structured = _normalize_report_fields(
+        fr,
+        fallback_level=emocc_result.get("risk_level", "medium"),
+        fallback_score=_safe_float(emocc_result.get("risk_score"), 0.5),
+        fallback_confidence=_safe_float(fr.get("confidence") if fr else emocc_result.get("confidence"), 0.8),
+        fallback_summary=fr.get("summary", "检测完成") if fr else "检测完成",
+    )
     result_summary = {
-        "riskLevel": fr.get("risk_level", emocc_result.get("risk_level", "medium")),
-        "riskScore": float(fr.get("risk_score", emocc_result.get("risk_score", 0.5))),
-        "confidence": int((fr.get("confidence", 0.8) if fr else emocc_result.get("confidence", 0.8)) * 100),
-        "summary": fr.get("summary", "检测完成") if fr else "检测完成",
+        "riskLevel": structured["riskLevel"],
+        "riskScore": structured["riskScore"],
+        "confidence": int(structured["confidence"] * 100),
+        "summary": structured["summary"],
         "emoccModelResult": {
             "riskLevel": emocc_result.get("risk_level"),
             "riskScore": emocc_result.get("risk_score"),
@@ -2267,16 +2514,17 @@ async def execute_emocc_detection_task(
             "modelType": emocc_result.get("model_type", "emocc_local")
         },
         "fusionMethod": fr.get("fusion_method", "direct") if fr else "direct",
-        "symptomDescription": fr.get("symptom_description", ""),
-        "emotionalAnalysis": fr.get("emotional_analysis", ""),
-        "riskInterpretation": fr.get("risk_interpretation", ""),
-        "keyHighlight": fr.get("key_highlight", ""),
-        "riskFactors": fr.get("risk_factors", []),
-        "protectiveFactors": fr.get("protective_factors", []),
-        "professionalAdvice": fr.get("professional_advice", ""),
-        "interventionSuggestion": fr.get("intervention_suggestion", ""),
-        "followUpSuggestion": fr.get("follow_up_suggestion", ""),
-        "llmModel": fr.get("model", "") if fr else ""
+        "symptomDescription": structured["symptomDescription"],
+        "emotionalAnalysis": structured["emotionalAnalysis"],
+        "riskInterpretation": structured["riskInterpretation"],
+        "keyHighlight": structured["keyHighlight"],
+        "riskFactors": structured["riskFactors"],
+        "protectiveFactors": structured["protectiveFactors"],
+        "professionalAdvice": structured["professionalAdvice"],
+        "interventionSuggestion": structured["interventionSuggestion"],
+        "followUpSuggestion": structured["followUpSuggestion"],
+        "llmModel": structured["llmModel"] or "qwen-flash",
+        "llmResponse": structured["llmResponse"],
     }
     
     # 5. 更新数据库
@@ -2733,6 +2981,7 @@ async def get_risk_task_report(task_id: str, request: Request):
             result_summary = {}
 
     emocc_result = result_summary.get("emoccModelResult")
+    report_model_name = _infer_report_model_name(task, result_summary)
 
     return {
         "success": True,
@@ -2743,7 +2992,7 @@ async def get_risk_task_report(task_id: str, request: Request):
             "userHash": task.get("user_hash", ""),
             "dataSource": task.get("data_source", ""),
             "postCount": task.get("post_count", 0),
-            "modelName": "Emocc + qwen-flash" if emocc_result else "qwen-flash",
+            "modelName": report_model_name,
             "processingTimeMs": task.get("processing_time_ms"),
             "createdAt": task.get("created_at").isoformat() if task.get("created_at") else "",
             "completedAt": task.get("completed_at").isoformat() if task.get("completed_at") else "",
@@ -2867,22 +3116,18 @@ async def create_fealearner_detection_task(
     if not user_hash:
         raise HTTPException(status_code=400, detail="缺少 userHash 参数")
     
-    # 从 psychological_records 获取用户信息（通过 user_profiles 关联）
-    async with pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cursor:
-            await cursor.execute("""
-                SELECT pr.id 
-                FROM psychological_records pr
-                JOIN user_profiles up ON pr.user_id = up.id
-                WHERE up.user_hash = %s AND up.dataset_source = %s
-                LIMIT 1
-            """, (user_hash, data_source))
-            record = await cursor.fetchone()
-            
-            post_count = 10  # 默认 post_count
+    post_count = 0
+    try:
+        db_posts, _ = await _get_user_posts_from_db(pool, user_hash=user_hash, data_source=data_source, page_size=100)
+        post_count = len([p for p in db_posts if p.get("content")])
+    except Exception as e:
+        print(f"[FeaLearner Create] 从数据库获取帖子失败: {e}")
+
+    if post_count <= 0:
+        raise HTTPException(status_code=400, detail="用户没有可用于 FeaLearner 检测的帖子数据")
     
     now = datetime.now()
-    task_code = now.strftime("%Y%m%d%H%M%S")
+    task_code = _generate_task_code("fea")
     
     if not task_name:
         task_name = f"FeaLearner检测_{user_hash[:8]}"
@@ -3024,14 +3269,9 @@ async def list_fealearner_tasks(
                 result_summary = json.loads(result_summary)
             except:
                 result_summary = None
-        
-        risk_level = None
-        risk_score = 0.5
-        confidence = 80
-        if result_summary:
-            risk_level = result_summary.get("riskLevel")
-            risk_score = result_summary.get("riskScore", 0.5)
-            confidence = result_summary.get("confidence", 80)
+
+        result_summary = result_summary or {}
+        report_model_name = _infer_report_model_name(row, result_summary) if result_summary else "FeaLearner-Reddit"
         
         tasks.append({
             "id": row["id"],
@@ -3042,14 +3282,10 @@ async def list_fealearner_tasks(
             "userHash": row["user_hash"],
             "dataSource": row["data_source"],
             "postCount": row["post_count"],
-            "modelName": "FeaLearner-Reddit",
+            "modelName": report_model_name,
             "progress": row.get("progress", 0),
             "status": row["status"],
-            "resultSummary": {
-                "riskLevel": risk_level,
-                "riskScore": risk_score,
-                "confidence": confidence
-            } if result_summary else None,
+            "resultSummary": result_summary if result_summary else None,
             "createdAt": row["created_at"].isoformat() if row.get("created_at") else "",
             "startedAt": row["started_at"].isoformat() if row.get("started_at") else None,
             "completedAt": row["completed_at"].isoformat() if row.get("completed_at") else None,
@@ -3246,11 +3482,18 @@ async def execute_fealearner_detection_task(
     processing_time_ms = int((time.time() - start_time) * 1000)
     
     fr = fusion_result if fusion_result else {}
+    structured = _normalize_report_fields(
+        fr,
+        fallback_level=fealearner_result.get("risk_level", "medium"),
+        fallback_score=_safe_float(fealearner_result.get("risk_score"), 0.5),
+        fallback_confidence=_safe_float(fr.get("confidence") if fr else fealearner_result.get("confidence"), 0.8),
+        fallback_summary=fr.get("summary", "FeaLearner 检测完成") if fr else "FeaLearner 检测完成",
+    )
     result_summary = {
-        "riskLevel": fr.get("risk_level", fealearner_result.get("risk_level", "medium")),
-        "riskScore": float(fr.get("risk_score", fealearner_result.get("risk_score", 0.5))),
-        "confidence": int((fr.get("confidence", 0.8)) * 100),
-        "summary": fr.get("summary", "FeaLearner 检测完成") if fr else "FeaLearner 检测完成",
+        "riskLevel": structured["riskLevel"],
+        "riskScore": structured["riskScore"],
+        "confidence": int(structured["confidence"] * 100),
+        "summary": structured["summary"],
         "fealearnerModelResult": {
             "riskLevel": fealearner_result.get("risk_level"),
             "riskScore": fealearner_result.get("risk_score"),
@@ -3259,15 +3502,16 @@ async def execute_fealearner_detection_task(
             "probabilities": list(fealearner_result.get("probabilities", {}).values()),
             "modelType": fealearner_result.get("model_type", "fealearner_local")
         },
-        "symptomDescription": fr.get("symptom_description", ""),
-        "emotionalAnalysis": fr.get("emotional_analysis", ""),
-        "riskInterpretation": fr.get("risk_interpretation", ""),
-        "riskFactors": fr.get("risk_factors", []),
-        "protectiveFactors": fr.get("protective_factors", []),
-        "professionalAdvice": fr.get("professional_advice", ""),
-        "interventionSuggestion": fr.get("intervention_suggestion", ""),
-        "followUpSuggestion": fr.get("follow_up_suggestion", ""),
-        "llmModel": fr.get("model", "") if fr else ""
+        "symptomDescription": structured["symptomDescription"],
+        "emotionalAnalysis": structured["emotionalAnalysis"],
+        "riskInterpretation": structured["riskInterpretation"],
+        "riskFactors": structured["riskFactors"],
+        "protectiveFactors": structured["protectiveFactors"],
+        "professionalAdvice": structured["professionalAdvice"],
+        "interventionSuggestion": structured["interventionSuggestion"],
+        "followUpSuggestion": structured["followUpSuggestion"],
+        "llmModel": structured["llmModel"] or "qwen-flash",
+        "llmResponse": structured["llmResponse"],
     }
     
     async with pool.acquire() as conn:
@@ -3289,6 +3533,7 @@ async def execute_fealearner_detection_task(
         "userHash": user_hash,
         "dataSource": data_source,
         "postCount": len(posts),
+        "modelName": "FeaLearner-Reddit + qwen-flash",
         "progress": 100,
         "status": "completed",
         "resultSummary": result_summary,
@@ -3306,14 +3551,13 @@ async def _call_llm_for_fealearner_fusion(
     """
     调用 DashScope LLM 整合 FeaLearner 模型检测结果
     """
+    model_name = "qwen-flash"
     if fusion_model_config and fusion_model_config.get('api_key'):
         api_key = fusion_model_config.get('api_key')
-        model_name = fusion_model_config.get('model_name', _get_llm_model_name())
-        print(f"[FeaLearner Fusion] 使用用户选择的融合模型: {model_name}")
+        print(f"[FeaLearner Fusion] 使用固定整理模型: {model_name}")
     else:
         api_key = _get_llm_api_key()
-        model_name = _get_llm_model_name()
-        print(f"[FeaLearner Fusion] 使用环境变量配置的融合模型: {model_name}")
+        print(f"[FeaLearner Fusion] 使用环境变量中的固定整理模型: {model_name}")
     
     if not api_key:
         return {
@@ -3357,24 +3601,65 @@ async def _call_llm_for_fealearner_fusion(
 - model: 使用的模型名称"""
 
     posts_text = "\n".join([f"[帖子{i+1}] {p[:200]}" for i, p in enumerate(posts[:10])])
-    fea_info = f"预测标签: {fealearner_result.get('pred_label', 'N/A')}, 风险等级: {fealearner_result.get('risk_level', 'N/A')}, 风险分数: {fealearner_result.get('risk_score', 'N/A')}"
+    high_signal_posts = _format_post_evidence(posts, limit=6, snippet_len=220)
+    probability_items = fealearner_result.get("probabilities", {}) or {}
+    probability_text = _format_probability_distribution(probability_items)
+    fea_info = (
+        f"预测标签: {fealearner_result.get('pred_label', 'N/A')}, "
+        f"风险等级: {fealearner_result.get('risk_level', 'N/A')}, "
+        f"风险分数: {fealearner_result.get('risk_score', 'N/A')}, "
+        f"置信度: {fealearner_result.get('confidence', 'N/A')}"
+    )
     
     user_prompt = f"""请分析以下用户的自杀风险评估：
 
 【FeaLearner 模型检测结果】
 {fea_info}
 
-【用户帖子内容】
+【FeaLearner 各类别概率分布】
+{probability_text}
+
+【高信号帖子】
+{high_signal_posts}
+
+【原始帖子内容】
 {posts_text}
 
-请给出综合评估报告（JSON格式）："""
+【分析要求】
+1. 先解释 FeaLearner 的五分类预测标签和概率分布，再结合帖子证据判断
+2. 必须明确说明：模型主判定是什么、最接近的次高风险类别是什么、两者差距意味着什么
+3. 从模型结果、文本证据、模型不确定性三个角度做互补与增强解释
+4. 如果当前模型没有提供注意力分数，不要编造；改为解释概率分布和边界不确定性
+5. 不要泛泛写“存在抑郁倾向”，要结合帖子中的具体线索
+6. 输出必须可直接作为检测报告展示，避免空话
+
+请给出综合评估报告（JSON格式），至少包含：
+{{
+  "risk_level": "low|medium|high",
+  "risk_score": 0.0,
+  "confidence": 0.0,
+  "summary": "50字以内，直接给出风险结论和最强证据",
+  "symptom_description": "60-120字，概括可观察到的症状或困扰",
+  "emotional_analysis": "50-100字，概括情绪基调、波动和触发因素",
+  "risk_interpretation": "80-160字，必须说明模型主判定、次高类别及文本证据是否支持",
+  "risk_factors": ["3到5个具体风险因素"],
+  "protective_factors": ["1到4个具体保护因素"],
+  "professional_advice": "50-100字，写给专业人员",
+  "intervention_suggestion": "40-100字，给出优先动作",
+  "follow_up_suggestion": "40-80字，写清首次随访时间和后续频率"
+}}"""
 
     try:
         import httpx
+        base_url = fusion_model_config.get("api_base_url") if fusion_model_config else None
+        if not base_url:
+            base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+        else:
+            base_url = base_url.rstrip("/") + "/chat/completions"
         
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
-                "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+                base_url,
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json"
@@ -3385,7 +3670,7 @@ async def _call_llm_for_fealearner_fusion(
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
                     ],
-                    "temperature": 0.7,
+                    "temperature": 0.2,
                     "max_tokens": 2048
                 }
             )
@@ -3397,7 +3682,10 @@ async def _call_llm_for_fealearner_fusion(
                 import re
                 json_match = re.search(r'\{[\s\S]*\}', content)
                 if json_match:
-                    return json.loads(json_match.group())
+                    parsed = json.loads(json_match.group())
+                    parsed["llmModel"] = model_name
+                    parsed["model"] = model_name
+                    return parsed
     except Exception as e:
         print(f"[FeaLearner Fusion] LLM 调用失败: {e}")
     

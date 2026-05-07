@@ -4,9 +4,9 @@ import ReactECharts from 'echarts-for-react';
 import {
   Clock, Filter, Search, FileText,
   Activity, MessageSquare, ArrowLeft,
-  FilterX, Info, Star, ListChecks, Eye
+  FilterX, Info, Star, AlertTriangle, BookOpen, ChevronDown
 } from 'lucide-react';
-import { fetchCSVPUserPosts, fetchCSVUserKeywords, fetchDatasets, fetchScaleTasks, DemoPostRecord, DatasetProfile, type ScaleTask } from '../api';
+import { fetchArchiveDetail, fetchCSVUserKeywords, fetchDatasets, DatasetProfile } from '../api';
 import ActionCapsuleButton from '../components/ActionCapsuleButton';
 
 // ==================== 类型定义 ====================
@@ -21,7 +21,7 @@ interface ArchiveRecord {
   age?: number;
   postCount?: number;
   riskLevel?: 'low' | 'medium' | 'high' | 'unknown' | string;
-  riskOverview?: '高风险' | '中风险' | '低风险';
+  riskOverview?: '高风险' | '中风险' | '低风险' | '待判定';
   importTime?: string;
   lastActive?: string;
   recordCount?: number;
@@ -40,6 +40,13 @@ interface PostRecord {
   timestamp?: string;
   hasTimestamp: boolean;
   microExpressions?: string[];
+  evidenceDomains?: Array<{
+    key: string;
+    label: string;
+    matches: string[];
+    count: number;
+  }>;
+  evidenceSummary?: string;
   status: 'pending' | 'accepted' | 'rejected';
 }
 
@@ -51,6 +58,74 @@ function formatTimestampLabel(timestamp?: string): string {
   if (!timestamp) return '';
   const [datePart = '', timePart = ''] = timestamp.split(' ');
   return timePart ? `${datePart}\n${timePart}` : datePart;
+}
+
+function mapRiskLevelToChinese(level?: string): '高风险' | '中风险' | '低风险' | '待判定' {
+  if (level === 'high') return '高风险';
+  if (level === 'medium') return '中风险';
+  if (level === 'low') return '低风险';
+  return '待判定';
+}
+
+function mapFineLabelToRiskLevel(label: number, datasetSource: string): 'low' | 'medium' | 'high' {
+  const source = datasetSource.toLowerCase();
+  if (source === 'reddit') {
+    if (label >= 4) return 'high';
+    if (label >= 2) return 'medium';
+    return 'low';
+  }
+  if (source === 'bigdata') {
+    if (label >= 3) return 'high';
+    if (label >= 2) return 'medium';
+    return 'low';
+  }
+  if (source === 'sigir' || source === 'weibo') {
+    return label >= 1 ? 'high' : 'low';
+  }
+  if (label >= 3) return 'high';
+  if (label >= 2) return 'medium';
+  return 'low';
+}
+
+function formatPostIndexLabel(postIndex: number, compact = false): string {
+  const normalized = Number.isFinite(postIndex) ? String(postIndex).padStart(2, '0') : '--';
+  return compact ? `P${normalized}` : `帖子 ${normalized}`;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function renderHighlightedContent(content: string, evidenceDomains?: PostRecord['evidenceDomains']) {
+  if (!content) return null;
+
+  const keywords = Array.from(new Set(
+    (evidenceDomains || [])
+      .flatMap((domain) => domain.matches || [])
+      .filter(Boolean)
+  )).sort((a, b) => b.length - a.length);
+
+  if (keywords.length === 0) {
+    return content;
+  }
+
+  const pattern = new RegExp(`(${keywords.map((item) => escapeRegExp(item)).join('|')})`, 'ig');
+  const parts = content.split(pattern);
+
+  return parts.map((part, index) => {
+    const matched = keywords.find((keyword) => keyword.toLowerCase() === part.toLowerCase());
+    if (!matched) {
+      return <span key={`text-${index}`}>{part}</span>;
+    }
+    return (
+      <mark
+        key={`hit-${index}`}
+        className="rounded-md bg-[#FFF3BF] px-1 py-0.5 text-[#92400E]"
+      >
+        {part}
+      </mark>
+    );
+  });
 }
 
 // ==================== 常量配置 ====================
@@ -86,7 +161,6 @@ export default function ArchiveDetailPage() {
   const [selectedArchive, setSelectedArchive] = useState<ArchiveRecord | null>(null);
   const [selectedPost, setSelectedPost] = useState<PostRecord | null>(null);
   const [posts, setPosts] = useState<PostRecord[]>([]);
-  const [scaleTasks, setScaleTasks] = useState<ScaleTask[]>([]);
   const [topN, setTopN] = useState(3);
   const [timeRange, setTimeRange] = useState({ start: '', end: '' });
   const [importanceFilter, setImportanceFilter] = useState('all');
@@ -133,113 +207,76 @@ export default function ArchiveDetailPage() {
 
   // 初始化数据（从后端 API 加载）
   useEffect(() => {
-    if (archiveId) {
-      // 从 sessionStorage 获取选中的档案信息
-      const savedArchive = sessionStorage.getItem('selectedArchive');
-      let userHash: string | null = null;
-      let datasetKey: string | null = null;
-      
-      if (savedArchive) {
-        try {
-          const archive = JSON.parse(savedArchive) as ArchiveRecord;
-          // 兼容不同的字段名：dataSource 或 datasetSource
-          const ds = archive.dataSource || (archive as any).datasetSource || 'reddit';
-          const uid = archive.userId || archive.id;
-          // 如果有 userId，设置 selectedArchive
-          if (uid && uid === archiveId) {
-            setSelectedArchive(archive);
-            userHash = uid;
-            datasetKey = ds;
-          }
-        } catch (e) {
-          console.error('Failed to parse saved archive:', e);
+    if (!archiveId) return;
+
+    const savedArchive = sessionStorage.getItem('selectedArchive');
+    if (savedArchive) {
+      try {
+        const archive = JSON.parse(savedArchive) as ArchiveRecord;
+        const uid = archive.userId || archive.id;
+        if (uid === archiveId) {
+          setSelectedArchive(archive);
         }
-      }
-
-      // 如果没有从 sessionStorage 获取到 userHash，尝试从 URL params
-      if (!userHash) {
-        userHash = params.archiveId || null;
-      }
-
-      // 如果没有从 sessionStorage 获取到数据集，从 URL 参数中获取
-      if (!datasetKey) {
-        datasetKey = new URLSearchParams(window.location.search).get('dataset') || 'reddit';
-      }
-
-      // 至少设置一个默认的 selectedArchive，确保页面不会卡在加载状态
-      setSelectedArchive({
-        id: userHash,
-        userId: userHash,
-        userHash: userHash,
-        dataSource: datasetKey,
-        gender: '',
-        age: 0,
-        riskLevel: 'unknown',
-        recordCount: 0,
-      } as ArchiveRecord);
-      
-      if (userHash) {
-        // 一次性获取足够多的帖子数据（50条），前端负责分页显示
-        fetchCSVPUserPosts({ datasetKey, userHash, pageSize: 100 })
-          .then((res) => {
-            // 转换 DemoPostRecord 到 PostRecord
-            const loadedPosts: PostRecord[] = (res.posts || []).map((p: DemoPostRecord) => ({
-              id: p.id,
-              userId: p.userId,
-              postIndex: p.postIndex,
-              content: p.content,
-              // 使用后端计算的重要性分数，如果后端未提供则使用风险值作为参考
-              importanceScore: p.importanceScore ?? (p.riskScore ?? 0.5),
-              riskLevel: p.riskLevel || 'medium',
-              riskScore: p.riskScore ?? 0.5,
-              suicideRisk: p.suicideRisk,
-              timestamp: p.timestamp || undefined,
-              hasTimestamp: p.hasTimestamp ?? Boolean(p.timestamp),
-              status: (p.status as 'pending' | 'accepted' | 'rejected') || 'accepted',
-              // 微表情序列：直接从 API 传递原始字符串
-              microExpressions: p.emojiSequence ? [p.emojiSequence] : undefined,
-            }));
-            setPosts(loadedPosts);
-            // 重置可见帖子数量为默认的15条
-            setVisiblePostCount(15);
-            // 默认选中 Top 1（按重要性分数排序）
-            const sorted = [...loadedPosts].sort((a, b) => b.importanceScore - a.importanceScore);
-            setSelectedPost(sorted[0] || null);
-          })
-          .catch((err) => {
-            console.error('Failed to load posts:', err);
-            setPosts([]);
-          });
-
-        fetchScaleTasks({ userHash, dataSource: datasetKey, limit: 20 })
-          .then((res) => setScaleTasks(res.tasks || []))
-          .catch((err) => {
-            console.error('Failed to load scale tasks:', err);
-            setScaleTasks([]);
-          });
+      } catch (error) {
+        console.warn('Failed to parse saved archive:', error);
       }
     }
+
+    fetchArchiveDetail(archiveId)
+      .then((detail) => {
+        const datasetSource = detail.source || new URLSearchParams(window.location.search).get('dataset') || 'reddit';
+        const resolvedArchive: ArchiveRecord = {
+          id: detail.userId,
+          userId: detail.userId,
+          userHash: detail.userId,
+          dataSource: datasetSource,
+          datasetSource,
+          postCount: detail.postCount,
+          recordCount: detail.postCount,
+          importTime: detail.assessmentTime,
+          riskLevel: detail.riskLevel || 'unknown',
+          riskOverview: mapRiskLevelToChinese(detail.riskLevel),
+        };
+        setSelectedArchive(resolvedArchive);
+
+        const loadedPosts: PostRecord[] = (detail.posts || []).map((post, index) => {
+          const label = Number(post.label ?? 0);
+          const derivedRiskLevel = mapFineLabelToRiskLevel(label, datasetSource);
+          return {
+            id: post.id,
+            userId: detail.userId,
+            postIndex: index + 1,
+            content: post.text || '',
+            importanceScore: detail.posts.length - index,
+            riskLevel: derivedRiskLevel,
+            riskScore: detail.riskScore ?? 0.5,
+            suicideRisk: label,
+            timestamp: post.timestamp || undefined,
+            hasTimestamp: Boolean(post.timestamp),
+            status: 'accepted',
+            evidenceDomains: [],
+            evidenceSummary: '',
+          };
+        });
+
+        setPosts(loadedPosts);
+        setVisiblePostCount(15);
+        const sorted = [...loadedPosts].sort((a, b) => b.importanceScore - a.importanceScore);
+        setSelectedPost(sorted[0] || null);
+
+        return fetchCSVUserKeywords({ datasetKey: datasetSource, userHash: archiveId, topN: 8 });
+      })
+      .then((res) => setFrequentWords(res.keywords.map((k) => k.word)))
+      .catch((err) => {
+        console.error('Failed to load archive detail:', err);
+        setPosts([]);
+        setSelectedPost(null);
+        setFrequentWords([]);
+      });
   }, [archiveId, params.archiveId]);
 
   // 高频词汇（从后端 API 实时获取）
   const [frequentWords, setFrequentWords] = useState<string[]>([]);
-  useEffect(() => {
-    if (!params.archiveId) return;
-    const savedArchive = sessionStorage.getItem('selectedArchive');
-    // 从 sessionStorage 获取数据源，默认为 reddit
-    let datasetKeyForKeywords = 'reddit';
-    if (savedArchive) {
-      try {
-        const archive = JSON.parse(savedArchive);
-        datasetKeyForKeywords = archive.dataSource || (archive as any).datasetSource || 'reddit';
-      } catch (e) {
-        console.warn('Failed to parse saved archive for datasetKey:', e);
-      }
-    }
-    fetchCSVUserKeywords({ datasetKey: datasetKeyForKeywords, userHash: params.archiveId, topN: 8 })
-      .then((res) => setFrequentWords(res.keywords.map((k) => k.word)))
-      .catch(() => setFrequentWords([]));
-  }, [params.archiveId]);
 
   // 根据筛选条件过滤帖子
   const filteredPosts = posts.filter(post => {
@@ -284,8 +321,8 @@ export default function ArchiveDetailPage() {
 const visiblePosts = chartPosts.slice(0, visiblePostCount);
 const chartUsesTimestamp = visiblePosts.some(post => hasUsableTimestamp(post));
 
-// 风险颜色
-  const riskKey = selectedArchive?.riskOverview === '高风险' ? 'high' : selectedArchive?.riskOverview === '中风险' ? 'medium' : 'low';
+  const archiveRiskLabel = selectedArchive?.riskOverview || mapRiskLevelToChinese(selectedArchive?.riskLevel);
+  const riskKey = archiveRiskLabel === '高风险' ? 'high' : archiveRiskLabel === '中风险' ? 'medium' : 'low';
 
   // 重置筛选
   const handleReset = () => {
@@ -362,7 +399,7 @@ const chartUsesTimestamp = visiblePosts.some(post => hasUsableTimestamp(post));
 
           <div className="flex items-center gap-3">
             <span className={`px-4 py-1.5 rounded-full text-sm font-semibold ${RISK_COLORS[riskKey].bg} ${RISK_COLORS[riskKey].text}`}>
-              {selectedArchive.riskOverview}
+              {archiveRiskLabel}
             </span>
             <span className="px-3 py-1.5 bg-[#F1F5FA] text-[#415168] rounded-full text-sm">
               共 {posts.length} 条帖子
@@ -375,72 +412,18 @@ const chartUsesTimestamp = visiblePosts.some(post => hasUsableTimestamp(post));
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2 text-sm text-[#64748B]">
             <Clock className="w-4 h-4" />
-            <span>近N天内频繁词汇：</span>
+            <span>当前用户贴文高频词：</span>
           </div>
-          {frequentWords.map((word, i) => (
-            <span key={i} className="px-3 py-1 bg-white border border-[#DCE7F5] text-[#2F6BFF] text-sm rounded-full font-medium hover:bg-blue-50 transition-colors cursor-default">
-              {word}
-            </span>
-          ))}
+          {frequentWords.length > 0 ? (
+            frequentWords.map((word, i) => (
+              <span key={i} className="px-3 py-1 bg-white border border-[#DCE7F5] text-[#2F6BFF] text-sm rounded-full font-medium hover:bg-blue-50 transition-colors cursor-default">
+                {word}
+              </span>
+            ))
+          ) : (
+            <span className="text-sm text-[#94A3B8]">当前用户帖子里暂无可展示的高频词</span>
+          )}
         </div>
-      </div>
-
-      <div className="bg-white rounded-[28px] border border-[#E2E8F0] p-5 shadow-[0_10px_28px_rgba(15,23,42,0.04)]">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-semibold text-[#162033] flex items-center gap-2">
-            <ListChecks className="w-5 h-5 text-[#2F6BFF]" />
-            量表评估记录
-          </h3>
-          <span className="text-sm text-[#94A3B8]">与当前心理档案用户自动关联</span>
-        </div>
-        {scaleTasks.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#D6E4FA] bg-[#F8FBFF] px-5 py-6 text-sm text-[#94A3B8]">
-            该用户暂未创建量表评估任务。
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {scaleTasks.slice(0, 5).map((task) => (
-              <div key={task.id} className="flex flex-col gap-3 rounded-2xl border border-[#EAF0F6] bg-[#FBFDFF] px-4 py-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-[#162033]">{task.scaleName}</span>
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                      task.status === 'completed'
-                        ? 'bg-green-100 text-green-700'
-                        : task.status === 'in_progress'
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-slate-100 text-slate-700'
-                    }`}>
-                      {task.status === 'completed' ? '已完成' : task.status === 'in_progress' ? '答题中' : '待评估'}
-                    </span>
-                    {task.riskLevel ? (
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                        task.riskLevel === 'high'
-                          ? 'bg-red-100 text-red-700'
-                          : task.riskLevel === 'medium'
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-green-100 text-green-700'
-                      }`}>
-                        {task.riskLevel === 'high' ? '高风险' : task.riskLevel === 'medium' ? '中风险' : '低风险'}
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-2 text-sm text-[#64748B]">
-                    {typeof task.totalScore === 'number' ? `得分 ${task.totalScore} 分` : '尚未提交结果'} · 创建时间 {task.createdAt?.replace('T', ' ').slice(0, 16)}
-                  </p>
-                </div>
-                <ActionCapsuleButton
-                  onClick={() => navigate(task.status === 'completed' ? `/scale/result/${task.id}` : `/scale/answer/${task.id}`)}
-                  tone={task.status === 'completed' ? 'blue' : 'green'}
-                  tableAction
-                  icon={task.status === 'completed' ? <Eye className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
-                >
-                  {task.status === 'completed' ? '查看结果' : task.status === 'in_progress' ? '继续答题' : '开始评估'}
-                </ActionCapsuleButton>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* 主内容区 */}
@@ -456,7 +439,7 @@ const chartUsesTimestamp = visiblePosts.some(post => hasUsableTimestamp(post));
           {/* 交互说明 */}
           <div className="flex flex-wrap gap-4 text-xs text-[#64748B] mb-4 p-3 bg-[#F7FAFD] rounded-xl">
             <span className="flex items-center gap-1"><Info className="w-3 h-3" /> 交互说明：</span>
-            <span>• 悬停柱子：显示重要性分数、风险等级、摘要</span>
+            <span>• 悬停柱子：显示重要性分数、当前用户风险等级、摘要</span>
             <span>• 点击柱子：选中该帖子，下方显示详情</span>
             <span>• 颜色标识：Top 1(红) → Top 2(橙) → Top 3(黄) → 其他</span>
           </div>
@@ -469,7 +452,7 @@ const chartUsesTimestamp = visiblePosts.some(post => hasUsableTimestamp(post));
                 xAxis: {
                   type: 'category',
                   data: visiblePosts.map(p => (
-                    hasUsableTimestamp(p) ? formatTimestampLabel(p.timestamp) : `#${p.postIndex}`
+                    hasUsableTimestamp(p) ? formatTimestampLabel(p.timestamp) : formatPostIndexLabel(p.postIndex, true)
                   )),
                   axisLine: { lineStyle: { color: '#DCE7F5' } },
                   axisLabel: {
@@ -507,8 +490,10 @@ const chartUsesTimestamp = visiblePosts.some(post => hasUsableTimestamp(post));
                     const topIdx = topPosts.findIndex(t => t.id === p.id);
                     const rank = topIdx >= 0 ? ` (Top ${topIdx + 1})` : '';
                     return `<div style="padding:4px 0">
-                      <div><b>${hasUsableTimestamp(p) ? '时间戳' : '帖子序号'}</b>: ${hasUsableTimestamp(p) ? (p.timestamp || '-') : `#${p.postIndex}`}</div>
+                      <div><b>${hasUsableTimestamp(p) ? '时间戳' : '帖子序号'}</b>: ${hasUsableTimestamp(p) ? (p.timestamp || '-') : formatPostIndexLabel(p.postIndex)}</div>
                       <div><b>重要性分数</b>: ${p.importanceScore.toFixed(4)}</div>
+                      <div><b>当前用户风险等级</b>: ${archiveRiskLabel}</div>
+                      <div><b>证据域</b>: ${(p.evidenceDomains?.map((item) => item.label).join(' / ') || '未命中明显风险域')}</div>
                       <div><b>重要性排名</b>: ${rank || '其他'}</div>
                       <div style="margin-top:6px;font-size:11px;color:#888;max-width:200px;overflow:hidden;text-overflow:ellipsis">${p.content.slice(0, 50)}...</div>
                     </div>`;
@@ -693,7 +678,9 @@ const chartUsesTimestamp = visiblePosts.some(post => hasUsableTimestamp(post));
                   </div>
                   <div className="bg-white rounded-xl p-3 border border-[#E2E8F0]">
                     <p className="text-xs text-[#64748B] mb-1">帖子序号</p>
-                    <p className="font-semibold text-[#162033] text-sm">#{selectedPost.postIndex}</p>
+                    <span className="inline-flex items-center rounded-full border border-[#D6E4FA] bg-[#F8FBFF] px-3 py-1 text-sm font-semibold text-[#1D4ED8]">
+                      {formatPostIndexLabel(selectedPost.postIndex)}
+                    </span>
                   </div>
                   <div className="bg-white rounded-xl p-3 border border-[#E2E8F0]">
                     <p className="text-xs text-[#64748B] mb-1">重要性分数</p>
@@ -712,19 +699,111 @@ const chartUsesTimestamp = visiblePosts.some(post => hasUsableTimestamp(post));
                   <Star className="w-4 h-4 text-[#2F6BFF]" />
                   重要性分数
                 </h4>
-                <div className="flex items-center gap-4">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${getImportanceBgColor(selectedPost.importanceScore)}`}>
-                    <Star className={`w-7 h-7 ${getImportanceTextColor(selectedPost.importanceScore)}`} />
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${getImportanceBgColor(selectedPost.importanceScore)}`}>
+                      <Star className={`w-7 h-7 ${getImportanceTextColor(selectedPost.importanceScore)}`} />
+                    </div>
+                    <div>
+                      <span className={`text-xl font-bold ${selectedPost.importanceScore >= 0.7 ? 'text-[#2F6BFF]' : selectedPost.importanceScore >= 0.4 ? 'text-yellow-600' : 'text-green-600'}`}>
+                        {selectedPost.importanceScore.toFixed(4)}
+                      </span>
+                      <span className="text-[#64748B] ml-2">
+                        {getImportanceLabel(selectedPost.importanceScore)}
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <span className={`text-xl font-bold ${selectedPost.importanceScore >= 0.7 ? 'text-[#2F6BFF]' : selectedPost.importanceScore >= 0.4 ? 'text-yellow-600' : 'text-green-600'}`}>
-                      {selectedPost.importanceScore.toFixed(4)}
-                    </span>
-                    <span className="text-[#64748B] ml-2">
-                      {getImportanceLabel(selectedPost.importanceScore)}
-                    </span>
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${RISK_COLORS[riskKey].light}`}>
+                    <AlertTriangle className={`w-7 h-7 ${RISK_COLORS[riskKey].text}`} />
+                  </div>
+                  <div className={`rounded-2xl border px-4 py-3 ${RISK_COLORS[riskKey].light} ${RISK_COLORS[riskKey].border}`}>
+                    <p className="text-xs text-[#64748B] mb-1">当前用户风险等级</p>
+                    <p className={`text-base font-semibold ${RISK_COLORS[riskKey].text}`}>{archiveRiskLabel}</p>
                   </div>
                 </div>
+                <div className="mt-4 rounded-2xl border border-[#E2E8F0] bg-white p-4">
+                  <p className="text-xs font-medium text-[#64748B] mb-2">风险证据摘要</p>
+                  <p className="text-sm text-[#334155] leading-6">
+                    {selectedPost.evidenceSummary || '当前帖子未命中明显风险证据域。'}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(selectedPost.evidenceDomains && selectedPost.evidenceDomains.length > 0) ? (
+                      selectedPost.evidenceDomains.map((domain) => (
+                        <span
+                          key={domain.key}
+                          className="inline-flex items-center gap-2 rounded-full border border-[#D6E4FA] bg-[#F8FBFF] px-3 py-1.5 text-xs font-medium text-[#1D4ED8]"
+                          title={domain.matches.join(', ')}
+                        >
+                          <span>{domain.label}</span>
+                          <span className="text-[#64748B]">{domain.matches.slice(0, 2).join(' / ')}</span>
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-[#94A3B8]">未识别到明显风险词汇</span>
+                    )}
+                  </div>
+                </div>
+                <details className="mt-4 rounded-2xl border border-[#DCE7F5] bg-[#FBFDFF] p-4 group">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-[#2F6BFF]" />
+                      <span className="text-sm font-semibold text-[#162033]">理论依据</span>
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-[#64748B] transition-transform group-open:rotate-180" />
+                  </summary>
+                  <div className="mt-4 space-y-3 text-sm text-[#415168] leading-6">
+                    <div className="rounded-xl border border-[#EAF0F6] bg-white p-3">
+                      <p className="font-semibold text-[#162033]">ASQ</p>
+                      <p className="mt-1">
+                        参考 NIMH 的 Ask Suicide-Screening Questions，核心问题包括
+                        “是否希望自己已经死去”“是否觉得自己或家人会在你死后更好”“最近是否想过杀死自己”。
+                        本页将这类表达归入“被动死亡愿望”与“主动自杀意念”证据域。
+                      </p>
+                      <a
+                        href="https://www.nimh.nih.gov/research/research-conducted-at-nimh/asq-toolkit-materials/asq-tool/asq-information-sheet"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex text-xs font-medium text-[#2F6BFF] hover:underline"
+                      >
+                        NIMH ASQ Information Sheet
+                      </a>
+                    </div>
+                    <div className="rounded-xl border border-[#EAF0F6] bg-white p-3">
+                      <p className="font-semibold text-[#162033]">C-SSRS</p>
+                      <p className="mt-1">
+                        参考 Columbia-Suicide Severity Rating Scale 的分层逻辑，将
+                        “希望死去”“实际想过自杀”“是否思考过方法”“是否形成计划或意图”
+                        拆成不同严重程度的证据域，因此页面会单独标出“方法线索”等命中结果。
+                      </p>
+                      <a
+                        href="https://www.cms.gov/files/document/cssrs-screen-version-instrument.pdf"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex text-xs font-medium text-[#2F6BFF] hover:underline"
+                      >
+                        C-SSRS Screen Version
+                      </a>
+                    </div>
+                    <div className="rounded-xl border border-[#EAF0F6] bg-white p-3">
+                      <p className="font-semibold text-[#162033]">NIMH Warning Signs</p>
+                      <p className="mt-1">
+                        参考 NIMH 官方自杀预警信号，将“想死”“负担感”“空虚、绝望、被困住”
+                        “计划或研究死亡方式”“退缩、睡眠改变”等内容纳入“绝望/负担感”和“孤立/痛苦状态”证据域。
+                      </p>
+                      <a
+                        href="https://www.nimh.nih.gov/health/publications/warning-signs-of-suicide"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex text-xs font-medium text-[#2F6BFF] hover:underline"
+                      >
+                        NIMH Warning Signs of Suicide
+                      </a>
+                    </div>
+                    <p className="text-xs text-[#64748B]">
+                      这些依据用于解释页面中的风险信号来源，服务于辅助筛查与研究展示，不等同临床诊断或正式量表结论。
+                    </p>
+                  </div>
+                </details>
               </div>
 
               {/* 帖子内容 */}
@@ -734,8 +813,13 @@ const chartUsesTimestamp = visiblePosts.some(post => hasUsableTimestamp(post));
                   帖子内容全文
                 </h4>
                 <p className="text-[#415168] leading-relaxed text-base bg-white rounded-xl p-4 border border-[#E2E8F0]">
-                  {selectedPost.content}
+                  {renderHighlightedContent(selectedPost.content, selectedPost.evidenceDomains)}
                 </p>
+                {selectedPost.evidenceDomains && selectedPost.evidenceDomains.length > 0 && (
+                  <p className="mt-3 text-xs text-[#64748B]">
+                    高亮内容表示当前帖子命中的风险证据短语，仅用于辅助筛查与解释，不等同临床诊断。
+                  </p>
+                )}
               </div>
 
               {/* 微表情序列 */}

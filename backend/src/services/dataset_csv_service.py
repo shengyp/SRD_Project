@@ -59,37 +59,183 @@ class PostInfo:
     timestamp: Optional[str]
     has_emojis: bool
     emoji_sequence: Optional[str]
+    evidence_domains: Optional[List[dict]] = None
+    evidence_summary: Optional[str] = None
 
 
-# 重要性分数计算：消极/自杀风险相关词汇（英文自杀风险五分类任务）
-# 基于 Reddit 数据集的关键词进行重要性评估
+# 重要性分数词表：按权威筛查/预警框架整理
+# 设计依据贴近以下维度：
+# 1. NIMH ASQ / PHQ-9 Item 9 的“wish to be dead / self-harm”表达
+# 2. C-SSRS 的被动意念、主动意念、计划/方法、既往自伤线索
+# 3. WHO / VA 危机预警中的绝望、负担感、孤立、被困等信号
 _IMPORTANCE_KEYWORDS = {
-    # 直接自杀相关（高权重）
-    "suicide": 3.0, "suicidal": 3.0, "kill myself": 3.0, "want to die": 3.0,
-    "better off dead": 3.0, "end my life": 3.0, "self-harm": 2.5, "self harm": 2.5,
-    "cutting": 2.0, "overdose": 2.0, "hang myself": 3.0, "jump off": 2.5,
-    # 抑郁症状（中权重）
-    "depressed": 2.0, "depression": 2.0, "hopeless": 2.0, "helpless": 2.0,
-    "worthless": 2.0, "empty": 1.5, "numb": 1.5, "empty inside": 2.0,
-    "crying": 1.5, "cry": 1.0, "tears": 1.0, "sad": 1.0, "sadness": 1.5,
-    # 焦虑症状
-    "anxiety": 1.5, "anxious": 1.5, "panic": 1.5, "worried": 1.0, "fear": 1.0,
-    "scared": 1.0, "terrified": 1.5, "overwhelmed": 1.5,
-    # 失眠/疲劳
-    "insomnia": 1.0, "can't sleep": 1.0, "no sleep": 1.0, "exhausted": 1.0,
-    "tired": 0.5, "fatigue": 1.0,
-    # 社交退缩
-    "alone": 1.5, "lonely": 1.5, "isolated": 1.5, "no one": 1.0, "nobody": 1.0,
-    "isolating": 1.5, "push away": 1.0, "stay away": 1.0,
-    # 负面自我评价
-    "hate myself": 2.5, "hate my life": 2.5, "burden": 2.0, "useless": 2.0,
-    "failure": 1.5, "pathetic": 1.5, "disgusting": 1.0, "ugly": 1.0,
-    # 绝望相关
-    "hopeless": 2.0, "no hope": 2.0, "never get better": 2.5, "forever": 1.5,
-    "always tired": 1.0, "give up": 2.0, "give up on": 2.0, "can't anymore": 2.0,
-    # 治疗/应对相关（可能降低风险）
-    "therapy": -0.5, "medication": -0.5, "hospital": 0.5, "better": -0.5,
+    # 一级：直接死亡/自杀意念
+    "suicide": 3.5, "suicidal": 3.5, "kill myself": 3.5, "end my life": 3.5,
+    "want to die": 3.3, "wish i was dead": 3.3, "wish i were dead": 3.3,
+    "better off dead": 3.3, "don't want to live": 3.3, "do not want to live": 3.3,
+    "not want to wake up": 3.1, "wish i could disappear": 2.8,
+    # 二级：计划/方法/自伤行为
+    "self-harm": 3.0, "self harm": 3.0, "cut myself": 3.0, "cutting": 2.7,
+    "overdose": 3.0, "hang myself": 3.5, "jump off": 3.1, "jumping off": 3.1,
+    "blow my head off": 3.5, "take all my pills": 3.3, "hurt myself": 2.8,
+    # 三级：绝望、被困、负担感、孤立
+    "hopeless": 2.4, "no hope": 2.4, "helpless": 2.0, "trapped": 2.2,
+    "stuck forever": 2.0, "burden": 2.3, "worthless": 2.3, "useless": 2.1,
+    "hate myself": 2.4, "hate my life": 2.4, "can't anymore": 2.2, "give up": 2.0,
+    "alone": 1.5, "lonely": 1.8, "isolated": 1.8, "no one cares": 2.0, "nobody cares": 2.0,
+    # 四级：常见症状与伴随状态
+    "depressed": 1.9, "depression": 1.9, "empty": 1.4, "numb": 1.6, "crying": 1.3,
+    "sad": 1.0, "anxiety": 1.2, "panic": 1.2, "overwhelmed": 1.5,
+    "can't sleep": 1.0, "insomnia": 1.0, "exhausted": 1.0,
+    # 保护性/求助性表达，轻度降权
+    "therapy": -0.4, "medication": -0.4, "counselor": -0.5, "hotline": -0.6,
+    "getting help": -0.7, "reach out": -0.5, "stay safe": -0.4,
 }
+
+_EVIDENCE_DOMAIN_CONFIG = [
+    {
+        "key": "passive_death_wish",
+        "label": "被动死亡愿望",
+        "keywords": [
+            "wish i was dead", "wish i were dead", "better off dead",
+            "don't want to live", "do not want to live", "want to die",
+            "wish i could disappear", "not want to wake up",
+        ],
+    },
+    {
+        "key": "active_suicidal_ideation",
+        "label": "主动自杀意念",
+        "keywords": [
+            "suicide", "suicidal", "kill myself", "end my life",
+        ],
+    },
+    {
+        "key": "self_harm_plan",
+        "label": "自伤/方法线索",
+        "keywords": [
+            "self-harm", "self harm", "cut myself", "cutting", "overdose",
+            "hang myself", "jump off", "jumping off", "blow my head off",
+            "take all my pills", "hurt myself",
+        ],
+    },
+    {
+        "key": "hopelessness_burden",
+        "label": "绝望/负担感",
+        "keywords": [
+            "hopeless", "no hope", "helpless", "trapped", "stuck forever",
+            "burden", "worthless", "useless", "hate myself", "hate my life",
+            "can't anymore", "give up",
+        ],
+    },
+    {
+        "key": "isolation_distress",
+        "label": "孤立/痛苦状态",
+        "keywords": [
+            "alone", "lonely", "isolated", "no one cares", "nobody cares",
+            "depressed", "depression", "empty", "numb", "crying", "sad",
+            "anxiety", "panic", "overwhelmed", "can't sleep", "insomnia", "exhausted",
+        ],
+    },
+]
+
+_KEYWORD_STOPWORDS: set = {
+    '的', '了', '是', '我', '你', '他', '她', '它', '们', '这', '那',
+    '有', '在', '和', '就', '不', '也', '都', '很', '要', '会', '可以',
+    'to', 'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'for',
+    'of', 'with', 'by', 'from', 'is', 'it', 'be', 'as', 'are', 'was',
+    'were', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will',
+    'would', 'could', 'should', 'may', 'might', 'must', 'shall',
+    'i', 'you', 'he', 'she', 'we', 'they', 'me', 'him', 'her', 'us', 'them',
+    'my', 'your', 'his', 'our', 'their', 'its', 'im', 'ive', 'ill',
+    'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those',
+    'am', 'if', 'so', 'not', 'no', 'all', 'any', 'some', 'one', 'two',
+}
+
+_CHINESE_RE = re.compile(r'[\u4e00-\u9fff]+')
+_ENGLISH_RE = re.compile(r"[a-zA-Z][a-zA-Z'_-]{1,}")
+
+
+def calculate_importance_score(content: str) -> float:
+    """基于权威筛查框架整理的词表计算贴文重要性分数。"""
+    if not content:
+        return 0.0
+
+    content_lower = content.lower()
+    total_score = 0.0
+
+    for keyword, weight in _IMPORTANCE_KEYWORDS.items():
+        if keyword in content_lower:
+            total_score += weight
+
+    import math
+    normalized = 1.0 / (1.0 + math.exp(-total_score * 0.55))
+    return 0.05 + normalized * 0.9
+
+
+def analyze_risk_evidence(content: str) -> dict:
+    """分析帖子中的风险证据域，并返回可解释结果。"""
+    if not content:
+        return {
+            "importance_score": 0.0,
+            "evidence_domains": [],
+            "evidence_summary": "未识别到明显风险词汇。",
+        }
+
+    content_lower = content.lower()
+    evidence_domains: List[dict] = []
+    matched_keywords: List[str] = []
+
+    for domain in _EVIDENCE_DOMAIN_CONFIG:
+        domain_matches = [keyword for keyword in domain["keywords"] if keyword in content_lower]
+        if not domain_matches:
+            continue
+        matched_keywords.extend(domain_matches)
+        evidence_domains.append({
+            "key": domain["key"],
+            "label": domain["label"],
+            "matches": domain_matches[:4],
+            "count": len(domain_matches),
+        })
+
+    importance_score = calculate_importance_score(content)
+    if evidence_domains:
+        summary = "；".join(
+            f"{domain['label']}（{', '.join(domain['matches'][:2])}）"
+            for domain in evidence_domains[:3]
+        )
+    else:
+        summary = "未识别到明显风险词汇。"
+
+    return {
+        "importance_score": importance_score,
+        "evidence_domains": evidence_domains,
+        "evidence_summary": summary,
+        "matched_keywords": matched_keywords,
+    }
+
+
+def extract_keywords_from_texts(texts: List[str], top_n: int = 8) -> List[dict]:
+    """从当前用户帖子中提取高频词，兼容中英文。"""
+    if not texts:
+        return []
+
+    all_text = " ".join(texts)
+    freq: Dict[str, int] = {}
+
+    for word in _CHINESE_RE.findall(all_text):
+        key = word.strip().lower()
+        if len(key) < 2 or key in _KEYWORD_STOPWORDS:
+            continue
+        freq[key] = freq.get(key, 0) + 1
+
+    for word in _ENGLISH_RE.findall(all_text.lower()):
+        key = word.strip("'_-")
+        if len(key) < 3 or key in _KEYWORD_STOPWORDS:
+            continue
+        freq[key] = freq.get(key, 0) + 1
+
+    sorted_words = sorted(freq.items(), key=lambda item: (-item[1], item[0]))[:top_n]
+    return [{"word": word, "count": count} for word, count in sorted_words]
 
 
 class DatasetCSVService:
@@ -141,9 +287,9 @@ class DatasetCSVService:
             "display_name": "Bigdata系列",
             "language": "en",
             "class_system": "multi-class",
-            "class_count": 5,
-            "fine_labels": {"0": "无风险", "1": "极低风险", "2": "低风险", "3": "中风险", "4": "高风险"},
-            "coarse_risk_mapping": {"0": "low", "1": "low", "2": "low", "3": "medium", "4": "high"},
+            "class_count": 4,
+            "fine_labels": {"0": "无风险", "1": "低风险", "2": "中风险", "3": "高风险"},
+            "coarse_risk_mapping": {"0": "low", "1": "low", "2": "medium", "3": "high"},
         },
         "sigir": {
             "csv_path": "sigir/sigir.csv",
@@ -209,12 +355,14 @@ class DatasetCSVService:
         if post_str.startswith("[") and post_str.endswith("]"):
             try:
                 import ast
-                items = ast.literal_eval(post_str)
+                cleaned = post_str.replace('\\"', '"')
+                items = ast.literal_eval(cleaned)
                 if isinstance(items, list):
                     return [str(i).strip() for i in items if str(i).strip()]
             except Exception:
                 pass
-            # 如果 ast 失败，尝试用正则提取
+            # bigdata 中存在少量格式受损的列表字符串，这里做温和恢复：
+            # 仅在已经明显是 [...] 结构时，按引号片段提取帖子，避免把普通文本切碎。
             try:
                 import re
                 items = re.findall(r'["\']([^"\']+)["\']', post_str)
@@ -658,31 +806,8 @@ class DatasetCSVService:
     # ==================== 用户贴文查询 ====================
 
     def _calculate_importance_score(self, content: str) -> float:
-        """根据贴文内容中的消极/自杀风险词汇计算重要性分数
-
-        算法：
-        1. 统计匹配到的关键词及其权重
-        2. 对权重求和（负值表示保护性因素）
-        3. 使用 sigmoid 归一化到 (0, 1) 区间
-        4. 确保分数总和为1（由调用方在返回前归一化）
-        """
-        if not content:
-            return 0.0
-
-        content_lower = content.lower()
-        total_score = 0.0
-
-        # 遍历关键词字典，计算匹配得分
-        for keyword, weight in _IMPORTANCE_KEYWORDS.items():
-            if keyword in content_lower:
-                total_score += weight
-
-        # 使用 sigmoid 归一化：sigmoid(x) = 1 / (1 + exp(-x))
-        # 将分数映射到 (0.05, 0.95) 区间，避免极端值
-        import math
-        normalized = 1.0 / (1.0 + math.exp(-total_score * 0.5))
-        # 将 (0, 1) 映射到 (0.05, 0.95)
-        return 0.05 + normalized * 0.9
+        """根据贴文内容中的风险信号词汇计算重要性分数。"""
+        return calculate_importance_score(content)
 
     def _normalize_importance_scores(self, posts: List[PostInfo]) -> List[PostInfo]:
         """归一化重要性分数，使所有帖子的分数总和为1"""
@@ -775,8 +900,8 @@ class DatasetCSVService:
                             timestamp_values = self._parse_timestamps(row.get(timestamp_column))
 
                         for idx, content in enumerate(posts):
-                            # 计算该帖子的重要性分数
-                            importance = self._calculate_importance_score(content)
+                            evidence = analyze_risk_evidence(content)
+                            importance = evidence["importance_score"]
 
                             # 获取对应的 emoji 序列（如果有的话）
                             post_emoji = emoji_list[idx] if idx < len(emoji_list) else None
@@ -784,7 +909,7 @@ class DatasetCSVService:
 
                             post_info = PostInfo(
                                 user_id=user_hash,
-                                post_index=idx,
+                                post_index=idx + 1,
                                 content=content,
                                 risk_level=coarse,
                                 risk_value=risk_val,
@@ -793,6 +918,8 @@ class DatasetCSVService:
                                 timestamp=timestamp_values[idx] if idx < len(timestamp_values) else None,
                                 has_emojis=has_emoji,
                                 emoji_sequence=post_emoji,
+                                evidence_domains=evidence["evidence_domains"],
+                                evidence_summary=evidence["evidence_summary"],
                             )
                             all_posts.append(post_info)
 
@@ -862,39 +989,12 @@ class DatasetCSVService:
 
     # ==================== 用户高频词汇提取 ====================
 
-    _KEYWORD_STOPWORDS: set = {
-        '的', '了', '是', '我', '你', '他', '她', '它', '们', '这', '那',
-        '有', '在', '和', '就', '不', '也', '都', '很', '要', '会', '可以',
-        'to', 'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'for',
-        'of', 'with', 'by', 'from', 'is', 'it', 'be', 'as', 'are', 'was',
-        'were', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will',
-        'would', 'could', 'should', 'may', 'might', 'must', 'shall',
-        'i', 'you', 'he', 'she', 'we', 'they', 'me', 'him', 'her', 'us', 'them',
-        'my', 'your', 'his', 'our', 'their', 'its',
-        'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those',
-        'am', 'if', 'so', 'not', 'no', 'all', 'any', 'some', 'one', 'two',
-    }
-
-    _chinese_re = __import__('re', fromlist=['re']).compile(r'[\u4e00-\u9fff]+')
-
     def get_user_keywords(self, user_hash: str, top_n: int = 8) -> List[dict]:
         """从用户贴文中提取高频词汇"""
         posts, _ = self.get_user_posts(user_hash=user_hash, page=1, page_size=100)
         if not posts:
             return []
-
-        all_text = " ".join(p.content for p in posts)
-        words = self._chinese_re.findall(all_text)
-
-        freq: dict = {}
-        for w in words:
-            w_lower = w.strip().lower()
-            if len(w_lower) < 2 or w_lower in self._KEYWORD_STOPWORDS:
-                continue
-            freq[w_lower] = freq.get(w_lower, 0) + 1
-
-        sorted_words = sorted(freq.items(), key=lambda x: x[1], reverse=True)[:top_n]
-        return [{"word": word, "count": count} for word, count in sorted_words]
+        return extract_keywords_from_texts([p.content for p in posts], top_n=top_n)
 
     def build_dataset_import_payload(self, dataset_key: str) -> Optional[dict]:
         """构建内置数据集的完整导入载荷，供 MySQL 同步使用。"""
@@ -984,7 +1084,7 @@ class DatasetCSVService:
             raw_scores: List[float] = []
             parsed_times: List[datetime] = []
 
-            for post_index, raw_post in enumerate(item["posts"]):
+            for post_index, raw_post in enumerate(item["posts"], start=1):
                 raw_score = self._calculate_importance_score(raw_post["content"])
                 raw_scores.append(raw_score)
                 timestamp = raw_post["timestamp"]

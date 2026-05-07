@@ -5,14 +5,36 @@ import json
 import uuid
 from datetime import datetime
 
-import sys
 import os
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(os.path.dirname(current_dir))
-target_path = os.path.join(project_root, "SuiAgent-main")
-sys.path.insert(0, target_path)
-from agent import SuicideAgent
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+DEFAULT_RECOMMENDED_QUESTIONS = {
+    "deep_think": [
+        {"question": "如何缓解焦虑情绪？请先帮我判断我现在更像压力反应、焦虑还是抑郁倾向。", "category": "情绪梳理"},
+        {"question": "如果一个人连续两周情绪低落、失眠、注意力下降，应该如何系统判断严重程度？", "category": "严重程度判断"},
+        {"question": "抑郁和焦虑经常同时出现时，日常最先该处理的三个问题是什么？", "category": "共病处理"},
+        {"question": "当我说不清自己为什么难受时，你可以用提问的方式一步步帮我梳理吗？", "category": "引导式支持"},
+    ],
+    "risk_assessment": [
+        {"question": "请帮我识别这段表达里是否存在自伤或自杀风险信号，并说明判断依据。", "category": "风险识别"},
+        {"question": "如果一个人说“活着没什么意思，但我不会真的去做”，风险等级通常怎么判断？", "category": "风险分级"},
+        {"question": "评估危机风险时，最关键要核实的危险细节有哪些？", "category": "风险核查"},
+        {"question": "请给我一套适合辅导员或家长使用的风险识别提问清单。", "category": "提问清单"},
+    ],
+    "intervention": [
+        {"question": "如果对方今晚情绪非常差，我现在最优先该做哪三步干预？", "category": "即时干预"},
+        {"question": "请给我一份“接下来1小时、今晚、24小时内”的陪伴与干预清单。", "category": "行动清单"},
+        {"question": "当对方拒绝沟通、又让我担心安全时，现实中应该怎样升级处置？", "category": "升级处置"},
+        {"question": "如果需要联系家属、老师或医院，沟通时该怎么说更稳妥？", "category": "沟通支持"},
+    ],
+    "scale_interpret": [
+        {"question": "量表分数出来后，应该怎样结合最近状态做解释，而不是只看高低？", "category": "结果解释"},
+        {"question": "PHQ-9 或 GAD-7 分数偏高时，通常意味着什么，还需要结合哪些信息？", "category": "结果解释"},
+        {"question": "请帮我把量表结果翻译成家长、老师也能听懂的说明。", "category": "对外说明"},
+        {"question": "量表提示有风险时，后续适合补做哪些问题核查或支持动作？", "category": "后续行动"},
+    ],
+}
 
 
 class ChatService:
@@ -369,7 +391,13 @@ class ChatService:
             ai_mode: str = "all",
             limit: int = 8
     ) -> List[Dict[str, Any]]:
-        """获取推荐问题列表"""
+        """获取推荐问题列表。
+
+        规则：
+        1. 指定 ai_mode 时优先返回该模式专属问题；
+        2. 不足 limit 时，再用 ai_mode='all' 的通用问题补齐；
+        3. 按 question 文本去重，避免历史重复种子数据把结果占满。
+        """
         async with self.mysql_pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cursor:
                 await cursor.execute("SET NAMES utf8mb4")
@@ -382,20 +410,38 @@ class ChatService:
                            LIMIT %s""",
                         (limit,)
                     )
+                    rows = await cursor.fetchall()
                 else:
                     await cursor.execute(
                         """SELECT id, question, ai_mode, category, keywords, sort_order, usage_count
                            FROM chat_recommended_questions
-                           WHERE is_active = TRUE AND (ai_mode = %s OR ai_mode = 'all')
+                           WHERE is_active = TRUE AND ai_mode = %s
                            ORDER BY sort_order ASC, usage_count DESC
                            LIMIT %s""",
                         (ai_mode, limit)
                     )
-                rows = await cursor.fetchall()
+                    mode_rows = await cursor.fetchall()
+
+                    rows = list(mode_rows)
+                    if len(rows) < limit:
+                        await cursor.execute(
+                            """SELECT id, question, ai_mode, category, keywords, sort_order, usage_count
+                               FROM chat_recommended_questions
+                               WHERE is_active = TRUE AND ai_mode = 'all'
+                               ORDER BY sort_order ASC, usage_count DESC
+                               LIMIT %s""",
+                            (max(limit * 2, 16),)
+                        )
+                        rows.extend(await cursor.fetchall())
 
         result = []
+        seen_questions = set()
         for row in rows:
             q = dict(row)
+            question = (q.get("question") or "").strip()
+            if not question or question in seen_questions:
+                continue
+            seen_questions.add(question)
             q["id"] = str(q["id"])
             if q.get("keywords") and isinstance(q["keywords"], str):
                 try:
@@ -403,6 +449,49 @@ class ChatService:
                 except:
                     q["keywords"] = []
             result.append(q)
+            if len(result) >= limit:
+                break
+
+        if ai_mode != "all":
+            prioritized_result = []
+            prioritized_seen = set()
+
+            for row in result:
+                question = (row.get("question") or "").strip()
+                if not question or question in prioritized_seen:
+                    continue
+                if row.get("ai_mode") == ai_mode:
+                    prioritized_result.append(row)
+                    prioritized_seen.add(question)
+
+            for index, item in enumerate(DEFAULT_RECOMMENDED_QUESTIONS.get(ai_mode, []), start=1):
+                question = item["question"].strip()
+                if not question or question in prioritized_seen:
+                    continue
+                prioritized_result.append({
+                    "id": f"default-{ai_mode}-{index}",
+                    "question": question,
+                    "ai_mode": ai_mode,
+                    "category": item["category"],
+                    "keywords": [],
+                    "sort_order": 10_000 + index,
+                    "usage_count": 0,
+                })
+                prioritized_seen.add(question)
+                if len(prioritized_result) >= limit:
+                    break
+
+            if len(prioritized_result) < limit:
+                for row in result:
+                    question = (row.get("question") or "").strip()
+                    if not question or question in prioritized_seen:
+                        continue
+                    prioritized_result.append(row)
+                    prioritized_seen.add(question)
+                    if len(prioritized_result) >= limit:
+                        break
+
+            result = prioritized_result
 
         return result
 

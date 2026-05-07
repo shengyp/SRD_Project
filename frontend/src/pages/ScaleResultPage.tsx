@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Check, AlertTriangle, Heart, Shield, RefreshCw, MessageSquare, Brain, Activity, Loader, Sun, TrendingDown, Printer, MoonStar
@@ -32,6 +32,13 @@ interface WorkflowSignals {
   profileOnly?: boolean;
 }
 
+interface AnswerSummaryItem {
+  qId: number;
+  questionText: string;
+  answerLabel: string;
+  score: number;
+}
+
 export default function ScaleResultPage() {
   const navigate = useNavigate();
   const { taskId } = useParams<{ taskId: string }>();
@@ -41,6 +48,7 @@ export default function ScaleResultPage() {
   const [pageLoading, setPageLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retesting, setRetesting] = useState(false);
+  const reportRef = useRef<HTMLDivElement | null>(null);
 
   // 加载任务数据（从后端 API）+ 量表信息（从本地）
   useEffect(() => {
@@ -199,12 +207,95 @@ export default function ScaleResultPage() {
       navigate(`/scale/answer/${newTask.id}`);
     } catch (err) {
       console.error('创建复测任务失败:', err);
+      window.alert(err instanceof Error ? err.message : '创建复测任务失败');
+    } finally {
       setRetesting(false);
     }
   };
 
   const handlePrint = () => {
-    window.print();
+    const reportTitle = `${scaleDisplay.name}_评估报告_${task.userAlias || task.userHash || task.id}`;
+    const reportHtml = reportRef.current?.outerHTML;
+    if (!reportHtml) {
+      window.alert('报告内容尚未准备好，请稍后重试');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=1100,height=900');
+    if (!printWindow) {
+      const previousTitle = document.title;
+      document.title = reportTitle;
+      window.print();
+      window.setTimeout(() => {
+        document.title = previousTitle;
+      }, 300);
+      return;
+    }
+
+    const styleMarkup = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+      .map((node) => node.outerHTML)
+      .join('\n');
+
+    printWindow.document.open();
+    printWindow.document.write(`
+      <!doctype html>
+      <html lang="zh-CN">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>${reportTitle}</title>
+          ${styleMarkup}
+          <style>
+            body {
+              margin: 0;
+              padding: 24px;
+              background: #ffffff;
+            }
+
+            .no-print,
+            .print-hide {
+              display: none !important;
+            }
+
+            .print-only {
+              display: block !important;
+            }
+
+            .scale-result-card {
+              width: 100% !important;
+              max-width: none !important;
+              margin: 0 !important;
+              border: none !important;
+              box-shadow: none !important;
+              padding: 0 !important;
+            }
+
+            @page {
+              size: A4;
+              margin: 12mm;
+            }
+
+            @media print {
+              body {
+                padding: 0;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${reportHtml}
+          <script>
+            window.addEventListener('load', () => {
+              window.setTimeout(() => {
+                window.focus();
+                window.print();
+              }, 150);
+            });
+          <\/script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   if (pageLoading || !task || !scale) {
@@ -241,6 +332,16 @@ export default function ScaleResultPage() {
     validatedPopulation: scaleMeta.authority.validatedPopulation,
     screeningOnly: scaleMeta.authority.screeningOnly,
   } : null);
+  const answerSummary: AnswerSummaryItem[] = (task.answers || []).map((item) => {
+    const question = scale.questions.find((entry) => entry.id === item.qId);
+    const option = question?.options.find((entry) => entry.value === item.score);
+    return {
+      qId: item.qId,
+      questionText: question?.text || `第 ${item.qId} 题`,
+      answerLabel: option?.label || '未匹配到选项',
+      score: item.normalizedScore ?? item.score,
+    };
+  });
 
   return (
     <div className="flex flex-1 flex-col min-h-0 w-full animate-fade-in space-y-5">
@@ -268,13 +369,29 @@ export default function ScaleResultPage() {
             className="flex items-center gap-2 px-4 py-2 border border-[#E2E8F0] rounded-xl text-[#415168] hover:bg-[#F1F5FA] transition-colors"
           >
             <Printer className="w-4 h-4" />
-            打印报告
+            打印 / 导出 PDF
           </button>
         </div>
       </div>
 
       {/* 结果卡片 */}
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-sm scale-result-card">
+      <div ref={reportRef} className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-sm scale-result-card">
+        <div className="print-only hidden border-b border-[#D9DEE8] pb-4 mb-5">
+          <div className="flex items-start justify-between gap-6">
+            <div>
+              <h1 className="text-2xl font-bold text-[#162033]">{scaleDisplay.name}评估报告</h1>
+              <p className="text-sm text-[#64748B] mt-1">
+                评估用户：{task.userAlias || task.userHash || '用户'} | 任务名称：{task.taskName}
+              </p>
+            </div>
+            <div className="text-right text-sm text-[#64748B]">
+              <p>任务编号：{task.id}</p>
+              <p>完成时间：{formatDateTime(task.completedAt)}</p>
+              <p>导出时间：{formatDateTime(new Date().toISOString())}</p>
+            </div>
+          </div>
+        </div>
+
         {/* 任务信息 */}
         <div className="bg-[#F7FAFD] rounded-xl border border-[#DCE7F5] p-4 flex items-center gap-4 mb-6">
           <div className={`w-12 h-12 rounded-xl ${scaleDisplay.bgColor} flex items-center justify-center`}>
@@ -337,6 +454,39 @@ export default function ScaleResultPage() {
                 <p className="text-sm text-[#5B78C7] mt-2">{dimension.label}</p>
               </div>
             ))}
+          </div>
+        ) : null}
+
+        {answerSummary.length ? (
+          <div className="rounded-2xl border border-[#E2E8F0] bg-white p-5 mb-6 report-answer-section">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h4 className="font-bold text-[#162033]">答题明细</h4>
+              <span className="text-xs text-[#64748B]">
+                共 {answerSummary.length} 题，便于打印存档与人工复核
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full report-answer-table">
+                <thead>
+                  <tr>
+                    <th className="w-16">题号</th>
+                    <th>题目</th>
+                    <th className="w-48">作答</th>
+                    <th className="w-20">得分</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {answerSummary.map((item) => (
+                    <tr key={item.qId}>
+                      <td>{item.qId}</td>
+                      <td>{item.questionText}</td>
+                      <td>{item.answerLabel}</td>
+                      <td>{item.score}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : null}
 

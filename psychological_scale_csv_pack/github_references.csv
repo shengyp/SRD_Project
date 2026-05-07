@@ -1,9 +1,0 @@
-﻿scale_code,repo,use_for
-DASS21,https://github.com/thiagocamargodacosta/dass-21,CSV输入输出、DASS-21计分逻辑参考
-DASS21,https://github.com/IsmielAbir/DASS-21-Measure-Your-Depression-Stress-Anxiety-Levels,DASS-21 Web问卷页面与结果展示参考
-DASS21,https://github.com/bgfborges/DASS-21-API,DASS-21 API接口设计参考
-PHQ9/GAD7,https://github.com/milanwiedemann/questionnaires,PHQ-9/GAD-7问卷数据包参考
-PHQ9/GAD7,https://github.com/uwcirg/fhir-questionnaires,FHIR问卷JSON结构参考
-DASS21/PHQ9/GAD7,https://github.com/rudra496/mindwell,多量表心理健康平台参考
-SDS,https://github.com/o8x/sdscalc,SDS计算器/部署参考
-GAD7,https://github.com/poibear/AnxietyPredictor,GAD-7焦虑等级预测参考

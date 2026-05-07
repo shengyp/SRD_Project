@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Upload, Search, RefreshCw, Eye, FileText, X,
@@ -7,7 +7,18 @@ import {
   FileStack, Activity, Database, FileText as FileIcon,
   CheckCircle, XCircle, Plus, Info, Trash2, Layers
 } from 'lucide-react';
-import { fetchDatasets, fetchArchives, fetchHomeStats, uploadArchiveCSV, confirmArchiveImport, type DatasetProfile } from '../api';
+import {
+  fetchDatasets,
+  fetchArchives,
+  fetchHomeStats,
+  deleteArchive,
+  deleteArchives,
+  uploadArchiveCSV,
+  confirmArchiveImport,
+  fetchArchiveTemplates,
+  type DatasetProfile,
+  type ArchiveTemplateMeta,
+} from '../api';
 import { formatDateTime } from '../utils/dateFormat';
 import PaperStatCard from '../components/PaperStatCard';
 import ActionCapsuleButton from '../components/ActionCapsuleButton';
@@ -55,6 +66,15 @@ interface ImportStep {
   status: 'active' | 'completed' | 'pending';
 }
 
+interface UserReviewRow {
+  userId: string;
+  posts: PostRecord[];
+  riskLevel: 'low' | 'medium' | 'high';
+  suicideRisk?: number | string;
+  timestamps: string[];
+  emojiPreview: string[];
+}
+
 // ==================== 常量配置 ====================
 
 const DATA_SOURCES = [
@@ -88,13 +108,30 @@ const RISK_COLORS = {
 const RISK_LABELS: Record<string, string> = { low: '低风险', medium: '中风险', high: '高风险' };
 void RISK_LABELS;
 
+const FIELD_LABELS: Record<string, string> = {
+  user_id: '用户ID',
+  user: '用户ID',
+  created_utc: '时间戳',
+  timestamp: '时间戳',
+  time: '时间戳',
+  post_sequence: '帖子序列',
+  post: '贴文内容',
+  content: '贴文内容',
+  text: '贴文内容',
+  emjio_sequence: '表情序列',
+  emjio_sequenc: '表情序列',
+  emoji_sequence: '表情序列',
+  label: '风险标签',
+  suicide_risk: '风险标签',
+};
+
 // ==================== 细粒度风险等级系统（按数据集动态生成）====================
 // 详见 .cursor/rules/risk-level-spec.mdc
 
 // 细粒度风险标签映射（根据数据集）- 仅保留 reddit 五分类
 const FINE_RISK_LABELS: Record<string, Record<number, string>> = {
   reddit: { 0: '无风险', 1: '极低风险', 2: '低风险', 3: '中风险', 4: '高风险' }, // 五分类
-  bigdata: { 0: '无风险', 1: '极低风险', 2: '低风险', 3: '中风险', 4: '高风险' },
+  bigdata: { 0: '无风险', 1: '低风险', 2: '中风险', 3: '高风险' },
   sigir: { 0: '无风险', 1: '高风险' },
   weibo: { 0: '无风险', 1: '高风险' },
 };
@@ -102,7 +139,7 @@ const FINE_RISK_LABELS: Record<string, Record<number, string>> = {
 // 粗粒度风险等级映射（用于颜色/统一显示）
 const COARSE_RISK_MAP: Record<string, Record<number, 'low' | 'medium' | 'high'>> = {
   reddit: { 0: 'low', 1: 'low', 2: 'medium', 3: 'medium', 4: 'high' },
-  bigdata: { 0: 'low', 1: 'low', 2: 'low', 3: 'medium', 4: 'high' },
+  bigdata: { 0: 'low', 1: 'low', 2: 'medium', 3: 'high' },
   sigir: { 0: 'low', 1: 'high' },
   weibo: { 0: 'low', 1: 'high' },
 };
@@ -156,6 +193,7 @@ function ImportWizardModal({
   dataSourceLabels = DATA_SOURCE_LABELS,
   fineRiskLabels = FINE_RISK_LABELS,
   coarseRiskMap = COARSE_RISK_MAP,
+  archiveTemplates = {},
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -164,14 +202,15 @@ function ImportWizardModal({
   dataSourceLabels?: Record<string, string>;
   fineRiskLabels?: Record<string, Record<number, string>>;
   coarseRiskMap?: Record<string, Record<number, 'low' | 'medium' | 'high'>>;
+  archiveTemplates?: Record<string, ArchiveTemplateMeta>;
 }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedSource, setSelectedSource] = useState('');
   const [dataFile, setDataFile] = useState<File | null>(null);
   const [importedData, setImportedData] = useState<PostRecord[]>([]);
-  const [postStatuses, setPostStatuses] = useState<Record<string, 'pending' | 'accepted' | 'rejected'>>({});
-  /** 复选框：仅表示该行是否被选中，与接受/拒绝无关 */
-  const [selectedRowIds, setSelectedRowIds] = useState<Record<string, boolean>>({});
+  const [userStatuses, setUserStatuses] = useState<Record<string, 'pending' | 'accepted' | 'rejected'>>({});
+  /** 复选框：仅表示该用户行是否被选中，与接受/拒绝无关 */
+  const [selectedUserIds, setSelectedUserIds] = useState<Record<string, boolean>>({});
   const [isManualAnnotation, setIsManualAnnotation] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -192,6 +231,24 @@ function ImportWizardModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const FILE_MAX_SIZE = 20 * 1024 * 1024; // 20M
+  const selectedTemplate = selectedSource ? archiveTemplates[selectedSource] : undefined;
+
+  useEffect(() => {
+    if (!selectedTemplate) return;
+    const templateFields = [
+      ...selectedTemplate.requiredColumns.map(field => field.name.toLowerCase()),
+      ...selectedTemplate.optionalColumns.map(field => field.name.toLowerCase()),
+    ];
+    setSelectedFields(Array.from(new Set(templateFields)));
+  }, [selectedTemplate]);
+
+  const buildUserStatuses = (records: PostRecord[]) => {
+    const statuses: Record<string, 'pending' | 'accepted' | 'rejected'> = {};
+    Array.from(new Set(records.map(record => record.userId))).forEach((userId) => {
+      statuses[userId] = 'pending';
+    });
+    return statuses;
+  };
 
   // 解析CSV/TXT文件
   const parseCSVFile = async (file: File): Promise<{ data: PostRecord[]; fields: string[]; totalPostCount: number }> => {
@@ -429,10 +486,8 @@ function ImportWizardModal({
         setDetectedFields(fields);
         if (parsedData.length > 0) {
           setImportedData(parsedData);
-          setSelectedRowIds({});
-          const statuses: Record<string, 'pending' | 'accepted' | 'rejected'> = {};
-          parsedData.forEach(d => { statuses[d.id] = 'pending'; });
-          setPostStatuses(statuses);
+          setSelectedUserIds({});
+          setUserStatuses(buildUserStatuses(parsedData));
           // 标记文件已解析
           setDataFileParsed(parsedData);
         } else {
@@ -440,10 +495,8 @@ function ImportWizardModal({
             { id: 'imp1', userId: 'new_user_01', postIndex: 1, postCount: 1, content: '测试数据1 - 请检查文件格式', sentimentScore: 0.5, riskLevel: 'medium' as const, riskScore: 0.5, timestamp: new Date().toISOString().split('T')[0], hasTimestamp: true, emjioSequence: '', status: 'pending' as const },
           ];
           setImportedData(mockData);
-          setSelectedRowIds({});
-          const statuses: Record<string, 'pending' | 'accepted' | 'rejected'> = {};
-          mockData.forEach(d => { statuses[d.id] = 'pending'; });
-          setPostStatuses(statuses);
+          setSelectedUserIds({});
+          setUserStatuses(buildUserStatuses(mockData));
           setDataFileParsed(mockData);
         }
       } catch (err) {
@@ -451,7 +504,8 @@ function ImportWizardModal({
         setUploadError('文件解析失败，请检查文件格式');
       }
     } else {
-      setUploadError('暂不支持 .xls/.xlsx 格式，请转换为 CSV 或 TXT 格式上传');
+      setImportedData([]);
+      setDataFileParsed([]);
     }
   };
 
@@ -479,12 +533,12 @@ function ImportWizardModal({
     const files = e.dataTransfer.files;
     if (files.length > 0) {
       const file = files[0];
-      const validTypes = ['.csv', '.txt', '.xls', '.xlsx'];
+      const validTypes = ['.csv', '.txt', '.xlsx'];
       const isValid = validTypes.some(type => file.name.toLowerCase().endsWith(type));
       if (isValid) {
         handleFileSelect(file);
       } else {
-        setUploadError('请上传 CSV、TXT 或 Excel 文件');
+        setUploadError('请上传 CSV、TXT 或 Excel(.xlsx) 文件');
       }
     }
   };
@@ -532,6 +586,7 @@ function ImportWizardModal({
         if (dataFileParsed.length > 0) {
           // 使用前端已解析的完整数据（包含 timestamp, emjioSequence 等所有字段）
           setImportedData([...dataFileParsed]);
+          setUserStatuses(buildUserStatuses(dataFileParsed));
         } else {
           // 如果没有前端解析数据，则使用后端 preview（兜底）
           const previewData = uploadResult.data.preview || [];
@@ -553,6 +608,7 @@ function ImportWizardModal({
             isAnomaly: false,
           }));
           setImportedData(newData);
+          setUserStatuses(buildUserStatuses(newData));
         }
 
         // 保存上传结果，用于步骤2确认导入
@@ -586,42 +642,42 @@ function ImportWizardModal({
 
   /** 批量接受：仅对选中的行生效；若未选任何行则对全部生效，操作后清空复选框 */
   const handleAcceptAll = () => {
-    const ids = importedData.filter(d => selectedRowIds[d.id]).map(d => d.id);
-    const targetIds = ids.length > 0 ? ids : importedData.map(d => d.id);
-    setPostStatuses(prev => {
+    const selectedIds = userReviewRows.filter(row => selectedUserIds[row.userId]).map(row => row.userId);
+    const targetIds = selectedIds.length > 0 ? selectedIds : userReviewRows.map(row => row.userId);
+    setUserStatuses(prev => {
       const next = { ...prev };
       targetIds.forEach(id => { next[id] = 'accepted'; });
       return next;
     });
-    setSelectedRowIds({});
+    setSelectedUserIds({});
   };
 
   /** 批量拒绝：仅对选中的行生效；若未选任何行则对全部生效，操作后清空复选框 */
   const handleRejectAll = () => {
-    const ids = importedData.filter(d => selectedRowIds[d.id]).map(d => d.id);
-    const targetIds = ids.length > 0 ? ids : importedData.map(d => d.id);
-    setPostStatuses(prev => {
+    const selectedIds = userReviewRows.filter(row => selectedUserIds[row.userId]).map(row => row.userId);
+    const targetIds = selectedIds.length > 0 ? selectedIds : userReviewRows.map(row => row.userId);
+    setUserStatuses(prev => {
       const next = { ...prev };
       targetIds.forEach(id => { next[id] = 'rejected'; });
       return next;
     });
-    setSelectedRowIds({});
+    setSelectedUserIds({});
   };
 
-  /** 切换某行是否选中（仅选中状态，与接受/拒绝无关） */
-  const toggleRowSelected = (id: string) => {
-    setSelectedRowIds(prev => ({ ...prev, [id]: !prev[id] }));
+  /** 切换某个用户行是否选中（仅选中状态，与接受/拒绝无关） */
+  const toggleRowSelected = (userId: string) => {
+    setSelectedUserIds(prev => ({ ...prev, [userId]: !prev[userId] }));
   };
 
   /** 全选/取消全选（仅选中状态） */
   const toggleSelectAll = () => {
-    const allSelected = importedData.length > 0 && importedData.every(d => selectedRowIds[d.id]);
+    const allSelected = userReviewRows.length > 0 && userReviewRows.every(row => selectedUserIds[row.userId]);
     if (allSelected) {
-      setSelectedRowIds({});
+      setSelectedUserIds({});
     } else {
       const next: Record<string, boolean> = {};
-      importedData.forEach(d => { next[d.id] = true; });
-      setSelectedRowIds(next);
+      userReviewRows.forEach(row => { next[row.userId] = true; });
+      setSelectedUserIds(next);
     }
   };
 
@@ -637,12 +693,14 @@ function ImportWizardModal({
 
     try {
       // 获取被接受的记录（status === 'accepted' 的记录）
-      const acceptedRecords = importedData
-        .filter(d => postStatuses[d.id] === 'accepted')
-        .map(d => d.userId);
+      const acceptedRecords = userReviewRows
+        .filter(row => userStatuses[row.userId] === 'accepted')
+        .map(row => row.userId);
 
       // 如果没有手动接受任何记录，默认全部接受
-      const recordsToImport = acceptedRecords.length > 0 ? acceptedRecords : importedData.map(d => d.userId);
+      const recordsToImport = acceptedRecords.length > 0
+        ? acceptedRecords
+        : userReviewRows.map(row => row.userId);
 
       // 调用后端确认导入 API
       const result = await confirmArchiveImport({
@@ -677,16 +735,14 @@ function ImportWizardModal({
     setSelectedSource('');
     setDataFile(null);
     setImportedData([]);
-    setSelectedRowIds({});
-    setPostStatuses({});
+    setSelectedUserIds({});
+    setUserStatuses({});
     setIsManualAnnotation(false);
     setUploadProgress(0);
     setUploadError(null);
     setUploadResult(null);
-    setSelectedFields(['user_id', 'created_utc', 'post_sequence', 'emjio_sequence', 'suicide_risk']);
+    setSelectedFields([]);
   };
-
-  if (!isOpen) return null;
 
   const steps: ImportStep[] = [
     { id: 1, label: '上传文件', status: currentStep >= 1 ? (currentStep > 1 ? 'completed' : 'active') : 'pending' },
@@ -697,12 +753,63 @@ function ImportWizardModal({
   // 自动计算用户数（去重user_id数量）
   const uniqueUserCount = new Set(importedData.map(d => d.userId)).size;
 
+  const userReviewRows = useMemo<UserReviewRow[]>(() => {
+    const grouped = new Map<string, UserReviewRow>();
+    importedData.forEach((record) => {
+      const existing = grouped.get(record.userId);
+      if (existing) {
+        existing.posts.push(record);
+        if (record.timestamp) {
+          existing.timestamps.push(record.timestamp);
+        }
+        if (record.emjioSequence) {
+          existing.emojiPreview.push(record.emjioSequence);
+        }
+        const nextRisk = typeof record.suicideRisk === 'number' ? record.suicideRisk : parseInt(String(record.suicideRisk ?? ''), 10);
+        const currentRisk = typeof existing.suicideRisk === 'number' ? existing.suicideRisk : parseInt(String(existing.suicideRisk ?? ''), 10);
+        if (!Number.isNaN(nextRisk) && (Number.isNaN(currentRisk) || nextRisk > currentRisk)) {
+          existing.suicideRisk = record.suicideRisk;
+          existing.riskLevel = record.riskLevel;
+        }
+        return;
+      }
+      grouped.set(record.userId, {
+        userId: record.userId,
+        posts: [record],
+        riskLevel: record.riskLevel,
+        suicideRisk: record.suicideRisk,
+        timestamps: record.timestamp ? [record.timestamp] : [],
+        emojiPreview: record.emjioSequence ? [record.emjioSequence] : [],
+      });
+    });
+    return Array.from(grouped.values());
+  }, [importedData]);
+
   // 根据suicide_risk列的值自动计算细粒度风险等级数
   const uniqueRiskLevels = new Set(importedData.map(d => d.suicideRisk ?? d.riskLevel));
   const fineRiskCount = uniqueRiskLevels.size;
 
   // 计算细粒度风险分布（使用动态风险映射）
   const riskDistribution = calculateRiskDistribution(importedData, selectedSource, fineRiskLabels);
+  const availableFields = useMemo(() => {
+    const templateFields = selectedTemplate
+      ? [
+          ...selectedTemplate.requiredColumns.map(field => field.name.toLowerCase()),
+          ...selectedTemplate.optionalColumns.map(field => field.name.toLowerCase()),
+        ]
+      : [];
+    return Array.from(new Set([
+      ...templateFields,
+      ...selectedFields,
+    ]));
+  }, [selectedFields, selectedTemplate]);
+  const showUserField = selectedFields.includes('user_id') || selectedFields.includes('user');
+  const showTimestampField = selectedFields.includes('created_utc') || selectedFields.includes('timestamp') || selectedFields.includes('time');
+  const showPostField = selectedFields.includes('post_sequence') || selectedFields.includes('post') || selectedFields.includes('content') || selectedFields.includes('text');
+  const showEmojiField = selectedFields.includes('emjio_sequence') || selectedFields.includes('emjio_sequenc') || selectedFields.includes('emoji_sequence');
+  const showRiskField = selectedFields.includes('suicide_risk') || selectedFields.includes('label');
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -787,7 +894,15 @@ function ImportWizardModal({
                           </label>
                         </div>
                       </div>
-                      <a href={templateType === 'excel' ? '/uploads/archives/导入模板_Excel.csv' : '/uploads/archives/导入模板_TAB.txt'} download
+                      <a
+                        href={
+                          !selectedTemplate
+                            ? '#'
+                            : templateType === 'excel'
+                              ? selectedTemplate.downloads.excel
+                              : selectedTemplate.downloads.txt
+                        }
+                        download
                         className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-green-600 bg-gradient-to-r from-green-600 to-green-700 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:from-green-700 hover:to-green-700">
                         <Download className="w-4 h-4" />
                         下载{templateType === 'excel' ? 'Excel' : 'TXT'}模板
@@ -798,11 +913,47 @@ function ImportWizardModal({
                       <div>
                         <p className="text-xs font-medium text-blue-700 mb-0.5">导入提示</p>
                         <p className="text-xs text-blue-600 leading-relaxed">
-                          请{templateType === 'excel' ? '下载 Excel 模板' : '下载 TXT 模板'}，按照格式要求填写数据后再上传。
-                          字段说明：user_id（用户ID）、created_utc（时间戳）、post_sequence（贴文序列）、emjio_sequence（微表情序列）、suicide_risk（自杀风险）。
+                          {!selectedTemplate
+                            ? '请先选择数据源，再下载对应模板。'
+                            : `请下载 ${selectedTemplate.displayName} 的${templateType === 'excel' ? ' Excel ' : ' TXT '}模板后再上传。${selectedTemplate.postSplitRule}`}
                         </p>
                       </div>
                     </div>
+                    {selectedTemplate && (
+                      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                        <div className="rounded-xl bg-white p-3 border border-[#E2E8F0]">
+                          <p className="text-xs font-semibold text-[#415168] mb-2">字段要求</p>
+                          <div className="space-y-1 text-xs text-[#64748B]">
+                            {selectedTemplate.requiredColumns.map((field) => (
+                              <div key={field.name}>
+                                <span className="font-medium text-[#162033]">{field.name}</span>
+                                <span>：{field.description}</span>
+                              </div>
+                            ))}
+                            {selectedTemplate.optionalColumns.map((field) => (
+                              <div key={field.name}>
+                                <span className="font-medium text-[#415168]">{field.name}</span>
+                                <span>：{field.description}（可选）</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="rounded-xl bg-white p-3 border border-[#E2E8F0]">
+                          <p className="text-xs font-semibold text-[#415168] mb-2">风险标签</p>
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {Object.entries(selectedTemplate.riskLabels).map(([value, label]) => (
+                              <span key={value} className="px-2 py-1 rounded-full bg-[#F3F8FF] text-[#415168] text-xs">
+                                {value} = {label}
+                              </span>
+                            ))}
+                          </div>
+                          <p className="text-xs font-semibold text-[#415168] mb-2">示例格式</p>
+                          <pre className="text-[11px] leading-relaxed text-[#64748B] whitespace-pre-wrap break-all">
+                            {JSON.stringify(selectedTemplate.sampleRows[0], null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* 数据源选择 */}
@@ -852,14 +1003,14 @@ function ImportWizardModal({
                         <>
                           <Upload className="w-12 h-12 text-[#2F6BFF] mx-auto mb-3" />
                           <p className="text-[#415168] font-medium mb-1">拖拽文件到此处 或 点击选择文件</p>
-                          <p className="text-xs text-[#A89B8E]">支持格式：.csv / .txt / .xls / .xlsx，不超过 20M</p>
+                          <p className="text-xs text-[#A89B8E]">支持格式：.csv / .txt / .xlsx，不超过 20M</p>
                         </>
                       )}
                       <input 
                         ref={fileInputRef}
                         type="file" 
                         className="hidden" 
-                        accept=".csv,.txt,.xls,.xlsx" 
+                        accept=".csv,.txt,.xlsx" 
                         onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])} 
                       />
                     </div>
@@ -961,10 +1112,10 @@ function ImportWizardModal({
                       <Layers className="w-4 h-4 text-[#2F6BFF]" />
                       字段筛选
                     </h5>
-                    <p className="text-xs text-[#64748B] mb-3">勾选要显示的字段（user_id、post_sequence、suicide_risk 必选，其他可选）</p>
+                    <p className="text-xs text-[#64748B] mb-3">按当前数据源模板显示字段。必填字段默认锁定，可选字段可手动隐藏。</p>
                     <div className="flex flex-wrap gap-3">
-                      {['user_id', 'post_sequence', 'created_utc', 'emjio_sequence', 'suicide_risk'].map(field => {
-                        const isRequired = ['user_id', 'post_sequence', 'suicide_risk'].includes(field);
+                      {availableFields.map(field => {
+                        const isRequired = !!selectedTemplate?.requiredColumns.some(col => col.name.toLowerCase() === field);
                         const isChecked = selectedFields.includes(field);
                         return (
                           <label key={field} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all ${
@@ -986,11 +1137,7 @@ function ImportWizardModal({
                               className="w-4 h-4 rounded border-[#BFD3F2] text-[#2F6BFF]"
                             />
                             <span className="text-xs font-medium text-[#415168]">
-                              {field === 'user_id' && '用户ID'}
-                              {field === 'post_sequence' && '帖子序号'}
-                              {field === 'created_utc' && '时间戳'}
-                              {field === 'emjio_sequence' && '表情序列'}
-                              {field === 'suicide_risk' && '自杀风险'}
+                              {FIELD_LABELS[field] || field}
                             </span>
                             {isRequired && <span className="text-[10px] text-gray-400">(必选)</span>}
                           </label>
@@ -1002,7 +1149,7 @@ function ImportWizardModal({
                   {/* 数据检查表格 */}
                   <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden">
                     <div className="flex items-center justify-between p-3 bg-gradient-to-r from-[#F7FAFD] to-white border-b border-[#E2E8F0]">
-                      <h5 className="font-semibold text-sm text-[#162033]">数据检查列表 <span className="text-xs font-normal text-[#64748B]">（共 {importedData.length} 条）</span></h5>
+                      <h5 className="font-semibold text-sm text-[#162033]">数据检查列表 <span className="text-xs font-normal text-[#64748B]">（共 {userReviewRows.length} 位用户）</span></h5>
                       <div className="flex gap-2">
                         <button
                           onClick={handleAcceptAll}
@@ -1023,85 +1170,121 @@ function ImportWizardModal({
                             <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168] w-10">
                               <input 
                                 type="checkbox"
-                                checked={importedData.length > 0 && importedData.every(d => selectedRowIds[d.id])}
+                                checked={userReviewRows.length > 0 && userReviewRows.every(row => selectedUserIds[row.userId])}
                                 onChange={toggleSelectAll}
                                 className="w-4 h-4 rounded border-[#BFD3F2] text-[#2F6BFF] cursor-pointer"
                                 title="全选/取消全选"
                               />
                             </th>
-                            {selectedFields.includes('user_id') && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">user_id</th>}
-                            {selectedFields.includes('created_utc') && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">时间戳</th>}
-                            {selectedFields.includes('post_sequence') && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">帖子序列</th>}
-                            {selectedFields.includes('emjio_sequence') && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">表情序列</th>}
-                            {selectedFields.includes('suicide_risk') && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">风险等级</th>}
+                            {showUserField && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">用户ID</th>}
+                            {showTimestampField && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">时间戳</th>}
+                            {showPostField && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">贴文内容</th>}
+                            {showEmojiField && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">表情序列</th>}
+                            {showRiskField && <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">风险等级</th>}
                             <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">检查状态</th>
                             <th className="px-3 py-2.5 text-left text-xs font-semibold text-[#415168]">操作</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#EAF0F6]">
-                          {importedData.map((data) => {
-                            const rc = RISK_COLORS[data.riskLevel];
+                          {userReviewRows.map((row) => {
+                            const rc = RISK_COLORS[row.riskLevel];
+                            const userStatus = userStatuses[row.userId] ?? 'pending';
                             return (
-                              <tr key={data.id} className={`hover:bg-[#F7FAFD] transition-colors ${data.isMissing ? 'bg-amber-50' : data.isAnomaly ? 'bg-red-50' : ''}`}>
+                              <tr key={row.userId} className="hover:bg-[#F7FAFD] transition-colors">
                                 <td className="px-3 py-2.5">
                                   <input 
                                     type="checkbox"
-                                    checked={!!selectedRowIds[data.id]}
-                                    onChange={() => toggleRowSelected(data.id)}
+                                    checked={!!selectedUserIds[row.userId]}
+                                    onChange={() => toggleRowSelected(row.userId)}
                                     className="w-4 h-4 rounded border-[#BFD3F2] text-[#2F6BFF] cursor-pointer"
                                     title="选中该行"
                                   />
                                 </td>
-                                {selectedFields.includes('user_id') && (
-                                  <td className="px-3 py-2.5 text-xs text-[#415168] font-mono">{data.userId}</td>
+                                {showUserField && (
+                                  <td className="px-3 py-2.5 text-xs text-[#415168] font-mono align-top">{row.userId}</td>
                                 )}
-                                {selectedFields.includes('created_utc') && (
-                                  <td className="px-3 py-2.5 text-xs text-[#415168]">
-                                    {data.hasTimestamp ? data.timestamp : <span className="text-amber-500 italic">缺失</span>}
+                                {showTimestampField && (
+                                  <td className="px-3 py-2.5 text-xs text-[#415168] align-top">
+                                    {row.timestamps.length > 0 ? (
+                                      <div className="space-y-1 max-w-[180px]">
+                                        {row.timestamps.slice(0, 3).map((timestamp, index) => (
+                                          <div key={`${row.userId}_timestamp_${index}`} className="truncate" title={timestamp}>
+                                            {timestamp}
+                                          </div>
+                                        ))}
+                                        {row.timestamps.length > 3 && (
+                                          <div className="text-[#94A3B8]">+{row.timestamps.length - 3} 条</div>
+                                        )}
+                                      </div>
+                                    ) : <span className="text-amber-500 italic">缺失</span>}
                                   </td>
                                 )}
-                                {selectedFields.includes('post_sequence') && (
-                                  <td className="px-3 py-2.5 text-xs text-[#415168] max-w-[200px] truncate" title={data.content}>
-                                    {data.content || <span className="text-gray-300 italic">无内容</span>}
+                                {showPostField && (
+                                  <td className="px-3 py-2.5 text-xs text-[#415168] align-top">
+                                    {row.posts.length > 0 ? (
+                                      <div className="max-w-[360px] space-y-1">
+                                        {row.posts.map((post, index) => (
+                                          <div
+                                            key={post.id}
+                                            className="rounded-md bg-[#F8FAFC] px-2 py-1 leading-5 text-[#415168]"
+                                            title={post.content}
+                                          >
+                                            <span className="mr-2 text-[#94A3B8]">{index + 1}.</span>
+                                            {post.content || <span className="text-gray-300 italic">无内容</span>}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : <span className="text-gray-300 italic">无内容</span>}
                                   </td>
                                 )}
-                                {selectedFields.includes('emjio_sequence') && (
-                                  <td className="px-3 py-2.5 text-xs text-[#415168] max-w-[120px] truncate">
-                                    {data.emjioSequence || <span className="text-gray-300 italic">无</span>}
+                                {showEmojiField && (
+                                  <td className="px-3 py-2.5 text-xs text-[#415168] align-top">
+                                    {row.emojiPreview.length > 0 ? (
+                                      <div className="max-w-[180px] space-y-1">
+                                        {row.emojiPreview.slice(0, 3).map((emoji, index) => (
+                                          <div key={`${row.userId}_emoji_${index}`} className="truncate" title={emoji}>
+                                            {emoji}
+                                          </div>
+                                        ))}
+                                        {row.emojiPreview.length > 3 && (
+                                          <div className="text-[#94A3B8]">+{row.emojiPreview.length - 3} 条</div>
+                                        )}
+                                      </div>
+                                    ) : <span className="text-gray-300 italic">无</span>}
                                   </td>
                                 )}
-                                {selectedFields.includes('suicide_risk') && (
-                                  <td className="px-3 py-2.5">
+                                {showRiskField && (
+                                  <td className="px-3 py-2.5 align-top">
                                     <span className={`px-2 py-0.5 ${rc.bg} ${rc.text} text-xs rounded-full font-medium`}>
-                                      {getFineRiskLabel(data.suicideRisk ?? data.riskLevel, selectedSource, fineRiskLabels)}
+                                      {getFineRiskLabel(row.suicideRisk ?? row.riskLevel, selectedSource, fineRiskLabels)}
                                     </span>
                                   </td>
                                 )}
-                                <td className="px-3 py-2.5">
+                                <td className="px-3 py-2.5 align-top">
                                   <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
-                                    postStatuses[data.id] === 'accepted' ? 'bg-green-100 text-green-700' :
-                                    postStatuses[data.id] === 'rejected' ? 'bg-red-100 text-red-700' :
+                                    userStatus === 'accepted' ? 'bg-green-100 text-green-700' :
+                                    userStatus === 'rejected' ? 'bg-red-100 text-red-700' :
                                     'bg-gray-100 text-gray-600'
                                   }`}>
-                                    {postStatuses[data.id] === 'accepted' ? '已接受' :
-                                     postStatuses[data.id] === 'rejected' ? '已拒绝' : '待处理'}
+                                    {userStatus === 'accepted' ? '已接受' :
+                                     userStatus === 'rejected' ? '已拒绝' : '待处理'}
                                   </span>
                                 </td>
-                                <td className="px-3 py-2.5">
+                                <td className="px-3 py-2.5 align-top">
                                   <div className="flex items-center gap-1">
                                     <button 
-                                      onClick={() => setPostStatuses(prev => ({ ...prev, [data.id]: 'accepted' }))}
+                                      onClick={() => setUserStatuses(prev => ({ ...prev, [row.userId]: 'accepted' }))}
                                       className={`px-2 py-1 text-xs rounded-lg transition-colors ${
-                                        postStatuses[data.id] === 'accepted' 
+                                        userStatus === 'accepted' 
                                           ? 'bg-green-500 text-white' 
                                           : 'bg-green-100 text-green-700 hover:bg-green-200'
                                       }`}>
                                       接受
                                     </button>
                                     <button 
-                                      onClick={() => setPostStatuses(prev => ({ ...prev, [data.id]: 'rejected' }))}
+                                      onClick={() => setUserStatuses(prev => ({ ...prev, [row.userId]: 'rejected' }))}
                                       className={`px-2 py-1 text-xs rounded-lg transition-colors ${
-                                        postStatuses[data.id] === 'rejected' 
+                                        userStatus === 'rejected' 
                                           ? 'bg-red-500 text-white' 
                                           : 'bg-red-100 text-red-700 hover:bg-red-200'
                                       }`}>
@@ -1127,7 +1310,7 @@ function ImportWizardModal({
                 </div>
                 <h4 className="text-2xl font-bold text-[#162033] mb-3">导入完成！</h4>
                 <p className="text-[#64748B] mb-2 text-center">
-                  已成功导入 <span className="font-bold text-green-600">{importedData.filter(d => postStatuses[d.id] === 'accepted').length}</span> 条数据
+                  已成功导入 <span className="font-bold text-green-600">{userReviewRows.filter(row => userStatuses[row.userId] === 'accepted').length}</span> 位用户
                 </p>
                 <p className="text-sm text-[#94A3B8] mb-6">档案已进入心理档案室列表</p>
                 
@@ -1140,11 +1323,11 @@ function ImportWizardModal({
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-[#EAF0F6]">
                       <span className="text-sm text-[#64748B]">接受记录</span>
-                      <span className="text-sm font-medium text-green-600">{importedData.filter(d => postStatuses[d.id] === 'accepted').length} 条</span>
+                      <span className="text-sm font-medium text-green-600">{userReviewRows.filter(row => userStatuses[row.userId] === 'accepted').length} 位用户</span>
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-[#EAF0F6]">
                       <span className="text-sm text-[#64748B]">拒绝记录</span>
-                      <span className="text-sm font-medium text-red-600">{importedData.filter(d => postStatuses[d.id] === 'rejected').length} 条</span>
+                      <span className="text-sm font-medium text-red-600">{userReviewRows.filter(row => userStatuses[row.userId] === 'rejected').length} 位用户</span>
                     </div>
                     <div className="flex justify-between items-center py-2">
                       <span className="text-sm text-[#64748B]">导入时间</span>
@@ -1221,6 +1404,7 @@ export default function ArchivePage() {
   const [selectedArchives, setSelectedArchives] = useState<Set<string>>(new Set());
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [isBatchPanelOpen, setIsBatchPanelOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // 动态数据源配置（从 API 加载）
   const [dataSourceOptions, setDataSourceOptions] = useState<{ value: string; label: string }[]>(DATA_SOURCES);
@@ -1229,6 +1413,7 @@ export default function ArchivePage() {
   // 动态细粒度/粗粒度风险映射（从 API 的 fineLabels / coarseRiskMapping 加载，覆盖静态默认值）
   const [fineRiskLabels, setFineRiskLabels] = useState<Record<string, Record<number, string>>>({ ...FINE_RISK_LABELS });
   const [coarseRiskMap, setCoarseRiskMap] = useState<Record<string, Record<number, 'low' | 'medium' | 'high'>>>({ ...COARSE_RISK_MAP });
+  const [archiveTemplates, setArchiveTemplates] = useState<Record<string, ArchiveTemplateMeta>>({});
 
   // 演示档案列表（从 demo_archives 表加载，替代静态 mockArchives）
   const [archives, setArchives] = useState<ArchiveRecord[]>([]);
@@ -1267,7 +1452,7 @@ export default function ArchivePage() {
   const handleImportComplete = async () => {
     try {
       await loadArchivePage(currentPage, appliedFilters, pageSize);
-      const stats = await fetchHomeStats();
+      const stats = await fetchHomeStats(true);
       setHomeStats({
         totalArchives: stats.totalArchives ?? stats.totalUsers ?? 0,
         totalPosts: stats.totalPosts ?? 0,
@@ -1282,7 +1467,11 @@ export default function ArchivePage() {
   useEffect(() => {
     const loadDatasetConfig = async () => {
       try {
-        const datasets = await fetchDatasets();
+        const [datasets, templateResp] = await Promise.all([
+          fetchDatasets(),
+          fetchArchiveTemplates().catch(() => ({ sources: {} })),
+        ]);
+        setArchiveTemplates(templateResp.sources || {});
         if (datasets && datasets.length > 0) {
           // 构建数据源选项（包含 reddit 和自定义数据集）
           const allDatasetOptions = datasets.map((ds: DatasetProfile) => ({
@@ -1325,7 +1514,7 @@ export default function ArchivePage() {
 
     const loadHomeStats = async () => {
       try {
-        const stats = await fetchHomeStats();
+        const stats = await fetchHomeStats(true);
         setHomeStats({
           totalArchives: stats.totalArchives ?? stats.totalUsers ?? 0,
           totalPosts: stats.totalPosts ?? 0,
@@ -1371,6 +1560,7 @@ export default function ArchivePage() {
   };
 
   const totalPages = Math.ceil(archiveTotal / pageSize);
+  const safeTotalPages = Math.max(1, totalPages || 0);
   const paginatedArchives = archives;
 
   // 统计概览数据（优先取首页口径，确保与分页显示一致）
@@ -1385,6 +1575,80 @@ export default function ArchivePage() {
     { label: '低风险档案', value: lowRiskCount, note: '当前整体风险水平较低、可常规跟踪的档案数量', icon: CheckCircle, tone: 'green' as const },
     { label: '高风险档案', value: highRiskCount, note: '需优先复核、转介和持续监测的高风险档案数量', icon: AlertTriangle, tone: 'red' as const },
   ];
+
+  const refreshArchiveData = async (targetPage = currentPage) => {
+    const normalizedPage = Math.min(Math.max(targetPage, 1), Math.max(1, Math.ceil(Math.max(archiveTotal - 1, 0) / pageSize)));
+    await loadArchivePage(normalizedPage, appliedFilters, pageSize);
+    const stats = await fetchHomeStats(true);
+    setHomeStats({
+      totalArchives: stats.totalArchives ?? stats.totalUsers ?? 0,
+      totalPosts: stats.totalPosts ?? 0,
+      riskDistribution: stats.riskDistribution ?? { low: { count: 0, percentage: 0 }, medium: { count: 0, percentage: 0 }, high: { count: 0, percentage: 0 } },
+    });
+    if (normalizedPage !== currentPage) {
+      setCurrentPage(normalizedPage);
+    }
+  };
+
+  const handleDeleteArchive = async (archive: ArchiveRecord) => {
+    const confirmed = window.confirm(`确定要删除档案「${archive.userId}」吗？此操作不可恢复。`);
+    if (!confirmed || isDeleting) return;
+
+    try {
+      setIsDeleting(true);
+      await deleteArchive(archive.userId);
+      setSelectedArchives((prev) => {
+        const next = new Set(prev);
+        next.delete(archive.id);
+        return next;
+      });
+      const nextTotal = Math.max(archiveTotal - 1, 0);
+      const nextPage = Math.min(currentPage, Math.max(1, Math.ceil(nextTotal / pageSize)));
+      await refreshArchiveData(nextPage);
+    } catch (error) {
+      console.error('删除档案失败:', error);
+      window.alert('删除失败，请稍后重试。');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedArchives.size === 0 || isDeleting) return;
+    const confirmed = window.confirm(`确定要删除选中的 ${selectedArchives.size} 条档案吗？此操作不可恢复。`);
+    if (!confirmed) return;
+
+    try {
+      setIsDeleting(true);
+      const selectedUserIds = paginatedArchives
+        .filter((archive) => selectedArchives.has(archive.id))
+        .map((archive) => archive.userId);
+      await deleteArchives(selectedUserIds);
+      setSelectedArchives(new Set());
+      setIsBatchMode(false);
+      setIsBatchPanelOpen(false);
+      const nextTotal = Math.max(archiveTotal - selectedUserIds.length, 0);
+      const nextPage = Math.min(currentPage, Math.max(1, Math.ceil(nextTotal / pageSize)));
+      await refreshArchiveData(nextPage);
+    } catch (error) {
+      console.error('批量删除档案失败:', error);
+      window.alert('批量删除失败，请稍后重试。');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handlePrevPage = () => {
+    setCurrentPage((prev) => Math.max(1, prev - 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(safeTotalPages, prev + 1));
+  };
+
+  const handleLastPage = () => {
+    setCurrentPage(safeTotalPages);
+  };
 
   return (
     <div className="flex flex-1 flex-col min-h-0 w-full gap-4 md:gap-5 animate-fade-in">
@@ -1461,7 +1725,7 @@ export default function ArchivePage() {
 
       {/* 档案列表 */}
       <div className="flex-1 min-h-0 bg-white rounded-[28px] shadow-[0_10px_28px_rgba(15,23,42,0.04)] border border-[#E2E8F0] overflow-hidden flex flex-col">
-        <div className="overflow-x-auto flex-1">
+        <div className="overflow-x-auto flex-1 min-h-0">
           <table className="w-full">
             <thead className="bg-gradient-to-r from-[#F7FAFD] to-white sticky top-0 z-10">
               <tr>
@@ -1560,18 +1824,11 @@ export default function ArchivePage() {
                       <div className="flex items-center gap-2">
                         <ActionCapsuleButton onClick={() => {
                           sessionStorage.setItem('selectedArchive', JSON.stringify(archive));
-                          navigate(`/archive/detail/${archive.id}`);
+                          navigate(`/archive/detail/${archive.id}?dataset=${encodeURIComponent(archive.dataSource)}`);
                         }} tone="blue" tableAction icon={<Eye className="w-4 h-4" />}>
                           查看
                         </ActionCapsuleButton>
-                        <ActionCapsuleButton onClick={() => {
-                          const confirmed = window.confirm(`确定要删除档案「${archive.userId}」吗？此操作不可恢复。`);
-                          if (confirmed) {
-                            // 模拟删除：从列表中移除
-                            // 实际项目中应调用 API 删除
-                            console.log('删除档案:', archive.id);
-                          }
-                        }} tone="red" tableAction icon={<Trash2 className="w-4 h-4" />}>
+                        <ActionCapsuleButton onClick={() => handleDeleteArchive(archive)} tone="red" tableAction icon={<Trash2 className="w-4 h-4" />}>
                           删除
                         </ActionCapsuleButton>
                       </div>
@@ -1599,15 +1856,7 @@ export default function ArchivePage() {
             </div>
             <div className="flex items-center gap-3">
               <ActionCapsuleButton
-                onClick={() => {
-                  const confirmed = window.confirm(`确定要删除选中的 ${selectedArchives.size} 条档案吗？`);
-                  if (confirmed) {
-                    // 模拟删除
-                    setSelectedArchives(new Set());
-                    setIsBatchMode(false);
-                    setIsBatchPanelOpen(false);
-                  }
-                }}
+                onClick={handleBatchDelete}
                 variant="solid"
                 tone="red"
                 icon={<Trash2 className="w-4 h-4" />}
@@ -1626,7 +1875,7 @@ export default function ArchivePage() {
         )}
 
         {/* 分页 - 模仿农业文档风格 */}
-        <div className="shrink-0 flex items-center justify-between p-4 border-t border-[#E2E8F0] bg-gradient-to-r from-[#F7FAFD] to-white">
+        <div className="relative z-20 shrink-0 flex items-center justify-between p-4 border-t border-[#E2E8F0] bg-gradient-to-r from-[#F7FAFD] to-white">
           <div className="flex items-center gap-2">
             <span className="text-sm text-[#64748B]">每页显示：</span>
             <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
@@ -1637,24 +1886,24 @@ export default function ArchivePage() {
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-[#64748B]">共 <strong className="text-[#162033]">{archiveTotal}</strong> 条，第 <strong className="text-[#162033]">{currentPage}</strong>/<strong className="text-[#162033]">{totalPages || 1}</strong> 页</span>
+            <span className="text-sm text-[#64748B]">共 <strong className="text-[#162033]">{archiveTotal}</strong> 条，第 <strong className="text-[#162033]">{currentPage}</strong>/<strong className="text-[#162033]">{safeTotalPages}</strong> 页</span>
             <div className="flex items-center gap-1 ml-2">
-              <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1}
+              <button type="button" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}
                 className="p-2 hover:bg-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 <ChevronLeft className="w-4 h-4 text-[#415168]" />
               </button>
-              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+              <button type="button" onClick={handlePrevPage} disabled={currentPage === 1}
                 className="px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-sm hover:bg-[#F1F5FA] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 上一页
               </button>
               <span className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg text-sm font-semibold shadow-sm">
                 {currentPage}
               </span>
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+              <button type="button" onClick={handleNextPage} disabled={currentPage >= safeTotalPages}
                 className="px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-sm hover:bg-[#F1F5FA] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 下一页
               </button>
-              <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}
+              <button type="button" onClick={handleLastPage} disabled={currentPage >= safeTotalPages}
                 className="p-2 hover:bg-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 <ChevronRight className="w-4 h-4 text-[#415168]" />
               </button>
@@ -1672,6 +1921,7 @@ export default function ArchivePage() {
         dataSourceLabels={dataSourceLabels}
         fineRiskLabels={fineRiskLabels}
         coarseRiskMap={coarseRiskMap}
+        archiveTemplates={archiveTemplates}
       />
     </div>
   );

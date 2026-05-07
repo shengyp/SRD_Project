@@ -719,9 +719,44 @@ tr:hover td {
   background-color: #F2935A;
 }
 
+.report-answer-table th {
+  background: #f5f8fc;
+  color: #415168;
+  font-size: 12px;
+  padding: 10px 12px;
+}
+
+.report-answer-table td {
+  background: #fff;
+  color: #162033;
+  vertical-align: top;
+  line-height: 1.6;
+}
+
+.report-answer-table tr:hover td {
+  background: #f8fbff;
+}
+
 /* 打印样式 */
 @media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
   aside,
+  nav,
+  header,
+  [role="banner"],
   [class*="bg-leaf-pattern"],
   .no-print,
   .print-hide {
@@ -731,6 +766,8 @@ tr:hover td {
   body {
     background: white !important;
     color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   #root > div {
@@ -738,19 +775,21 @@ tr:hover td {
     height: auto !important;
     width: 100% !important;
     max-width: 100% !important;
+    overflow: visible !important;
   }
 
-  #root > div > div:nth-child(2) {
+  #root > div > :first-child {
+    display: none !important;
+  }
+
+  #root > div > :last-child {
     display: block !important;
+    width: 100% !important;
     height: auto !important;
     overflow: visible !important;
   }
 
-  #root > div > div:nth-child(2) > header {
-    display: none !important;
-  }
-
-  #root > div > div:nth-child(2) > main {
+  #root > div > :last-child > main {
     display: block !important;
     width: 100% !important;
     height: auto !important;
@@ -759,10 +798,14 @@ tr:hover td {
     margin: 0 !important;
   }
 
-  #root > div > div:nth-child(2) > main > div {
+  #root > div > :last-child > main > div {
     display: block !important;
     width: 100% !important;
     height: auto !important;
+  }
+
+  .print-only {
+    display: block !important;
   }
 
   .scale-result-card,
@@ -773,8 +816,61 @@ tr:hover td {
     page-break-inside: avoid;
   }
 
+  .scale-result-card {
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  .scale-result-card > div {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
   .scale-result-card * {
     color: #000 !important;
+  }
+
+  .report-answer-section {
+    border: 1px solid #d9dee8 !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .scale-result-card,
+  .scale-result-card *,
+  .result-card,
+  .result-card * {
+    visibility: visible;
+  }
+
+  .scale-result-card,
+  .result-card {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    margin: 0 !important;
+    background: #fff !important;
+  }
+
+  .report-answer-table {
+    table-layout: fixed;
+  }
+
+  .report-answer-table th,
+  .report-answer-table td {
+    border: 1px solid #d9dee8 !important;
+    background: #fff !important;
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+  }
+
+  .scale-result-card a {
+    color: #000 !important;
+    text-decoration: underline !important;
+    word-break: break-all;
   }
 
   [class*="rounded-2xl"] {

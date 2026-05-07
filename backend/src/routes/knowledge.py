@@ -46,6 +46,39 @@ def _get_knowledge_service(request: Request):
     return request.app.state.knowledge_service
 
 
+def _resolve_knowledge_file_path(file_path: str) -> str:
+    """将数据库中的知识库相对路径解析为本地绝对路径。"""
+    if not file_path:
+        return ""
+
+    backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    project_root = os.path.dirname(backend_dir)
+    normalized_path = file_path.replace("\\", "/").lstrip("/")
+
+    if normalized_path.startswith("rag-skill/knowledge/"):
+        relative_path = normalized_path[len("rag-skill/knowledge/"):]
+        return os.path.normpath(
+            os.path.join(backend_dir, "SuiAgent-main", "rag-skill", "knowledge", relative_path)
+        )
+
+    if "/rag-skill/knowledge/" in normalized_path:
+        relative_path = normalized_path.split("/rag-skill/knowledge/")[-1]
+        return os.path.normpath(
+            os.path.join(backend_dir, "SuiAgent-main", "rag-skill", "knowledge", relative_path)
+        )
+
+    if normalized_path.startswith("uploads/"):
+        project_upload_path = os.path.normpath(os.path.join(project_root, normalized_path))
+        backend_upload_path = os.path.normpath(os.path.join(backend_dir, normalized_path))
+        if os.path.exists(project_upload_path):
+            return project_upload_path
+        if os.path.exists(backend_upload_path):
+            return backend_upload_path
+        return backend_upload_path
+
+    return os.path.normpath(os.path.join(backend_dir, normalized_path))
+
+
 def _topic_row_to_response(row: dict) -> dict:
     """将数据库主题行转换为前端期望的格式"""
     return {
@@ -274,26 +307,7 @@ async def download_document(doc_id: str, request: Request):
     if not file_path:
         raise HTTPException(status_code=404, detail="文件路径不存在")
 
-    # 获取 backend 目录作为基础路径
-    # __file__ = .../backend/src/routes/knowledge.py
-    # dirname(__file__) = .../backend/src/routes
-    # dirname(dirname(__file__)) = .../backend/src
-    # dirname(dirname(dirname(__file__))) = .../backend
-    backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-    # 规范化路径分隔符
-    normalized_path = file_path.replace("\\", "/")
-
-    # 如果是 rag-skill/knowledge 路径，需要调整
-    # 注意：使用 startswith 而不是 in，因为 in 对中文路径判断可能有问题
-    if normalized_path.startswith("rag-skill/knowledge/"):
-        relative_path = normalized_path[len("rag-skill/knowledge/"):]
-        actual_path = os.path.normpath(os.path.join(backend_dir, "SuiAgent-main", "rag-skill", "knowledge", relative_path))
-    elif normalized_path.startswith("/rag-skill/knowledge/"):
-        relative_path = normalized_path[len("/rag-skill/knowledge/"):]
-        actual_path = os.path.normpath(os.path.join(backend_dir, "SuiAgent-main", "rag-skill", "knowledge", relative_path))
-    else:
-        actual_path = os.path.normpath(os.path.join(backend_dir, normalized_path.lstrip("/")))
+    actual_path = _resolve_knowledge_file_path(file_path)
 
     if not os.path.exists(actual_path):
         raise HTTPException(status_code=404, detail=f"文件不存在或已被删除: {actual_path}")
@@ -348,17 +362,7 @@ async def get_document_preview_stream(
     if not file_path:
         raise HTTPException(status_code=404, detail="文件路径不存在")
 
-    backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    normalized_path = file_path.lstrip("/")
-    # 如果是 rag-skill/knowledge 路径，需要调整
-    if normalized_path.startswith("rag-skill/knowledge/"):
-        relative_path = normalized_path[len("rag-skill/knowledge/"):]
-        actual_path = os.path.normpath(os.path.join(backend_dir, "SuiAgent-main", "rag-skill", "knowledge", relative_path))
-    elif normalized_path.startswith("/rag-skill/knowledge/"):
-        relative_path = normalized_path[len("/rag-skill/knowledge/"):]
-        actual_path = os.path.normpath(os.path.join(backend_dir, "SuiAgent-main", "rag-skill", "knowledge", relative_path))
-    else:
-        actual_path = os.path.normpath(os.path.join(backend_dir, normalized_path.lstrip("/")))
+    actual_path = _resolve_knowledge_file_path(file_path)
 
     if not os.path.exists(actual_path):
         raise HTTPException(status_code=404, detail="文件不存在")
@@ -400,18 +404,7 @@ async def get_document_base64(doc_id: str, request: Request):
     if not file_path:
         raise HTTPException(status_code=404, detail="文件路径不存在")
 
-    backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    normalized_path = file_path.lstrip("/")
-    # 如果是 rag-skill/knowledge 路径，需要调整
-    # 注意：使用 startswith 而不是 in，因为 in 对中文路径判断可能有问题
-    if normalized_path.startswith("rag-skill/knowledge/"):
-        relative_path = normalized_path[len("rag-skill/knowledge/"):]
-        actual_path = os.path.normpath(os.path.join(backend_dir, "SuiAgent-main", "rag-skill", "knowledge", relative_path))
-    elif normalized_path.startswith("/rag-skill/knowledge/"):
-        relative_path = normalized_path[len("/rag-skill/knowledge/"):]
-        actual_path = os.path.normpath(os.path.join(backend_dir, "SuiAgent-main", "rag-skill", "knowledge", relative_path))
-    else:
-        actual_path = os.path.normpath(os.path.join(backend_dir, normalized_path.lstrip("/")))
+    actual_path = _resolve_knowledge_file_path(file_path)
 
     if not os.path.exists(actual_path):
         raise HTTPException(status_code=404, detail="文件不存在")
@@ -614,8 +607,8 @@ async def upload_knowledge_document(
     format_map = {"txt": "txt", "md": "md", "markdown": "md", "pdf": "pdf", "docx": "docx", "doc": "docx"}
     doc_format = format or format_map.get(ext, "txt")
 
-    # 确保上传目录存在
-    upload_base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+    # 统一落到 backend/uploads/knowledge，避免上传与下载解析目录不一致
+    upload_base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     upload_dir = os.path.join(upload_base, "uploads", "knowledge")
     os.makedirs(upload_dir, exist_ok=True)
 

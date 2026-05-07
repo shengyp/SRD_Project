@@ -104,6 +104,17 @@ interface MessageViewModel {
   createdAt?: string;
 }
 
+interface StreamingUiState {
+  startedAt: number;
+  displayedContent: string;
+  fullContent: string;
+  queuedChars: string[];
+  streamDone: boolean;
+  timerId: number | null;
+  typingTimerId: number | null;
+  onBeforeFinish?: (message: MessageViewModel) => void;
+}
+
 interface SessionListItem {
   id: number;
   title: string;
@@ -459,6 +470,10 @@ function saveFeedbackMap(map: Record<string, 'up' | 'down'>) {
   }
 }
 
+function formatProcessingTimeLabel(durationMs: number): string {
+  return `用时${Math.max(0, durationMs / 1000).toFixed(2)}秒`;
+}
+
 function createAiMessage(message: ChatMessage, question: string): MessageViewModel {
   const references = normalizeReferences(message.references ?? message.referencesJson ?? message.retrievalSources ?? message.retrieval_sources);
   const ragContext = parseJsonSafely(message.ragContext ?? message.rag_context);
@@ -476,7 +491,7 @@ function createAiMessage(message: ChatMessage, question: string): MessageViewMod
     contextSources: Array.isArray(ragContext?.contextSources) ? ragContext.contextSources.map(String) : [],
     knowledgePanel: panel || undefined,
     modeLabel: CHAT_MODE_LABELS[resolvedMode],
-    durationLabel: message.processingTimeMs ? `用时${(message.processingTimeMs / 1000).toFixed(2)}秒` : undefined,
+    durationLabel: message.processingTimeMs ? formatProcessingTimeLabel(message.processingTimeMs) : undefined,
     isGenerating: false,
     feedback: null,
     createdAt: message.createdAt,
@@ -981,9 +996,13 @@ function ReferenceBadge({ iconText }: { iconText: string }) {
 
 export default function ChatPage() {
   const navigate = useNavigate();
+  const messageListRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const streamingUiRef = useRef<Map<number | string, StreamingUiState>>(new Map());
+  const shouldAutoScrollRef = useRef(true);
+  const previousMessageCountRef = useRef(0);
   const [sessionItems, setSessionItems] = useState<SessionListItem[]>([]);
   const [messages, setMessages] = useState<MessageViewModel[]>([]);
   const [inputText, setInputText] = useState('');
@@ -1044,6 +1063,11 @@ export default function ChatPage() {
   );
 
   const resetConversationView = () => {
+    streamingUiRef.current.forEach((state) => {
+      if (state.timerId) window.clearInterval(state.timerId);
+      if (state.typingTimerId) window.clearInterval(state.typingTimerId);
+    });
+    streamingUiRef.current.clear();
     setMessages([]);
     setActiveAnswerId(null);
     setSelectedNodeId(null);
@@ -1148,8 +1172,20 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    const container = messageListRef.current;
+    if (!container) return;
+    const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    shouldAutoScrollRef.current = distanceToBottom <= 120;
+  }, [currentSessionId, messages.length]);
+
+  useEffect(() => {
+    const previousCount = previousMessageCountRef.current;
+    const hasNewMessage = messages.length > previousCount;
+    previousMessageCountRef.current = messages.length;
+
+    if (!hasNewMessage || !shouldAutoScrollRef.current) return;
+    messagesEndRef.current?.scrollIntoView({ behavior: previousCount === 0 ? 'auto' : 'smooth' });
+  }, [messages.length]);
 
   useEffect(() => {
     if (!copied) return;
@@ -1159,6 +1195,11 @@ export default function ChatPage() {
 
   useEffect(() => {
     return () => {
+      streamingUiRef.current.forEach((state) => {
+        if (state.timerId) window.clearInterval(state.timerId);
+        if (state.typingTimerId) window.clearInterval(state.typingTimerId);
+      });
+      streamingUiRef.current.clear();
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
@@ -1173,6 +1214,102 @@ export default function ChatPage() {
 
   const updateAiMessage = (messageId: number | string, updater: (message: MessageViewModel) => MessageViewModel) => {
     setMessages((prev) => prev.map((message) => (message.id === messageId ? updater(message) : message)));
+  };
+
+  const clearStreamingUiState = (messageId: number | string) => {
+    const state = streamingUiRef.current.get(messageId);
+    if (!state) return;
+    if (state.timerId) window.clearInterval(state.timerId);
+    if (state.typingTimerId) window.clearInterval(state.typingTimerId);
+    streamingUiRef.current.delete(messageId);
+  };
+
+  const finishStreamingUi = (
+    messageId: number | string,
+    options?: {
+      forceContent?: string;
+      durationLabel?: string;
+      onBeforeFinish?: (message: MessageViewModel) => void;
+    },
+  ) => {
+    const state = streamingUiRef.current.get(messageId);
+    const finalDurationLabel =
+      options?.durationLabel ||
+      (state ? formatProcessingTimeLabel(performance.now() - state.startedAt) : '用时0.00秒');
+    const finalContent = options?.forceContent ?? state?.fullContent ?? '';
+    clearStreamingUiState(messageId);
+    updateAiMessage(messageId, (message) => {
+      (options?.onBeforeFinish ?? state?.onBeforeFinish)?.(message);
+      return {
+        ...message,
+        content: finalContent,
+        durationLabel: finalDurationLabel,
+        isGenerating: false,
+      };
+    });
+  };
+
+  const startStreamingUi = (messageId: number | string) => {
+    clearStreamingUiState(messageId);
+    const state: StreamingUiState = {
+      startedAt: performance.now(),
+      displayedContent: '',
+      fullContent: '',
+      queuedChars: [],
+      streamDone: false,
+      timerId: null,
+      typingTimerId: null,
+      onBeforeFinish: undefined,
+    };
+
+    state.timerId = window.setInterval(() => {
+      updateAiMessage(messageId, (message) => ({
+        ...message,
+        durationLabel: formatProcessingTimeLabel(performance.now() - state.startedAt),
+      }));
+    }, 100);
+
+    state.typingTimerId = window.setInterval(() => {
+      if (state.queuedChars.length > 0) {
+        state.displayedContent += state.queuedChars.shift() || '';
+        updateAiMessage(messageId, (message) => ({
+          ...message,
+          content: state.displayedContent,
+          durationLabel: formatProcessingTimeLabel(performance.now() - state.startedAt),
+          isGenerating: true,
+        }));
+        return;
+      }
+
+      if (state.streamDone) {
+        finishStreamingUi(messageId);
+      }
+    }, 20);
+
+    streamingUiRef.current.set(messageId, state);
+  };
+
+  const appendStreamingChunk = (messageId: number | string, chunk: string) => {
+    const state = streamingUiRef.current.get(messageId);
+    if (!state || !chunk) return;
+    state.fullContent += chunk;
+    state.queuedChars.push(...Array.from(chunk));
+  };
+
+  const markStreamingDone = (
+    messageId: number | string,
+    onBeforeFinish?: (message: MessageViewModel) => void,
+  ) => {
+    const state = streamingUiRef.current.get(messageId);
+    if (!state) {
+      finishStreamingUi(messageId, { onBeforeFinish });
+      return;
+    }
+    state.onBeforeFinish = onBeforeFinish;
+    state.streamDone = true;
+    if (state.queuedChars.length === 0) {
+      finishStreamingUi(messageId, { onBeforeFinish });
+    }
   };
 
   const getQuestionForAiMessage = (messageId: number | string) => {
@@ -1301,7 +1438,7 @@ export default function ChatPage() {
       evidenceList: [],
       contextSources: [],
       modeLabel: CHAT_MODE_LABELS[activeMode],
-      durationLabel: '用时生成中',
+      durationLabel: '用时0.00秒',
       isGenerating: true,
       feedback: null,
       createdAt: new Date().toISOString(),
@@ -1312,8 +1449,7 @@ export default function ChatPage() {
     setActiveAnswerId(placeholderId);
     setSelectedNodeId(null);
     setSelectedEvidenceId(null);
-
-    let streamedContent = '';
+    startStreamingUi(placeholderId);
 
     try {
       await sendChatMessageStream(
@@ -1321,32 +1457,19 @@ export default function ChatPage() {
         question,
         activeMode,
         (chunk) => {
-          streamedContent += chunk;
-          updateAiMessage(placeholderId, (message) => ({
-            ...message,
-            content: streamedContent,
-            isGenerating: true,
-          }));
+          appendStreamingChunk(placeholderId, chunk);
         },
         () => {
-          updateAiMessage(placeholderId, (message) => {
+          markStreamingDone(placeholderId, (message) => {
             setSelectedEvidenceId(message.evidenceList?.[0]?.id || null);
             setSelectedNodeId(message.knowledgePanel?.mindMap.nodes[0]?.id || null);
-            return {
-              ...message,
-              content: streamedContent,
-              durationLabel: `用时${Math.max(3.8, streamedContent.length / 70).toFixed(2)}秒`,
-              isGenerating: false,
-            };
           });
         },
         (error) => {
-          updateAiMessage(placeholderId, (message) => ({
-            ...message,
-            content: streamedContent || `抱歉，消息发送失败：${error.message}`,
+          finishStreamingUi(placeholderId, {
+            forceContent: `抱歉，消息发送失败：${error.message}`,
             durationLabel: '生成失败',
-            isGenerating: false,
-          }));
+          });
         },
         (sources) => {
           const refs = normalizeReferences(sources);
@@ -1398,6 +1521,10 @@ export default function ChatPage() {
       await refreshSessions(currentSessionId);
     } catch (error) {
       console.error('发送消息失败:', error);
+      finishStreamingUi(placeholderId, {
+        forceContent: error instanceof Error ? `抱歉，消息发送失败：${error.message}` : '抱歉，消息发送失败，请稍后重试。',
+        durationLabel: '生成失败',
+      });
     }
   };
 
@@ -1661,7 +1788,16 @@ export default function ChatPage() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="mx-auto w-full max-w-[980px] flex-1 overflow-y-auto px-4 pb-8 pt-3 xl:max-w-[1040px]">
+        <div
+          ref={messageListRef}
+          onScroll={() => {
+            const container = messageListRef.current;
+            if (!container) return;
+            const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+            shouldAutoScrollRef.current = distanceToBottom <= 120;
+          }}
+          className="mx-auto w-full max-w-[980px] flex-1 overflow-y-auto px-4 pb-8 pt-3 xl:max-w-[1040px]"
+        >
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-[#E7EDF5] bg-[rgba(255,255,255,0.8)] px-5 py-4 shadow-[0_10px_30px_rgba(90,109,135,0.05)] backdrop-blur-sm">
             <div>
               <div className="text-[20px] font-semibold text-[#1C2A3A]">

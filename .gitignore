@@ -53,6 +53,8 @@ backend/uploads/*
 # ---- Logs ----
 *.log
 logs/
+.dev-logs/
+.playwright-cli/
 
 # ---- OS ----
 .DS_Store
@@ -76,6 +78,7 @@ frontend/build/
 .cache/
 tmp/
 temp/
+tmp_*.json
 
 # ---- Docker ----
 # 注意：deploy/docker-compose.server.yml 和 Dockerfile*.server 是生产部署必需文件
@@ -105,3 +108,5 @@ datasets/
 *.bak
 *.swp
 *.DS_Store
+backend/outputs/
+output/

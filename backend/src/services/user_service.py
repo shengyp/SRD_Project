@@ -128,3 +128,40 @@ class UserService:
                     }
 
         raise ValueError("用户不存在")
+
+    async def delete_user(self, user_hash: str) -> int:
+        """删除单个用户档案及关联贴文。"""
+        return await self.delete_users([user_hash])
+
+    async def delete_users(self, user_hashes: List[str]) -> int:
+        """批量删除用户档案及关联贴文。"""
+        normalized_hashes = [item for item in dict.fromkeys(user_hashes) if item]
+        if not normalized_hashes:
+            return 0
+
+        placeholders = ",".join(["%s"] * len(normalized_hashes))
+
+        async with self.mysql_pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute("SET NAMES utf8mb4")
+                await cursor.execute(
+                    f"SELECT COUNT(*) AS cnt FROM psychological_archives WHERE user_id IN ({placeholders})",
+                    normalized_hashes,
+                )
+                row = await cursor.fetchone()
+                deleted_count = int(row["cnt"]) if row else 0
+
+                if deleted_count == 0:
+                    return 0
+
+                await cursor.execute(
+                    f"DELETE FROM user_posts WHERE user_id IN ({placeholders})",
+                    normalized_hashes,
+                )
+                await cursor.execute(
+                    f"DELETE FROM psychological_archives WHERE user_id IN ({placeholders})",
+                    normalized_hashes,
+                )
+                await conn.commit()
+
+        return deleted_count

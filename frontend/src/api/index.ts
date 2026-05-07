@@ -115,8 +115,8 @@ export interface HomeTrend {
   riskHigh: number;
 }
 
-export async function fetchHomeStats(): Promise<HomeStats> {
-  const endpoint = '/api/home/stats';
+export async function fetchHomeStats(forceRefresh = false): Promise<HomeStats> {
+  const endpoint = forceRefresh ? '/api/home/stats?force_refresh=true' : '/api/home/stats';
   try {
     const data = await request<HomeStats>(endpoint);
     return data;
@@ -541,15 +541,52 @@ export async function fetchArchiveUsers(params?: {
 }
 
 export async function fetchArchiveDetail(userHash: string): Promise<{
-  archive: PsychologicalArchive;
-  posts: UserPost[];
+  userId: string;
+  source: string;
+  postCount: number;
+  avgLabel: number;
+  maxLabel: number;
+  riskLevel: string;
+  riskScore: number;
+  posts: Array<{
+    id: string;
+    text: string;
+    label: number;
+    timestamp: string | null;
+  }>;
+  assessmentTime: string;
 }> {
   const endpoint = `/api/users/${userHash}`;
   const data = await request<{
-    archive: PsychologicalArchive;
-    posts: UserPost[];
+    userId: string;
+    source: string;
+    postCount: number;
+    avgLabel: number;
+    maxLabel: number;
+    riskLevel: string;
+    riskScore: number;
+    posts: Array<{
+      id: string;
+      text: string;
+      label: number;
+      timestamp: string | null;
+    }>;
+    assessmentTime: string;
   }>(endpoint);
   return data;
+}
+
+export async function deleteArchive(userHash: string): Promise<{ deleted: number }> {
+  const endpoint = `/api/users/${encodeURIComponent(userHash)}`;
+  return request<{ deleted: number }>(endpoint, { method: 'DELETE' });
+}
+
+export async function deleteArchives(userIds: string[]): Promise<{ deleted: number }> {
+  const endpoint = '/api/users/batch-delete';
+  return request<{ deleted: number }>(endpoint, {
+    method: 'POST',
+    body: JSON.stringify({ user_ids: userIds }),
+  });
 }
 
 export interface UserPost {
@@ -1264,7 +1301,8 @@ export async function sendChatMessageStream(
   onMindMap?: (mindMap: any) => void,
   onRagEvidence?: (evidence: any[]) => void,
   onPreKnowledge?: (terms: any) => void,
-  onContextSources?: (sources: string[]) => void
+  onContextSources?: (sources: string[]) => void,
+  onKnowledgePanel?: (panel: any) => void,
 ): Promise<void> {
   const endpoint = `/api/chat/sessions/${sessionId}/messages/stream`;
   const resp = await fetch(endpoint, {
@@ -1291,11 +1329,10 @@ export async function sendChatMessageStream(
   const decoder = new TextDecoder();
   let buffer = '';
 
-  // 流式渲染缓冲：合并 SSE 数据包，平滑更新 DOM
-  // 累积 chunk，每 60ms 更新一次 DOM，避免逐字渲染导致的"卡顿感"
+  // 流式渲染缓冲：只做极短暂合并，尽快把 chunk 交给上层逐字渲染
   let pendingContent = '';
   let pendingTimer: ReturnType<typeof setTimeout> | null = null;
-  const BATCH_INTERVAL_MS = 60; // 每 60ms 批量更新一次
+  const BATCH_INTERVAL_MS = 20;
 
   const flushPendingContent = () => {
     if (pendingContent.length > 0) {
@@ -1359,6 +1396,8 @@ export async function sendChatMessageStream(
         } else if (json.type === 'context_sources' && Array.isArray(json.sources)) {
           // 解析上下文数据来源（使用 Array.isArray 以支持空数组）
           onContextSources?.(json.sources as string[]);
+        } else if (json.type === 'knowledge_panel' && json.knowledgePanel) {
+          onKnowledgePanel?.(json.knowledgePanel);
         }
       } catch {}
     }
@@ -2226,6 +2265,33 @@ export interface UploadArchiveResult {
     firstPost: string;
   }>;
   uploadedAt: string;
+}
+
+export interface ArchiveTemplateField {
+  name: string;
+  description: string;
+}
+
+export interface ArchiveTemplateMeta {
+  source: string;
+  displayName: string;
+  description: string;
+  requiredColumns: ArchiveTemplateField[];
+  optionalColumns: ArchiveTemplateField[];
+  postSplitRule: string;
+  riskLabels: Record<string, string>;
+  sampleRows: Array<Record<string, string>>;
+  downloads: {
+    excel: string;
+    csv: string;
+    txt: string;
+  };
+}
+
+export async function fetchArchiveTemplates(): Promise<{
+  sources: Record<string, ArchiveTemplateMeta>;
+}> {
+  return await request<{ sources: Record<string, ArchiveTemplateMeta> }>('/api/upload/archive/templates');
 }
 
 /**

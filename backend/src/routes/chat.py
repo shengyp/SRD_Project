@@ -11,13 +11,14 @@ import json
 import asyncio
 import time
 import re
+import importlib
 from collections import OrderedDict
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 _backend_root = os.path.dirname(os.path.dirname(current_dir))
 _sui_agent_root = os.path.join(_backend_root, "SuiAgent-main")
 sys.path.insert(0, _sui_agent_root)
-from agent import SuicideAgent
+import agent as sui_agent_module
 
 router = APIRouter(prefix="", tags=["chat"])
 
@@ -46,7 +47,8 @@ def _get_agent(session_id: str, preset_intent: str) -> Any:
         _agent_pool[session_id] = (agent, now)
         return agent
 
-    agent = SuicideAgent(
+    importlib.reload(sui_agent_module)
+    agent = sui_agent_module.SuicideAgent(
         session_id=session_id,
         knowledge_base_path=_sui_knowledge_path(),
         preset_intent=preset_intent,
@@ -73,7 +75,8 @@ def _warmup_agent_pool(count: int = 3) -> None:
     for i in range(count):
         warmup_session_id = f"__warmup_{i}__"
         try:
-            agent = SuicideAgent(
+            importlib.reload(sui_agent_module)
+            agent = sui_agent_module.SuicideAgent(
                 session_id=warmup_session_id,
                 knowledge_base_path=knowledge_path,
                 preset_intent="",
@@ -98,7 +101,8 @@ async def _warmup_agent_pool_async(count: int = 1) -> None:
     for i in range(count):
         warmup_session_id = f"__warmup_{i}__"
         try:
-            agent = SuicideAgent(
+            importlib.reload(sui_agent_module)
+            agent = sui_agent_module.SuicideAgent(
                 session_id=warmup_session_id,
                 knowledge_base_path=knowledge_path,
                 preset_intent="",
@@ -134,7 +138,9 @@ def _ai_mode_to_preset_intent(ai_mode: str) -> str:
         return ""
     if ai_mode == "risk_assessment":
         return "emotional_support"
-    if ai_mode in ("intervention", "scale_interpret"):
+    if ai_mode == "intervention":
+        return "intervention_query"
+    if ai_mode == "scale_interpret":
         return "professional_query"
     return ""
 

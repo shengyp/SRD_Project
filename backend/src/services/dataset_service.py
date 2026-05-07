@@ -8,6 +8,7 @@ from typing import Dict, Tuple, List, Any, Optional
 import aiomysql
 
 from src.core.constants import TABLE_DATASET_ANALYSIS, TABLE_CUSTOM_DATASET_META
+from src.services.dataset_csv_service import analyze_risk_evidence, extract_keywords_from_texts
 
 
 def _sanitize_col(name: str) -> str:
@@ -445,8 +446,11 @@ class DatasetService:
         page: int = 1,
         page_size: int = 50,
     ) -> dict:
-        """从 MySQL 获取用户帖子分页。"""
-        offset = (page - 1) * page_size
+        """从 MySQL 获取用户帖子分页。
+
+        `importance_score` 以入库快照为准；风险证据解释实时根据文本计算。
+        这样既保留“命中了哪些证据”的可解释性，也保证详情页分数与数据库一致。
+        """
         async with self.mysql_pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cursor:
                 await cursor.execute("SET NAMES utf8mb4")
@@ -464,19 +468,26 @@ class DatasetService:
                 await cursor.execute(
                     """
                     SELECT up.user_id, up.post_index, up.content, up.importance_score, up.importance_level,
-                           up.post_timestamp, up.emoji_sequence, up.fine_risk_value, pa.risk_level
+                           up.post_timestamp, up.emoji_sequence, up.fine_risk_value, up.review_status,
+                           pa.risk_level
                     FROM user_posts up
                     INNER JOIN psychological_archives pa ON up.archive_id = pa.id
                     WHERE pa.dataset_source = %s AND pa.user_id = %s
                     ORDER BY up.post_index ASC
-                    LIMIT %s OFFSET %s
                     """,
-                    (dataset_key, user_hash, page_size, offset),
+                    (dataset_key, user_hash),
                 )
                 rows = await cursor.fetchall()
 
-        posts = [
-            {
+        posts = []
+        needs_normalize = False
+        for row in rows:
+            evidence = analyze_risk_evidence(row["content"] or "")
+            stored_importance_score = row["importance_score"]
+            if stored_importance_score is None:
+                stored_importance_score = evidence["importance_score"]
+                needs_normalize = True
+            posts.append({
                 "id": f"{row['user_id']}_{row['post_index']}",
                 "userId": row["user_id"],
                 "postIndex": row["post_index"],
@@ -484,30 +495,35 @@ class DatasetService:
                 "riskLevel": row["risk_level"],
                 "riskValue": row["fine_risk_value"],
                 "sentimentScore": None,
-                "importanceScore": float(row["importance_score"]) if row["importance_score"] is not None else None,
+                "importanceScore": float(stored_importance_score),
+                "importanceLevel": row["importance_level"],
                 "timestamp": row["post_timestamp"].isoformat(sep=" ") if row["post_timestamp"] else None,
                 "hasTimestamp": bool(row["post_timestamp"]),
                 "hasEmojis": bool(row["emoji_sequence"]),
                 "emojiSequence": row["emoji_sequence"],
-            }
-            for row in rows
-        ]
-        return {"posts": posts, "total": total, "page": page, "pageSize": page_size}
+                "status": row["review_status"],
+                "evidenceDomains": evidence["evidence_domains"],
+                "evidenceSummary": evidence["evidence_summary"],
+            })
+
+        if posts and needs_normalize:
+            total_raw_score = sum(float(post["importanceScore"]) for post in posts)
+            if total_raw_score <= 0:
+                equal_score = 1.0 / len(posts)
+                for post in posts:
+                    post["importanceScore"] = equal_score
+            else:
+                for post in posts:
+                    post["importanceScore"] = float(post["importanceScore"]) / total_raw_score
+
+        offset = (page - 1) * page_size
+        paged_posts = posts[offset:offset + page_size]
+        return {"posts": paged_posts, "total": total, "page": page, "pageSize": page_size}
 
     async def get_db_user_keywords(self, dataset_key: str, user_hash: str, top_n: int = 8) -> List[dict]:
         posts_result = await self.get_db_user_posts(dataset_key=dataset_key, user_hash=user_hash, page=1, page_size=500)
         texts = [post["content"] for post in posts_result["posts"] if post.get("content")]
-        if not texts:
-            return []
-
-        words = re.findall(r"[\u4e00-\u9fff]+", " ".join(texts))
-        freq: Dict[str, int] = {}
-        for word in words:
-            key = word.strip().lower()
-            if len(key) < 2:
-                continue
-            freq[key] = freq.get(key, 0) + 1
-        return [{"word": word, "count": count} for word, count in sorted(freq.items(), key=lambda item: item[1], reverse=True)[:top_n]]
+        return extract_keywords_from_texts(texts, top_n=top_n)
 
     async def get_dataset_by_key(self, dataset_key: str) -> Optional[dict]:
         """根据 dataset_key 获取单个数据集。"""

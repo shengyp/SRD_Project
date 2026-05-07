@@ -39,6 +39,39 @@ def _simple_cache(ttl_seconds: int = 300):
     return decorator
 
 
+def _resolve_knowledge_file_path(file_path: str) -> str:
+    """将数据库中的知识库相对路径解析为本地绝对路径。"""
+    if not file_path:
+        return ""
+
+    backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    project_root = os.path.dirname(backend_dir)
+    normalized_path = file_path.replace("\\", "/").lstrip("/")
+
+    if normalized_path.startswith("rag-skill/knowledge/"):
+        relative_path = normalized_path[len("rag-skill/knowledge/"):]
+        return os.path.normpath(
+            os.path.join(backend_dir, "SuiAgent-main", "rag-skill", "knowledge", relative_path)
+        )
+
+    if "/rag-skill/knowledge/" in normalized_path:
+        relative_path = normalized_path.split("/rag-skill/knowledge/")[-1]
+        return os.path.normpath(
+            os.path.join(backend_dir, "SuiAgent-main", "rag-skill", "knowledge", relative_path)
+        )
+
+    if normalized_path.startswith("uploads/"):
+        project_upload_path = os.path.normpath(os.path.join(project_root, normalized_path))
+        backend_upload_path = os.path.normpath(os.path.join(backend_dir, normalized_path))
+        if os.path.exists(project_upload_path):
+            return project_upload_path
+        if os.path.exists(backend_upload_path):
+            return backend_upload_path
+        return backend_upload_path
+
+    return os.path.normpath(os.path.join(backend_dir, normalized_path))
+
+
 class KnowledgeService:
     """知识库服务，依赖 MySQL 连接池。"""
 
@@ -986,25 +1019,7 @@ class KnowledgeService:
         doc_format = row.get("format", "")
 
         if file_path and doc_format in ("txt", "md"):
-            # 获取 backend 目录作为基础路径
-            # __file__ = .../backend/src/services/knowledge_service.py
-            # dirname(__file__) = .../backend/src/services
-            # dirname(dirname(__file__)) = .../backend/src
-            # dirname(dirname(dirname(__file__))) = .../backend
-            backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-            # 规范化路径分隔符
-            normalized_path = file_path.replace("\\", "/").lstrip("/")
-
-            # rag-skill/knowledge 路径转换
-            if normalized_path.startswith("rag-skill/knowledge/"):
-                relative_path = normalized_path[len("rag-skill/knowledge/"):]
-                actual_path = os.path.normpath(os.path.join(backend_dir, "SuiAgent-main", "rag-skill", "knowledge", relative_path))
-            elif "/rag-skill/knowledge/" in normalized_path:
-                relative_path = normalized_path.split("/rag-skill/knowledge/")[-1]
-                actual_path = os.path.normpath(os.path.join(backend_dir, "SuiAgent-main", "rag-skill", "knowledge", relative_path))
-            else:
-                actual_path = os.path.normpath(os.path.join(backend_dir, normalized_path))
+            actual_path = _resolve_knowledge_file_path(file_path)
 
             if os.path.isfile(actual_path):
                 try:

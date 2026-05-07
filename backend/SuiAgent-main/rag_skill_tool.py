@@ -42,6 +42,79 @@ class RAGSkillTool:
         self.last_index_load = 0
         self.index_cache_ttl = 3600
 
+    def _collect_fragments_for_file(
+        self,
+        file_path: Path,
+        query: str,
+        initial_keywords: List[str],
+        lightweight: bool = False,
+    ) -> List[str]:
+        """对单个文件收集证据片段。
+
+        lightweight=True 时，跳过“上下文是否充分”的多轮 LLM 评估，
+        仅做一次关键词搜索，找不到再退化到一次 LLM 定位片段。
+        """
+        print(f"开始搜索文件: {file_path.name}")
+        current_keywords = [kw for kw in initial_keywords if kw]
+        file_fragments: List[str] = []
+
+        if current_keywords:
+            print(f" 第 1 次搜索，关键词: {current_keywords}")
+            new_fragments = self._search_context_in_file(file_path, current_keywords)
+            print(f" 找到 {len(new_fragments)} 个新上下文片段")
+            for frag in new_fragments:
+                if frag not in file_fragments:
+                    file_fragments.append(frag)
+
+        if lightweight:
+            if not file_fragments:
+                print(f"使用LLM阅读: {file_path.name}")
+                llm_fragments = self._search_in_file(file_path, query)
+                for frag in llm_fragments:
+                    if frag not in file_fragments:
+                        file_fragments.append(frag)
+            return file_fragments
+
+        used_keywords = set(current_keywords)
+        for attempt in range(1, self.max_attempts):
+            sufficient, new_keywords = self._evaluate_context_and_generate_keyword(
+                query, current_keywords, file_fragments, attempt - 1
+            )
+
+            if sufficient:
+                print(" 上下文已充分")
+                break
+
+            if attempt == self.max_attempts - 1:
+                print("已达到最大尝试次数")
+                break
+
+            if not new_keywords:
+                print("无法生成有效新关键词")
+                break
+
+            current_keywords = list(current_keywords)
+            for kw in new_keywords:
+                if kw and kw not in used_keywords:
+                    used_keywords.add(kw)
+                    current_keywords.append(kw)
+
+            print(f" 第 {attempt + 1} 次搜索，关键词: {current_keywords}")
+            new_fragments = self._search_context_in_file(file_path, current_keywords)
+            print(f" 找到 {len(new_fragments)} 个新上下文片段")
+            for frag in new_fragments:
+                if frag not in file_fragments:
+                    file_fragments.append(frag)
+
+        if not file_fragments:
+            print(f"使用LLM阅读: {file_path.name}")
+            llm_fragments = self._search_in_file(file_path, query)
+            for frag in llm_fragments:
+                if frag not in file_fragments:
+                    file_fragments.append(frag)
+
+        return file_fragments
+
     def _read_markdown(self, file_path: Path) -> str:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
@@ -399,49 +472,12 @@ class RAGSkillTool:
         file_infos = [{"name": fp.name, "path": str(fp)} for fp in target_files]
 
         for file_path in target_files:
-            print(f"开始搜索文件: {file_path.name}")
-            current_keywords = initial_keywords.copy()
-            used_keywords = set(current_keywords)
-            file_fragments = []
-
-            for attempt in range(self.max_attempts):
-                print(f" 第 {attempt + 1} 次搜索，关键词: {current_keywords}")
-                new_fragments = self._search_context_in_file(file_path, current_keywords)
-                print(f" 找到 {len(new_fragments)} 个新上下文片段")
-
-                for frag in new_fragments:
-                    if frag not in file_fragments:
-                        file_fragments.append(frag)
-
-                sufficient, new_keywords = self._evaluate_context_and_generate_keyword(
-                    query, current_keywords, file_fragments, attempt
-                )
-
-                if sufficient:
-                    print(" 上下文已充分")
-                    break
-
-                if attempt == self.max_attempts - 1:
-                    print("已达到最大尝试次数")
-                    break
-
-                if not new_keywords:
-                    print("无法生成有效新关键词")
-                    break
-
-                for kw in new_keywords:
-                    if kw and kw not in used_keywords:
-                        used_keywords.add(kw)
-                        if kw not in current_keywords:
-                            current_keywords.append(kw)
-
-            if not file_fragments:
-                print(f"使用LLM阅读: {file_path.name}")
-                llm_fragments = self._search_in_file(file_path, query)
-                for frag in llm_fragments:
-                    if frag not in file_fragments:
-                        file_fragments.append(frag)
-
+            file_fragments = self._collect_fragments_for_file(
+                file_path=file_path,
+                query=query,
+                initial_keywords=initial_keywords,
+                lightweight=False,
+            )
             all_context_fragments.extend(file_fragments)
 
         if not all_context_fragments:
@@ -457,6 +493,47 @@ class RAGSkillTool:
             "LLM_ans": final_answer,
             "target_file": file_infos,
             "rela_text": all_context_fragments
+        }
+
+    async def retrieve_evidence(
+        self,
+        query: str,
+        max_files: int = 2,
+    ) -> Dict[str, Union[List[Dict[str, str]], List[str]]]:
+        """轻量证据检索。
+
+        面向聊天链，只负责找证据和来源文件，不额外生成一次答案，
+        避免每个 retrieval query 都重复调用 LLM 做总结。
+        """
+        if not query.strip():
+            return {"target_file": [], "rela_text": []}
+
+        target_files = await self._locate_target_file(query)
+        if not target_files:
+            print("未找到目标文件")
+            return {"target_file": [], "rela_text": []}
+
+        target_files = target_files[:max_files]
+        print(f"已找到 {len(target_files)} 个目标文件: {[f.name for f in target_files]}")
+
+        initial_keywords = self._extract_query_keywords(query)
+        print(f"初始关键词: {initial_keywords}")
+
+        all_context_fragments: List[str] = []
+        file_infos = [{"name": fp.name, "path": str(fp)} for fp in target_files]
+
+        for file_path in target_files:
+            file_fragments = self._collect_fragments_for_file(
+                file_path=file_path,
+                query=query,
+                initial_keywords=initial_keywords,
+                lightweight=True,
+            )
+            all_context_fragments.extend(file_fragments[: self.top_k])
+
+        return {
+            "target_file": file_infos,
+            "rela_text": all_context_fragments,
         }
 
     def _extract_triples(self, context_fragments: List[str],query:str) -> List[Dict]:

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import {
   fetchDatasets,
+  fetchArchiveUsers,
   fetchApiModelsForRiskPage,
   fetchLlmModelsForRiskPage,
   fetchPromptTemplatesForRiskPage,
@@ -77,6 +78,14 @@ interface RiskResultSummary {
       emoji_count?: number;
       emojiCount?: number;
     }[];
+    modelType: string;
+  };
+  fealearnerModelResult?: {
+    riskLevel: string;
+    riskScore: number;
+    predLabel: number;
+    confidence: number;
+    probabilities: number[];
     modelType: string;
   };
   symptomDescription?: string;
@@ -230,8 +239,10 @@ function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTask
   const [promptTemplates, setPromptTemplates] = useState<RiskPagePromptTemplate[]>([]);
   const [sourceUsers, setSourceUsers] = useState<{ id: string; userHash: string; displayName: string; riskLevel: string; postCount: number }[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-
-  const selectedSourceUsers = sourceUsers;
+  const [userSearchKeyword, setUserSearchKeyword] = useState('');
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [usersTotalPages, setUsersTotalPages] = useState(0);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -255,8 +266,17 @@ function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTask
 
   useEffect(() => {
     if (!isOpen) return;
+    const timer = window.setTimeout(() => {
+      setUsersPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [isOpen, userSearchKeyword]);
+
+  useEffect(() => {
     if (!selectedSource) {
       setSourceUsers([]);
+      setUsersTotal(0);
+      setUsersTotalPages(0);
       return;
     }
 
@@ -264,48 +284,27 @@ function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTask
     const loadUsersBySource = async () => {
       setLoadingUsers(true);
       try {
-        const pageSize = 100;
-        let page = 1;
-        let totalPages = 1;
-        const users: { id: string; userHash: string; displayName: string; riskLevel: string; postCount: number }[] = [];
-
-        while (page <= totalPages) {
-          const response = await fetch(
-            `${import.meta.env.VITE_API_BASE || ''}/api/users?dataset=${encodeURIComponent(selectedSource)}&page=${page}&page_size=${pageSize}`,
-            { signal: controller.signal }
-          );
-          const result = await response.json();
-          const payload = result?.data;
-          const pageUsers = Array.isArray(payload?.users)
-            ? payload.users
-            : Array.isArray(payload?.archives)
-              ? payload.archives
-              : [];
-
-          if (page === 1) {
-            const total = Number(payload?.total || 0);
-            const currentPageSize = Number(payload?.page_size || payload?.pageSize || pageSize);
-            totalPages = Math.max(1, Math.ceil(total / currentPageSize));
-          }
-
-          users.push(
-            ...pageUsers.map((user: any) => ({
-              id: `${user.source || user.datasetSource || selectedSource}:${user.userId}`,
-              userHash: user.userId,
-              displayName: user.userId,
-              riskLevel: user.riskLevel || 'low',
-              postCount: Number(user.postCount || 0),
-            }))
-          );
-
-          page += 1;
-        }
-
-        setSourceUsers(users);
+        const result = await fetchArchiveUsers({
+          dataset: selectedSource,
+          keyword: userSearchKeyword.trim() || undefined,
+          page: usersPage,
+          pageSize: 20,
+        });
+        setSourceUsers(result.users.map((user) => ({
+          id: `${user.datasetSource || selectedSource}:${user.userId}`,
+          userHash: user.userId,
+          displayName: user.userId,
+          riskLevel: user.riskLevel || 'low',
+          postCount: Number(user.postCount || 0),
+        })));
+        setUsersTotal(result.total || 0);
+        setUsersTotalPages(result.totalPages || 0);
       } catch (err) {
         if (!(err instanceof DOMException && err.name === 'AbortError')) {
           console.error('按数据源加载心理档案用户列表失败:', err);
           setSourceUsers([]);
+          setUsersTotal(0);
+          setUsersTotalPages(0);
         }
       } finally {
         setLoadingUsers(false);
@@ -314,7 +313,7 @@ function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTask
 
     loadUsersBySource();
     return () => controller.abort();
-  }, [isOpen, selectedSource]);
+  }, [selectedSource, userSearchKeyword, usersPage]);
 
   const handleCreate = async () => {
     if (!selectedUser || !selectedSource) return;
@@ -486,6 +485,11 @@ function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTask
 
   const handleClose = () => {
     setTaskName('');
+    setUserSearchKeyword('');
+    setUsersPage(1);
+    setUsersTotal(0);
+    setUsersTotalPages(0);
+    setSourceUsers([]);
     setSelectedSource('');
     setSelectedUser(null);
     setSelectedApiModel(null);
@@ -544,7 +548,12 @@ function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTask
             </label>
             <select
               value={selectedSource}
-              onChange={e => { setSelectedSource(e.target.value); setSelectedUser(null); }}
+              onChange={e => {
+                setSelectedSource(e.target.value);
+                setSelectedUser(null);
+                setUserSearchKeyword('');
+                setUsersPage(1);
+              }}
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-300 bg-white"
             >
               <option value="">请选择数据源</option>
@@ -559,24 +568,92 @@ function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTask
             <label className="block text-sm font-semibold text-[#415168] mb-2">
               目标用户 <span className="text-red-500">*</span>
             </label>
-            <select
-              value={selectedUser?.id ?? ''}
-              onChange={e => setSelectedUser(selectedSourceUsers.find(u => u.id === e.target.value) ?? null)}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-300 bg-white"
-            >
-              <option value="">请选择用户</option>
-              {selectedSourceUsers.map(u => (
-                <option key={u.id} value={u.id}>
-                  {u.displayName} | {RISK_LABELS[u.riskLevel] || '未知'} | {u.postCount}条帖子
-                </option>
-              ))}
-            </select>
-            {loadingUsers && (
-              <p className="text-xs text-slate-500 mt-1">正在加载该数据源下的心理档案用户...</p>
-            )}
-            {!loadingUsers && selectedSource && selectedSourceUsers.length === 0 && (
-              <p className="text-xs text-amber-600 mt-1">暂无可用用户，请先导入档案数据</p>
-            )}
+            <div className="space-y-3">
+              <div className="relative">
+                <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={userSearchKeyword}
+                  disabled={!selectedSource}
+                  onChange={e => setUserSearchKeyword(e.target.value)}
+                  placeholder={selectedSource ? '搜索用户ID...' : '请先选择数据源'}
+                  className="w-full rounded-xl border-2 border-gray-200 py-3 pl-10 pr-4 focus:outline-none focus:border-blue-300 disabled:bg-gray-50 disabled:text-gray-400"
+                />
+              </div>
+              <div className="text-xs text-[#64748B]">
+                {!selectedSource
+                  ? '选择数据源后，再按页搜索用户'
+                  : `当前数据源共 ${usersTotal} 位用户，当前第 ${usersPage}/${Math.max(usersTotalPages, 1)} 页`}
+              </div>
+              <div className="max-h-56 overflow-y-auto rounded-xl border-2 border-gray-200 bg-white">
+                {loadingUsers ? (
+                  <div className="flex items-center justify-center py-8 text-sm text-slate-500">
+                    <Loader className="mr-2 h-4 w-4 animate-spin" />
+                    正在加载该数据源下的心理档案用户...
+                  </div>
+                ) : sourceUsers.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-[#94A3B8]">
+                    {!selectedSource ? '请选择数据源后再搜索用户' : userSearchKeyword ? '无匹配用户' : '暂无可用用户，请先导入档案数据'}
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {sourceUsers.map((user) => {
+                      const active = selectedUser?.id === user.id;
+                      return (
+                        <button
+                          key={user.id}
+                          type="button"
+                          onClick={() => setSelectedUser(user)}
+                          className={`flex w-full items-center justify-between px-4 py-3 text-left transition-colors ${
+                            active ? 'bg-blue-50' : 'hover:bg-[#F7F9FC]'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-[#162033]">{user.displayName}</div>
+                            <div className="mt-1 text-xs text-[#64748B]">{user.postCount} 条帖子</div>
+                          </div>
+                          <div className="ml-4 flex items-center gap-2">
+                            <span className={`rounded-full px-2 py-0.5 text-xs ${
+                              user.riskLevel === 'high'
+                                ? 'bg-red-100 text-red-700'
+                                : user.riskLevel === 'medium'
+                                  ? 'bg-yellow-100 text-yellow-700'
+                                  : 'bg-green-100 text-green-700'
+                            }`}>
+                              {RISK_LABELS[user.riskLevel] || '未知'}
+                            </span>
+                            {active && <Check className="h-4 w-4 text-blue-600" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              {selectedSource && (
+                <div className="flex items-center justify-between text-xs text-[#64748B]">
+                  <span>每页 20 位用户</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={usersPage <= 1 || loadingUsers}
+                      onClick={() => setUsersPage((page) => Math.max(1, page - 1))}
+                      className="rounded-lg border border-gray-200 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-[#F7F9FC]"
+                    >
+                      上一页
+                    </button>
+                    <button
+                      type="button"
+                      disabled={loadingUsers || usersPage >= Math.max(usersTotalPages, 1)}
+                      onClick={() => setUsersPage((page) => page + 1)}
+                      className="rounded-lg border border-gray-200 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-[#F7F9FC]"
+                    >
+                      下一页
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* 模型类型选择 */}
@@ -972,6 +1049,7 @@ function ResultPage({ task, onBack }: ResultPageProps) {
   const result = task.resultSummary;
   const rc = result ? RISK_COLORS[result.riskLevel] : null;
   const emocc = result?.emoccModelResult;
+  const fealearner = result?.fealearnerModelResult;
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   const formatTime = (ms?: number) => {
@@ -1185,6 +1263,59 @@ function ResultPage({ task, onBack }: ResultPageProps) {
                     </div>
                   );
                 })()}
+              </div>
+            )}
+
+            {/* FeaLearner 详细结果 */}
+            {fealearner && (
+              <div className="mt-4 bg-gradient-to-r from-slate-50 to-blue-50 rounded-xl p-5 border border-slate-200">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                    <Brain className="w-4 h-4" /> FeaLearner 模型详情
+                  </p>
+                  <span className="text-xs text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                    {fealearner.modelType === 'fealearner_local' ? '真实模型' : fealearner.modelType}
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-3 mb-4">
+                  <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
+                    <p className="text-xs text-slate-500 mb-1">五分类标签</p>
+                    <p className="font-bold text-slate-800">Class {fealearner.predLabel}</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
+                    <p className="text-xs text-slate-500 mb-1">原始风险等级</p>
+                    <p className="font-bold text-slate-800">{RISK_LABELS[fealearner.riskLevel as keyof typeof RISK_LABELS] || fealearner.riskLevel}</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
+                    <p className="text-xs text-slate-500 mb-1">原始风险分数</p>
+                    <p className="font-bold text-slate-800">{(fealearner.riskScore ?? 0).toFixed(4)}</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
+                    <p className="text-xs text-slate-500 mb-1">最大类别置信度</p>
+                    <p className="font-bold text-slate-800">{((fealearner.confidence ?? 0) * 100).toFixed(1)}%</p>
+                  </div>
+                </div>
+
+                {fealearner.probabilities && fealearner.probabilities.length > 0 && (
+                  <div className="bg-white rounded-lg p-3 border border-slate-200">
+                    <p className="text-xs text-slate-600 mb-2 font-medium">五分类概率分布</p>
+                    <div className="space-y-1.5">
+                      {fealearner.probabilities.map((prob: number, idx: number) => {
+                        const labels = ['无风险', '极低风险', '低风险', '中风险', '高风险'];
+                        const colors = ['bg-green-400', 'bg-emerald-300', 'bg-yellow-300', 'bg-orange-400', 'bg-red-500'];
+                        return (
+                          <div key={idx} className="flex items-center gap-2">
+                            <span className="text-xs text-slate-600 w-16 shrink-0">{labels[idx] || `Class ${idx}`}</span>
+                            <div className="flex-1 bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                              <div className={`h-full rounded-full ${colors[idx] || 'bg-slate-400'}`} style={{ width: `${prob * 100}%` }} />
+                            </div>
+                            <span className="text-xs text-slate-600 w-12 text-right">{(prob * 100).toFixed(1)}%</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1406,6 +1537,7 @@ export default function RiskPage() {
               riskScore: t.resultSummary.riskScore || 0.5,
               confidence: t.resultSummary.confidence || 80,
               summary: t.resultSummary.summary || '',
+              fealearnerModelResult: t.resultSummary.fealearnerModelResult,
               symptomDescription: t.resultSummary.symptomDescription,
               emotionalAnalysis: t.resultSummary.emotionalAnalysis,
               riskInterpretation: t.resultSummary.riskInterpretation,
@@ -1576,11 +1708,14 @@ export default function RiskPage() {
             ...t,
             status: 'completed',
             progress: 100,
+            postCount: result.postCount || t.postCount,
+            modelName: result.modelName || t.modelName,
             resultSummary: result.resultSummary ? {
               riskLevel: (result.resultSummary.riskLevel || 'medium') as 'low' | 'medium' | 'high',
               riskScore: result.resultSummary.riskScore || 0.5,
               confidence: result.resultSummary.confidence || 80,
               summary: result.resultSummary.summary || 'FeaLearner 检测完成',
+              fealearnerModelResult: result.resultSummary.fealearnerModelResult,
               symptomDescription: result.resultSummary.symptomDescription,
               emotionalAnalysis: result.resultSummary.emotionalAnalysis,
               riskInterpretation: result.resultSummary.riskInterpretation,
