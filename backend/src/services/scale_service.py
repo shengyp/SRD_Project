@@ -15,6 +15,8 @@ class ScaleService:
         self,
         status: Optional[str] = None,
         user_hash: Optional[str] = None,
+        archive_id: Optional[int] = None,
+        data_source: Optional[str] = None,
         page: int = 1,
         page_size: int = 20,
     ) -> Dict[str, Any]:
@@ -28,6 +30,12 @@ class ScaleService:
         if user_hash:
             conditions.append("st.user_hash = %s")
             params.append(user_hash)
+        if archive_id:
+            conditions.append("st.archive_id = %s")
+            params.append(archive_id)
+        if data_source:
+            conditions.append("st.data_source = %s")
+            params.append(data_source)
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
 
@@ -44,8 +52,8 @@ class ScaleService:
         async with self.mysql_pool.acquire() as conn:
             async with conn.cursor() as cursor:
                 await cursor.execute("SET NAMES utf8mb4")
-                stats_sql = "SELECT status, COUNT(*) as count FROM scale_tasks GROUP BY status"
-                await cursor.execute(stats_sql)
+                stats_sql = f"SELECT status, COUNT(*) as count FROM scale_tasks st WHERE {where_clause} GROUP BY status"
+                await cursor.execute(stats_sql, params)
                 stats_rows = await cursor.fetchall()
                 stats = {"total": total, "pending": 0, "inProgress": 0, "completed": 0}
                 for s_row in stats_rows:
@@ -64,8 +72,9 @@ class ScaleService:
                 await cursor.execute("SET NAMES utf8mb4")
                 # scale_name/scale_code 等字段已冗余存储在 scale_tasks 表中，不再 JOIN
                 await cursor.execute(
-                    f"""SELECT st.*
+                    f"""SELECT st.*, pa.risk_level AS archive_risk_level
                        FROM scale_tasks st
+                       LEFT JOIN psychological_archives pa ON pa.id = st.archive_id
                        WHERE {where_clause}
                        ORDER BY st.created_at DESC
                        LIMIT %s OFFSET %s""",
@@ -93,8 +102,9 @@ class ScaleService:
                 await cursor.execute("SET NAMES utf8mb4")
                 # scale_name 等字段已冗余存储在 scale_tasks 表中，不再 JOIN
                 await cursor.execute(
-                    """SELECT st.*
+                    """SELECT st.*, pa.risk_level AS archive_risk_level
                        FROM scale_tasks st
+                       LEFT JOIN psychological_archives pa ON pa.id = st.archive_id
                        WHERE st.id = %s""",
                     (task_id,)
                 )
@@ -116,6 +126,38 @@ class ScaleService:
             except:
                 pass
         return task
+
+    async def find_archive_user(
+        self,
+        user_hash: str,
+        archive_id: Optional[int] = None,
+        data_source: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        conditions = ["user_id = %s"]
+        params: List[Any] = [user_hash]
+        if archive_id is not None:
+            conditions.append("id = %s")
+            params.append(archive_id)
+        if data_source:
+            conditions.append("dataset_source = %s")
+            params.append(data_source)
+
+        where_clause = " AND ".join(conditions)
+        async with self.mysql_pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute("SET NAMES utf8mb4")
+                await cursor.execute(
+                    f"""SELECT pa.id, pa.user_id, pa.dataset_source, pa.risk_level,
+                               dp.display_name AS dataset_display_name
+                        FROM psychological_archives pa
+                        LEFT JOIN dataset_profile dp ON dp.dataset_key = pa.dataset_source
+                        WHERE {where_clause}
+                        ORDER BY pa.import_timestamp DESC, pa.id DESC
+                        LIMIT 1""",
+                    params,
+                )
+                row = await cursor.fetchone()
+        return dict(row) if row else None
 
     async def create_task(self, task_data: Dict[str, Any]) -> int:
         """创建量表评估任务"""
@@ -162,7 +204,7 @@ class ScaleService:
         answers: List[Dict[str, Any]],
         total_score: int,
         risk_level: str,
-        assessment_result: str
+        assessment_result: Any
     ) -> bool:
         """提交量表答案并更新任务"""
         answered = len(answers)
@@ -198,7 +240,7 @@ class ScaleService:
                         json.dumps(answers, ensure_ascii=False),
                         total_score,
                         risk_level,
-                        assessment_result,
+                        json.dumps(assessment_result, ensure_ascii=False),
                         answered,
                         progress,
                         now,

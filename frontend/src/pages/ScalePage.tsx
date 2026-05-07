@@ -11,14 +11,14 @@ import {
   fetchScaleTasks,
   createScaleTask,
   deleteScaleTask,
-  fetchCSVArchives,
   fetchDatasets,
-  type DemoArchiveRecord,
+  fetchArchives,
   type DatasetProfile,
 } from '../api';
 import {
-  SCALES_META,
+  getAllScalesMeta,
   getScaleMeta,
+  loadScalesData,
   type ScaleMeta,
 } from '../scales';
 import { formatDateTime } from '../utils/dateFormat';
@@ -27,11 +27,12 @@ import ActionCapsuleButton from '../components/ActionCapsuleButton';
 // ==================== 类型定义 ====================
 
 interface UserProfile {
-  id: string;
+  id: string | number;
   userId: string;
   riskLevel: string;
   postCount: number;
   dataSource: string;
+  importTime?: string;
 }
 
 interface ScaleTask {
@@ -125,18 +126,19 @@ function CreateTaskModal({
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
 
-  // 从 API 加载用户列表（从 CSV 数据集获取，心理档案导入的 reddit 用户）
+  // 直接联动心理档案模块的数据
   useEffect(() => {
     if (!isOpen) return;
     setUsersLoading(true);
-    fetchCSVArchives({ datasetKey: selectedDataSource || 'reddit', page: 1, pageSize: 100 })
+    fetchArchives({ dataset: selectedDataSource || undefined, page: 1, limit: 100 })
       .then(data => {
-        const mapped: UserProfile[] = (data.archives || []).map((a: DemoArchiveRecord) => ({
-          id: String(a.id),
+        const mapped: UserProfile[] = (data.archives || []).map((a) => ({
+          id: a.id,
           userId: a.userId,
           riskLevel: a.riskLevel?.toLowerCase() || 'low',
           postCount: a.postCount || 0,
           dataSource: a.dataSource || selectedDataSource || 'reddit',
+          importTime: a.importTime,
         }));
         setUsers(mapped);
       })
@@ -158,7 +160,7 @@ function CreateTaskModal({
       taskName: name,
       dataSource: selectedDataSource,
       dataSourceLabel: sourceLabel,
-      userId: selectedUser.id,
+      userId: String(selectedUser.id),
       userName: selectedUser.userId,
       scaleCode: selectedScale.code,
       scaleName: selectedScale.name,
@@ -235,7 +237,7 @@ function CreateTaskModal({
                   className="w-full pl-10 pr-4 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
               </div>
             </div>
-            <div className="border border-[#E2E8F0] rounded-xl overflow-hidden max-h-36 overflow-y-auto">
+            <div className="border border-[#E2E8F0] rounded-xl overflow-hidden max-h-56 overflow-y-auto">
               {usersLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader className="w-5 h-5 text-[#2F6BFF] animate-spin" />
@@ -252,6 +254,7 @@ function CreateTaskModal({
                       <th className="px-3 py-2 text-left text-xs font-semibold text-[#415168] w-10">选择</th>
                       <th className="px-3 py-2 text-left text-xs font-semibold text-[#415168]">用户ID</th>
                       <th className="px-3 py-2 text-left text-xs font-semibold text-[#415168]">风险</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-[#415168]">贴文数</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E2E8F0]">
@@ -267,6 +270,7 @@ function CreateTaskModal({
                             {RISK_LABELS[user.riskLevel] || user.riskLevel}
                           </span>
                         </td>
+                        <td className="px-3 py-2 text-sm text-[#64748B]">{user.postCount}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -327,7 +331,7 @@ function CreateTaskModal({
 export default function ScalePage() {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<ScaleTask[]>([]);
-  const [scales] = useState<ScaleMeta[]>(SCALES_META);
+  const [scales, setScales] = useState<ScaleMeta[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [dataSourceOptions, setDataSourceOptions] = useState<{ value: string; label: string }[]>(
@@ -366,7 +370,12 @@ export default function ScalePage() {
       .finally(() => setTasksLoading(false));
   };
 
-  useEffect(() => { loadTasks(); }, []);
+  useEffect(() => {
+    loadScalesData()
+      .then(() => setScales(getAllScalesMeta()))
+      .catch((err) => console.error('加载量表定义失败:', err));
+    loadTasks();
+  }, []);
 
   useEffect(() => {
     fetchDatasets()
@@ -427,7 +436,9 @@ export default function ScalePage() {
     try {
       // 使用 scaleCode 作为 scaleId 传给后端（后端接受 scale_code 字符串格式）
       await createScaleTask({
+        taskName: taskData.taskName,
         userHash: taskData.userName,
+        archiveId: Number(taskData.userId),
         scaleId: taskData.scaleCode,
         dataSource: taskData.dataSource,
       });

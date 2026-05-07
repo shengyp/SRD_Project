@@ -79,6 +79,14 @@ export default function ScaleResultPage() {
   const getRiskInfo = (): RiskInfo | null => {
     if (!task?.riskLevel || !scale) return null;
 
+    if (task.assessmentResult && typeof task.assessmentResult === 'object') {
+      return {
+        level: task.riskLevel,
+        label: task.assessmentResult.label || task.riskLevel,
+        suggestion: task.assessmentResult.suggestion,
+      };
+    }
+
     const thresholdInfo = getThresholdByScore(scale.code, task.totalScore || 0);
     return {
       level: task.riskLevel,
@@ -185,6 +193,9 @@ export default function ScaleResultPage() {
   const scaleDisplay = getScaleDisplayInfo();
   const scaleMeta = getScaleMeta(scale?.code || '');
   const scaleMaxScore = scale?.scoring?.max_standard_score ?? scale?.scoring?.max_score ?? 27;
+  const assessmentPayload = task.assessmentResult && typeof task.assessmentResult === 'object'
+    ? task.assessmentResult
+    : null;
 
   return (
     <div className="flex flex-1 flex-col min-h-0 w-full animate-fade-in space-y-5">
@@ -268,9 +279,35 @@ export default function ScaleResultPage() {
           <div className={`${riskColors.bg} rounded-2xl p-6 text-center mb-6`}>
             <p className="text-white text-lg font-bold mb-1">{scaleDisplay.name} 评估结果</p>
             <p className="text-white text-2xl font-bold">{riskInfo.label}</p>
-            <p className="text-white/80 text-sm mt-2">{riskInfo.suggestion || ''}</p>
+            <p className="text-white/80 text-sm mt-2">{riskInfo.suggestion || assessmentPayload?.summary || ''}</p>
           </div>
         )}
+
+        {assessmentPayload?.dimensions?.length ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {assessmentPayload.dimensions.map((dimension: any) => (
+              <div key={dimension.id} className="rounded-2xl border border-[#E2E8F0] bg-[#F7FAFD] p-4">
+                <p className="text-sm text-[#64748B] mb-2">{dimension.name}</p>
+                <p className="text-2xl font-bold text-[#162033]">{dimension.score} 分</p>
+                <p className="text-sm text-[#5B78C7] mt-2">{dimension.label}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {assessmentPayload?.alerts?.length ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 mb-6">
+            <h4 className="font-bold text-[#162033] mb-3 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              重点提示
+            </h4>
+            <div className="space-y-2 text-sm text-[#7A4B00]">
+              {assessmentPayload.alerts.map((alert: any, index: number) => (
+                <p key={`${alert.itemId}-${index}`}>{alert.message}</p>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {/* 信息暗示 */}
         {comfortMessage && (

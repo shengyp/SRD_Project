@@ -4,9 +4,9 @@ import ReactECharts from 'echarts-for-react';
 import {
   Clock, Filter, Search, FileText,
   Activity, MessageSquare, ArrowLeft,
-  FilterX, Info, Star
+  FilterX, Info, Star, ListChecks, Eye
 } from 'lucide-react';
-import { fetchCSVPUserPosts, fetchCSVUserKeywords, fetchDatasets, DemoPostRecord, DatasetProfile } from '../api';
+import { fetchCSVPUserPosts, fetchCSVUserKeywords, fetchDatasets, fetchScaleTasks, DemoPostRecord, DatasetProfile, type ScaleTask } from '../api';
 import ActionCapsuleButton from '../components/ActionCapsuleButton';
 
 // ==================== 类型定义 ====================
@@ -86,6 +86,7 @@ export default function ArchiveDetailPage() {
   const [selectedArchive, setSelectedArchive] = useState<ArchiveRecord | null>(null);
   const [selectedPost, setSelectedPost] = useState<PostRecord | null>(null);
   const [posts, setPosts] = useState<PostRecord[]>([]);
+  const [scaleTasks, setScaleTasks] = useState<ScaleTask[]>([]);
   const [topN, setTopN] = useState(3);
   const [timeRange, setTimeRange] = useState({ start: '', end: '' });
   const [importanceFilter, setImportanceFilter] = useState('all');
@@ -208,6 +209,13 @@ export default function ArchiveDetailPage() {
           .catch((err) => {
             console.error('Failed to load posts:', err);
             setPosts([]);
+          });
+
+        fetchScaleTasks({ userHash, dataSource: datasetKey, limit: 20 })
+          .then((res) => setScaleTasks(res.tasks || []))
+          .catch((err) => {
+            console.error('Failed to load scale tasks:', err);
+            setScaleTasks([]);
           });
       }
     }
@@ -375,6 +383,64 @@ const chartUsesTimestamp = visiblePosts.some(post => hasUsableTimestamp(post));
             </span>
           ))}
         </div>
+      </div>
+
+      <div className="bg-white rounded-[28px] border border-[#E2E8F0] p-5 shadow-[0_10px_28px_rgba(15,23,42,0.04)]">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-semibold text-[#162033] flex items-center gap-2">
+            <ListChecks className="w-5 h-5 text-[#2F6BFF]" />
+            量表评估记录
+          </h3>
+          <span className="text-sm text-[#94A3B8]">与当前心理档案用户自动关联</span>
+        </div>
+        {scaleTasks.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#D6E4FA] bg-[#F8FBFF] px-5 py-6 text-sm text-[#94A3B8]">
+            该用户暂未创建量表评估任务。
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {scaleTasks.slice(0, 5).map((task) => (
+              <div key={task.id} className="flex flex-col gap-3 rounded-2xl border border-[#EAF0F6] bg-[#FBFDFF] px-4 py-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-[#162033]">{task.scaleName}</span>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                      task.status === 'completed'
+                        ? 'bg-green-100 text-green-700'
+                        : task.status === 'in_progress'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-slate-100 text-slate-700'
+                    }`}>
+                      {task.status === 'completed' ? '已完成' : task.status === 'in_progress' ? '答题中' : '待评估'}
+                    </span>
+                    {task.riskLevel ? (
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                        task.riskLevel === 'high'
+                          ? 'bg-red-100 text-red-700'
+                          : task.riskLevel === 'medium'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-green-100 text-green-700'
+                      }`}>
+                        {task.riskLevel === 'high' ? '高风险' : task.riskLevel === 'medium' ? '中风险' : '低风险'}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-2 text-sm text-[#64748B]">
+                    {typeof task.totalScore === 'number' ? `得分 ${task.totalScore} 分` : '尚未提交结果'} · 创建时间 {task.createdAt?.replace('T', ' ').slice(0, 16)}
+                  </p>
+                </div>
+                <ActionCapsuleButton
+                  onClick={() => navigate(task.status === 'completed' ? `/scale/result/${task.id}` : `/scale/answer/${task.id}`)}
+                  tone={task.status === 'completed' ? 'blue' : 'green'}
+                  tableAction
+                  icon={task.status === 'completed' ? <Eye className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                >
+                  {task.status === 'completed' ? '查看结果' : task.status === 'in_progress' ? '继续答题' : '开始评估'}
+                </ActionCapsuleButton>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 主内容区 */}

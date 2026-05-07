@@ -528,9 +528,10 @@ export interface ScaleTask {
   userHash: string;
   userAlias?: string;
   archiveId?: number;
+  archiveRiskLevel?: string;
   dataSource?: string;
   dataSourceLabel?: string;
-  scaleId: number;
+  scaleId: number | string;
   scaleCode: string;
   scaleName: string;
   scaleFullName?: string;
@@ -541,10 +542,10 @@ export interface ScaleTask {
   progress: number;
   totalQuestions: number;
   answeredQuestions: number;
-  answers?: { qId: number; score: number }[];
+  answers?: { qId: number; score: number; normalizedScore?: number }[];
   totalScore?: number;
   riskLevel?: string;
-  assessmentResult?: string;
+  assessmentResult?: any;
   startedAt?: string;
   completedAt?: string;
   expiredAt?: string;
@@ -565,11 +566,17 @@ export async function fetchScaleTasks(params?: {
   page?: number;
   limit?: number;
   status?: string;
+  userHash?: string;
+  archiveId?: number;
+  dataSource?: string;
 }): Promise<ScaleTaskListResponse> {
   const searchParams = new URLSearchParams();
   if (params?.page) searchParams.set('page', String(params.page));
   if (params?.limit) searchParams.set('limit', String(params.limit));
   if (params?.status) searchParams.set('status', params.status);
+  if (params?.userHash) searchParams.set('user_hash', params.userHash);
+  if (params?.archiveId) searchParams.set('archive_id', String(params.archiveId));
+  if (params?.dataSource) searchParams.set('data_source', params.dataSource);
 
   const endpoint = `/api/scale/tasks?${searchParams.toString()}`;
   const data = await request<ScaleTaskListResponse>(endpoint);
@@ -580,6 +587,7 @@ export async function fetchScaleTasks(params?: {
  * @param task.scaleId 传入量表代码字符串（如 'PHQ-9'），后端接受字符串格式的 scale_code
  */
 export async function createScaleTask(task: {
+  taskName?: string;
   userHash: string;
   archiveId?: number;
   scaleId: string | number;
