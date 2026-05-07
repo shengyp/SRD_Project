@@ -20,7 +20,7 @@ class Settings:
 
     # 服务
     HOST: str = _env("HOST", "0.0.0.0")
-    PORT: int = int(_env("PORT", "3000"))
+    PORT: int = int(_env("PORT", "8000"))
 
     # MySQL（主业务库）
     DB_HOST: str = _env("DB_HOST", "localhost")

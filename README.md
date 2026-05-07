@@ -1,476 +1,439 @@
-# VIS4SRD - 自杀风险可视化检测系统
+# VIS4SRD
 
-<div align="center">
+VIS4SRD 是一个面向心理健康服务与自杀风险识别场景的前后端分离系统，围绕“心理档案 -> 风险检测 -> 量表评估 -> 知识支持 -> 对话辅助 -> 地图资源”这条链路组织功能。
 
-![FastAPI](https://img.shields.io/badge/FastAPI-0.109-009688.svg)
-![React](https://img.shields.io/badge/React-18.2-61DAFB.svg)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)
-![Python](https://img.shields.io/badge/Python-3.10-3776AB.svg)
-![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+当前仓库已经包含：
 
-**面向医生的自杀风险评估可视化系统（前后端完整版）**
-本版本包含完整的前后端系统，支持真实数据存储、AI 智能分析、心理咨询地图等功能。
+- FastAPI 后端
+- React + Vite 前端
+- FeaLearner / Emocc 本地风险检测资源
+- SuiAgent RAG 对话与知识库目录
+- 内置心理量表定义
+- 内置数据集同步与校验脚本
 
-</div>
-
----
-
-## 目录
-
-- [系统简介](#系统简介)
-- [技术架构](#技术架构)
-- [功能模块](#功能模块)
-- [项目结构](#项目结构)
-- [快速部署](#快速部署)
-- [环境变量配置](#环境变量配置)
-- [API 接口文档](#api-接口文档)
-- [常见问题](#常见问题)
+这份 README 只描述当前仓库里真实存在、能对应到代码与脚本的内容。
 
 ---
 
-## 系统简介
+## 1. 项目结构
 
-VIS4SRD（Visual Interactive System with Sentiment Analysis for Suicide Risk Detection）是一个面向医生的心理健康服务系统，主要功能包括：
-
-- **心理档案管理**：导入、管理患者心理档案数据，支持 Excel/CSV 格式批量导入
-- **风险检测分析**：基于机器学习模型（FeaLearner）自动评估自杀风险等级
-- **量表评估系统**：支持 PHQ-9、SAS、SDS、MINI 等标准化心理量表
-- **AI 智能问答**：基于 RAG 技术的心理咨询对话助手
-- **心理援助地图**：基于高德地图的全国心理咨询机构查询与导航
-- **知识库管理**：心理健康相关文档的上传、预览和管理
-- **3D 情绪可视化**：Three.js 粒子云图展示情绪分布
-
-> **注意**：本系统为完整前后端版本，需要配置 MySQL 和 PostgreSQL 数据库。
-
----
-
-## 技术架构
-
-### 后端技术栈
-
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| FastAPI | 0.109 | Web 框架 |
-| Python | 3.10+ | 后端语言 |
-| PostgreSQL | 15+ | 地图/机构数据存储 |
-| MySQL | 8.0+ | 主业务数据存储 |
-| SQLAlchemy | 2.0 | ORM |
-| Uvicorn | 0.27 | ASGI 服务器 |
-| Torch | 2.0+ | 深度学习模型 |
-| Transformers | 4.36+ | NLP 模型 |
-| LangChain | 0.3+ | RAG 知识库 |
-
-### 前端技术栈
-
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| React | 18.2 | 前端框架 |
-| TypeScript | 5.3 | 类型检查 |
-| Vite | 5.0 | 构建工具 |
-| Ant Design | 5.12 | UI 组件库 |
-| Tailwind CSS | 3.3 | 样式框架 |
-| Zustand | 4.4 | 状态管理 |
-| ECharts | 5.4 | 数据可视化 |
-| Three.js | 0.160 | 3D 渲染 |
-| React Router | 6.20 | 路由管理 |
-| Lucide React | 0.294 | 图标库 |
-
----
-
-## 功能模块
-
-### 后端模块 (`backend/`)
-
-| 模块 | 路径 | 功能说明 |
-|------|------|----------|
-| 用户认证 | `src/routes/auth.py` | JWT 登录注册、密码管理 |
-| 心理档案 | `src/routes/upload_archive.py` | 档案导入、查询、删除 |
-| 数据集管理 | `src/routes/dataset_routes.py` | 数据集配置、CSV 处理 |
-| 风险检测 | `src/routes/risk.py` | FeaLearner 模型推理 |
-| 量表系统 | `src/routes/scales.py` | 量表配置、答题、结果存储 |
-| 知识库 | `src/routes/knowledge.py` | 文档管理、RAG 检索 |
-| 智能问答 | `src/routes/chat.py` | AI 对话、历史记录 |
-| 心理地图 | `src/routes/map_routes.py` | 机构查询、热线管理 |
-| 模型中心 | `src/routes/models.py` | 模型管理、状态监控 |
-| 首页数据 | `src/routes/home.py` | 仪表盘统计数据 |
-
-### 前端页面 (`frontend/src/pages/`)
-
-| 页面 | 文件 | 功能说明 |
-|------|------|----------|
-| 首页仪表盘 | `HomePage.tsx` | 数据概览、快捷入口 |
-| 心理档案 | `ArchivePage.tsx` | 档案列表、搜索、导入 |
-| 档案详情 | `ArchiveDetailPage.tsx` | 单个档案详细信息 |
-| 风险检测 | `RiskPage.tsx` | 风险评估、模型推理 |
-| 量表列表 | `ScalePage.tsx` | 量表选择 |
-| 量表答题 | `ScaleAnswerPage.tsx` | 在线答题 |
-| 量表结果 | `ScaleResultPage.tsx` | 结果展示、历史 |
-| 模型中心 | `ModelCenterPage.tsx` | 模型状态管理 |
-| 知识库 | `KnowledgeBasePage.tsx` | 文档列表 |
-| 知识详情 | `KnowledgeDocDetailPage.tsx` | 文档预览 |
-| 智能问答 | `ChatPage.tsx` | AI 对话界面 |
-| 心理地图 | `MapPage.tsx` | 机构地图、定位 |
-| 文档预览 | `DocPreviewPage.tsx` | PDF/Markdown 预览 |
-| 登录注册 | `LoginPage.tsx` / `RegisterPage.tsx` | 用户认证 |
-| 个人中心 | `ProfilePage.tsx` | 用户信息管理 |
-| 修改密码 | `ChangePasswordPage.tsx` | 密码修改 |
-
----
-
-## 项目结构
-
-```
-vis4srd-V2.0/
-├── backend/                      # FastAPI 后端
-│   ├── src/
-│   │   ├── app.py               # 主应用入口
-│   │   ├── core/                # 核心配置
-│   │   │   ├── config.py        # 环境配置
-│   │   │   ├── database.py      # 数据库连接池
-│   │   │   ├── security.py      # 安全工具
-│   │   │   └── llm_client.py    # LLM 客户端
-│   │   ├── routes/              # API 路由
-│   │   │   ├── auth.py          # 认证接口
-│   │   │   ├── user_routes.py   # 用户管理
-│   │   │   ├── upload_archive.py # 档案管理
-│   │   │   ├── dataset_routes.py # 数据集
-│   │   │   ├── risk.py          # 风险检测
-│   │   │   ├── scales.py        # 量表系统
-│   │   │   ├── knowledge.py     # 知识库
-│   │   │   ├── chat.py          # 智能问答
-│   │   │   ├── map_routes.py    # 心理地图
-│   │   │   ├── models.py        # 模型中心
-│   │   │   ├── home.py          # 首页数据
-│   │   │   └── ...
-│   │   ├── services/            # 业务逻辑
-│   │   │   ├── map_service.py   # 地图服务
-│   │   │   ├── chat_service.py  # 问答服务
-│   │   │   ├── fealearner_service.py # 模型推理
-│   │   │   └── ...
-│   │   └── models/              # 数据模型
-│   ├── SuiAgent-main/           # AI Agent 模块
-│   │   ├── agent.py            # Agent 主程序
-│   │   ├── rag_skill_tool.py    # RAG 工具
-│   │   └── ...
-│   ├── uploads/                 # 上传文件存储
-│   ├── requirements.txt         # Python 依赖
-│   └── .env                     # 环境变量
-│
-├── frontend/                     # React 前端
-│   ├── src/
-│   │   ├── pages/              # 页面组件（16个页面）
-│   │   ├── components/          # 通用组件
-│   │   │   └── layout/         # 布局组件
-│   │   ├── api/                # API 调用封装
-│   │   ├── services/           # 业务服务
-│   │   ├── stores/             # 状态管理
-│   │   ├── types/              # TypeScript 类型
-│   │   ├── scales/             # 量表定义
-│   │   ├── App.tsx             # 路由配置
-│   │   └── main.tsx            # 入口文件
-│   ├── public/                  # 静态资源
-│   ├── dist/                   # 构建输出
-│   ├── package.json            # 前端依赖
-│   ├── vite.config.ts          # Vite 配置
-│   └── nginx.conf              # Nginx 配置
-│
-├── Fealeaner/                   # FeaLearner 模型
-│   ├── FeaLearner/             # 模型核心
-│   │   ├── bigdata/           # 大数据模型
-│   │   ├── weibo/             # 微博模型
-│   │   ├── reddit/            # Reddit 模型
-│   │   └── sigir/             # SIGIR 模型
-│   ├── feature_data/           # 特征数据
-│   ├── predict_with_bestmodel.py # 预测脚本
-│   └── README.md               # 模型说明
-│
-├── datasets/                     # 数据集目录
-│   ├── archives/               # 心理档案数据
-│   └── reddit/                # Reddit 数据集
-│
-├── deploy/                       # 部署配置
-│   └── production/              # 生产环境
-│
-├── docs/                         # 文档目录
-├── map_data/                     # 地图数据
-├── scales/                       # 量表配置
-└── README.md                     # 本文档
+```text
+vis4srd/
+├─ backend/                      # FastAPI 后端
+│  ├─ src/
+│  │  ├─ app.py                  # 应用入口
+│  │  ├─ core/                   # 配置、数据库、鉴权、LLM 客户端
+│  │  ├─ routes/                 # API 路由
+│  │  ├─ services/               # 业务服务
+│  │  └─ models/                 # Pydantic Schema
+│  ├─ scripts/                   # 数据同步/校验脚本
+│  ├─ deploy/                    # 数据库导出与修复脚本
+│  ├─ SuiAgent-main/             # Agent 与 RAG 相关代码/知识目录
+│  └─ requirements.txt
+├─ frontend/                     # React + Vite 前端
+│  ├─ src/
+│  │  ├─ pages/                  # 页面
+│  │  ├─ components/             # 组件
+│  │  ├─ api/                    # 接口封装
+│  │  ├─ hooks/                  # 前端钩子
+│  │  ├─ store/                  # Zustand 状态
+│  │  └─ scales/                 # 量表辅助定义
+│  ├─ package.json
+│  └─ vite.config.ts
+├─ datasets/                     # 内置数据集 CSV
+├─ scales/                       # 量表 JSON 定义
+├─ map_data/                     # 地图机构数据资源
+├─ Fealeaner/                    # FeaLearner 模型与推理脚本
+├─ Emocc/                        # Emocc 模型资源
+├─ docs/                         # 设计/数据库/部署文档
+└─ deploy/production/            # 生产部署脚本
 ```
 
 ---
 
-## 快速部署
+## 2. 系统能力概览
 
-### 环境要求
+### 后端模块
 
-| 软件 | 版本要求 | 说明 |
-|------|----------|------|
-| Python | 3.10+ | 后端运行环境 |
-| Node.js | 18+ | 前端构建（可选） |
-| PostgreSQL | 15+ | 地图数据存储 |
-| MySQL | 8.0+ | 主业务数据库 |
-| Redis | 6+ | 缓存（可选） |
+- `auth.py`：登录、注册、登出、个人信息、修改密码
+- `upload_archive.py`：档案模板、CSV 上传、确认导入、上传文件管理
+- `dataset_routes.py`：内置数据集列表、档案分页、帖子分页、关键词、对比视图
+- `user_routes.py`：统一档案列表、档案详情、删除
+- `risk.py`：风险检测任务、Emocc 检测、模型对比、风险报告
+- `scales.py`：量表任务创建、答题、结果查询、删除
+- `knowledge.py`：知识主题、文档管理、预览、下载、同步
+- `chat.py`：聊天会话、消息、推荐问题、流式问答
+- `map_routes.py`：心理机构、热线、城市、周边检索
+- `models.py`：模型中心、提示词模板、API / 本地模型能力
+- `home.py`：首页统计与趋势
+- `health.py`：健康检查
 
-### 步骤 1：配置环境变量
+### 前端页面
 
-复制后端配置文件：
+- `/home`：首页仪表盘
+- `/archive`：心理档案列表
+- `/archive/detail/:archiveId`：档案详情
+- `/risk`：风险检测任务与结果
+- `/scale`、`/scale/answer/:taskId`、`/scale/result/:taskId`：量表流程
+- `/knowledge`、`/knowledge/detail`：知识库
+- `/chat`：AI 对话
+- `/map`：心理援助地图
+- `/model`：模型中心
+- `/profile`、`/change-password`：账号信息
 
-```bash
-cd backend
-cp .env.example .env  # 如果有示例文件
-# 编辑 .env 填写数据库配置
+前端路由默认要求登录；未登录会跳转到 `/login`。
+
+---
+
+## 3. 技术栈
+
+### 后端
+
+- Python 3.10+
+- FastAPI
+- Uvicorn
+- aiomysql
+- asyncpg
+- orjson
+- pandas / numpy
+- torch / transformers / scikit-learn
+- OpenAI SDK
+- langchain-core `>=0.2.0,<0.3.0`
+
+### 前端
+
+- React 18
+- TypeScript 5
+- Vite 5
+- Ant Design 5
+- Zustand
+- ECharts
+- Three.js
+- Lucide React
+
+---
+
+## 4. 当前运行依赖
+
+本项目本地开发默认依赖两类数据库：
+
+- MySQL：业务数据，默认 `127.0.0.1:3306`
+- PostgreSQL：地图/地理数据，默认通过 SSH 隧道映射到 `127.0.0.1:5432`
+
+固定约束：
+
+- 后端端口固定 `8000`
+- 前端端口固定 `5173`
+- Python 虚拟环境固定在项目根目录 `.venv/`
+- 不要靠改端口绕过问题，优先释放占用
+
+---
+
+## 5. 快速启动
+
+### 5.1 安装 Python 依赖
+
+项目默认使用根目录 `.venv`：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install --upgrade pip setuptools wheel -i https://pypi.tuna.tsinghua.edu.cn/simple
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
-参考配置项：
+注意：
+
+- `backend/requirements.txt` 中 `langchain-core` 的兼容范围已经收紧到 `>=0.2.0,<0.3.0`
+- 不要改回 `>=0.3.0`，否则会和当前依赖组合冲突
+
+### 5.2 安装前端依赖
+
+```powershell
+npm install --prefix frontend --registry=https://registry.npmmirror.com
+```
+
+如果 `frontend/node_modules` 来自别的机器的压缩包，优先删掉重装。
+
+### 5.3 建立 PostgreSQL SSH 隧道
+
+地图相关接口依赖 PostgreSQL 时，先建立本地映射：
+
+```powershell
+ssh -o ExitOnForwardFailure=yes -o ServerAliveInterval=60 -N -L 5432:127.0.0.1:5432 vis4srd-server
+```
+
+本地端口固定为 `5432`。
+
+### 5.4 配置后端环境变量
+
+从 `backend/.env.example` 复制一份到 `backend/.env`，再按本地环境修改。
+
+后端实际读取的是这些变量名：
 
 ```env
-# 数据库配置
-MYSQL_HOST=localhost
-MYSQL_PORT=3306
-MYSQL_USER=root
-MYSQL_PASSWORD=your_password
-MYSQL_DATABASE=vis4srd
+HOST=0.0.0.0
+PORT=8000
 
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=your_password
-POSTGRES_DATABASE=vis4srd_map
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=your_mysql_user
+DB_PASSWORD=your_mysql_password
+DB_NAME=vis4srd
 
-# JWT 配置
-JWT_SECRET_KEY=your-secret-key
+PG_HOST=127.0.0.1
+PG_PORT=5432
+PG_USER=postgres
+PG_PASSWORD=your_pg_password
+PG_NAME=mental_health
+
+AMAP_WEB_SERVICE_KEY=your_amap_key
+
+LLM_API_KEY=your_api_key
+LLM_BASE_URL=https://api.deepseek.com
+LLM_MODEL=qwen-flash
+
+JWT_SECRET_KEY=replace_me
 JWT_ALGORITHM=HS256
-JWT_EXPIRE_MINUTES=1440
-
-# 高德地图 API（用于心理援助地图）
-AMAP_KEY=your-amap-key
-AMAP_SECURITY_CODE=your-security-code
-
-# AI 模型配置（可选）
-OPENAI_API_KEY=your-api-key
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1440
 ```
 
-### 步骤 2：安装后端依赖
+注意：
 
-```bash
+1. 代码读取的是 `DB_HOST / PG_HOST`，不读取 `MYSQL_HOST / POSTGRES_HOST`
+2. `backend/.env.example` 里示例 `PORT=3000` 不是当前项目的本地开发端口，实际应改成 `8000`
+3. 当前开发态推荐 `LLM_MODEL=qwen-flash`
+
+### 5.5 启动后端
+
+在项目根目录进入 `backend/` 后执行：
+
+```powershell
 cd backend
-pip install -r requirements.txt
+..\.venv\Scripts\python.exe -m uvicorn src.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 步骤 3：初始化数据库
+### 5.6 启动前端
 
-```bash
-# 创建 MySQL 数据库
-mysql -u root -p
-CREATE DATABASE vis4srd CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+在项目根目录执行：
 
-# 创建 PostgreSQL 数据库
-psql -U postgres
-CREATE DATABASE vis4srd_map;
+```powershell
+npm run dev --prefix frontend -- --host 0.0.0.0 --port 5173 --strictPort
 ```
 
-### 步骤 4：启动后端服务
+前端开发代理位于 `frontend/vite.config.ts`：
 
-```bash
+- `/api` -> `http://localhost:8000`
+- `/uploads` -> `http://localhost:8000/knowledge`
+
+---
+
+## 6. 启动后验证
+
+至少验证三项：
+
+### 6.1 后端健康检查
+
+```powershell
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8000/api/health
+```
+
+### 6.2 前端首页
+
+```powershell
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1:5173/
+```
+
+### 6.3 前端代理到后端
+
+```powershell
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1:5173/api/health
+```
+
+如果前两步通、第三步不通，优先检查：
+
+- 后端是否真的跑在 `8000`
+- 前端是否真的跑在 `5173`
+- `frontend/vite.config.ts` 的代理是否被改动
+
+---
+
+## 7. 数据与脚本
+
+### 7.1 内置数据集
+
+当前后端围绕 `datasets/` 下的 CSV 构建内置数据集，核心数据源包括：
+
+- `reddit`
+- `bigdata`
+- `sigir`
+- `weibo`
+
+相关脚本：
+
+- `backend/scripts/sync_builtin_datasets.py`
+- `backend/scripts/verify_builtin_archives.py`
+- `backend/scripts/import_dataset_api.py`
+
+同步命令：
+
+```powershell
 cd backend
-uvicorn src.app:app --host 0.0.0.0 --port 8000 --reload
+..\.venv\Scripts\python.exe scripts\sync_builtin_datasets.py
 ```
 
-后端服务将运行在：http://localhost:8000
+校验命令：
 
-### 步骤 5：启动前端开发服务器
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-前端服务将运行在：http://localhost:5173
-
-### 生产环境部署
-
-使用 Nginx 反向代理前端静态资源：
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    # 前端静态文件
-    location / {
-        root /path/to/vis4srd-V2.0/frontend/dist;
-        try_files $uri $uri/ /index.html;
-    }
-
-    # API 反向代理
-    location /api {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
----
-
-## 环境变量配置
-
-### 后端 `.env` 配置项
-
-| 变量名 | 必填 | 说明 | 示例 |
-|--------|------|------|------|
-| `MYSQL_HOST` | 是 | MySQL 主机地址 | localhost |
-| `MYSQL_PORT` | 是 | MySQL 端口 | 3306 |
-| `MYSQL_USER` | 是 | MySQL 用户名 | root |
-| `MYSQL_PASSWORD` | 是 | MySQL 密码 | password |
-| `MYSQL_DATABASE` | 是 | MySQL 数据库名 | vis4srd |
-| `POSTGRES_HOST` | 是 | PostgreSQL 主机 | localhost |
-| `POSTGRES_PORT` | 是 | PostgreSQL 端口 | 5432 |
-| `POSTGRES_USER` | 是 | PostgreSQL 用户 | postgres |
-| `POSTGRES_PASSWORD` | 是 | PostgreSQL 密码 | password |
-| `POSTGRES_DATABASE` | 是 | PostgreSQL 数据库 | vis4srd_map |
-| `JWT_SECRET_KEY` | 是 | JWT 密钥 | your-secret |
-| `JWT_ALGORITHM` | 否 | JWT 算法 | HS256 |
-| `JWT_EXPIRE_MINUTES` | 否 | Token 过期时间(分钟) | 1440 |
-| `VITE_API_BASE` | 前端 | API 基础地址 | /api |
-| `VITE_AMAP_KEY` | 前端 | 高德地图 Key | your-key |
-| `VITE_AMAP_SECURITY_CODE` | 前端 | 高德安全码 | your-code |
-
----
-
-## API 接口文档
-
-启动服务后访问 API 文档：
-
-- Swagger UI：http://localhost:8000/docs
-- ReDoc：http://localhost:8000/redoc
-
-### 主要接口列表
-
-| 模块 | 前缀 | 说明 |
-|------|------|------|
-| 认证 | `/api/auth` | 登录、注册、Token |
-| 用户 | `/api/users` | 用户管理 |
-| 档案 | `/api/archives` | 心理档案 CRUD |
-| 数据集 | `/api/datasets` | 数据集管理 |
-| 风险 | `/api/risk` | 风险评估推理 |
-| 量表 | `/api/scales` | 量表相关接口 |
-| 知识库 | `/api/knowledge` | 文档管理 |
-| 问答 | `/api/chat` | AI 对话 |
-| 地图 | `/api/institutions` | 机构查询 |
-| 地图 | `/api/hotlines` | 热线查询 |
-| 模型 | `/api/models` | 模型管理 |
-| 首页 | `/api/home` | 统计数据 |
-
----
-
-## 常见问题
-
-### Q1：后端启动报错 `ModuleNotFoundError`
-
-**原因**：Python 依赖未安装。
-
-**解决**：
-
-```bash
+```powershell
 cd backend
-pip install -r requirements.txt
+..\.venv\Scripts\python.exe scripts\verify_builtin_archives.py
 ```
 
-### Q2：数据库连接失败
+### 7.2 量表定义
 
-**原因**：数据库服务未启动或配置错误。
+量表定义放在根目录 `scales/`，当前包含：
 
-**解决**：
-1. 确保 MySQL 和 PostgreSQL 服务已启动
-2. 检查 `.env` 中的数据库配置
-3. 确认数据库和用户已创建
+- `BHS`
+- `C-SSRS`
+- `DASS-21`
+- `GAD-7`
+- `ISI`
+- `PHQ-9`
+- `SDS`
 
-```bash
-# 检查 MySQL 服务状态
-systemctl status mysql
+后端读取入口位于 `backend/src/services/scale_catalog.py`。
 
-# 检查 PostgreSQL 服务状态
-systemctl status postgresql
-```
+### 7.3 模型与知识资源
 
-### Q3：高德地图加载失败
-
-**原因**：未配置高德地图 API Key 或 Key 无效。
-
-**解决**：
-1. 在高德开放平台申请 Web API Key
-2. 在前端 `.env` 或 `index.html` 中配置：
-
-```html
-<script src="https://webapi.amap.com/maps?v=2.0&key=YOUR_KEY"></script>
-```
-
-### Q4：模型推理服务不可用
-
-**原因**：FeaLearner 模型文件缺失或 PyTorch 未安装。
-
-**解决**：
-
-```bash
-# 安装 PyTorch
-pip install torch torchvision
-
-# 检查模型文件
-ls Fealeaner/FeaLearner/
-```
-
-### Q5：前端构建失败
-
-**原因**：Node.js 版本过低或依赖冲突。
-
-**解决**：
-
-```bash
-# 清理缓存重新安装
-cd frontend
-rm -rf node_modules package-lock.json
-npm install
-```
-
-### Q6：JWT Token 过期
-
-**原因**：Token 默认 24 小时过期。
-
-**解决**：
-1. 重新登录获取新 Token
-2. 修改 `JWT_EXPIRE_MINUTES` 调整过期时间
-
-### Q7：RAG 知识库检索无结果
-
-**原因**：知识库文档未上传或索引未建立。
-
-**解决**：
-1. 在知识库页面上传文档
-2. 系统会自动建立索引
-3. 等待索引完成后重试
+- `Fealeaner/`：FeaLearner 模型文件、特征数据与预测脚本
+- `Emocc/`：Emocc 模型资源
+- `backend/SuiAgent-main/`：对话 Agent、RAG 技能、知识目录、记忆文件
 
 ---
 
-## 停止服务
+## 8. 关键代码入口
 
-```bash
-# 停止后端服务
-pkill -f "uvicorn src.app"
+### 后端
 
-# 停止前端服务
-cd frontend && npm run build
+- `backend/src/app.py`：服务入口与生命周期管理
+- `backend/src/routes/__init__.py`：所有路由导出
+- `backend/src/core/config.py`：配置读取
+- `backend/src/core/database.py`：MySQL / PostgreSQL 连接池
+- `backend/src/core/llm_client.py`：LLM 客户端
+- `backend/src/routes/upload_archive.py`：档案上传与导入
+- `backend/src/routes/risk.py`：风险检测
+- `backend/src/routes/knowledge.py`：知识库
+- `backend/src/routes/chat.py`：聊天与流式对话
+
+### 前端
+
+- `frontend/src/main.tsx`：前端入口
+- `frontend/src/App.tsx`：路由与鉴权守卫
+- `frontend/src/api/index.ts`：接口封装
+- `frontend/src/components/layout/Layout.tsx`：整体布局
+- `frontend/vite.config.ts`：开发代理
+
+---
+
+## 9. 接口文档
+
+服务启动后可访问：
+
+- Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- ReDoc: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+
+常用接口前缀：
+
+- `/api/health`
+- `/api/auth/*`
+- `/api/home/*`
+- `/api/datasets/*`
+- `/api/users/*`
+- `/api/upload/archive/*`
+- `/api/risk/*`
+- `/api/scales/*`
+- `/api/knowledge/*`
+- `/api/chat/*`
+- `/api/models/*`
+- `/api/institutions/*`
+- `/api/hotlines/*`
+
+---
+
+## 10. 本地日志与排错
+
+建议把本地开发日志统一放到根目录 `.dev-logs/`：
+
+- `.dev-logs/backend.stdout.log`
+- `.dev-logs/backend.stderr.log`
+- `.dev-logs/frontend.stdout.log`
+- `.dev-logs/frontend.stderr.log`
+
+常见排查方向：
+
+### 10.1 `8000` 端口被占用
+
+本项目要求后端固定跑在 `8000`。不要先改端口，先查占用并释放。
+
+### 10.2 地图接口异常
+
+优先检查 PostgreSQL SSH 隧道是否还活着，以及 `PG_HOST/PG_PORT` 是否仍然是 `127.0.0.1:5432`。
+
+### 10.3 前端接口请求失败
+
+先确认：
+
+1. 后端是否已成功启动
+2. 前端是否已成功启动
+3. Vite 代理是否仍指向 `http://localhost:8000`
+
+### 10.4 档案或量表数据不一致
+
+优先执行：
+
+```powershell
+cd backend
+..\.venv\Scripts\python.exe scripts\verify_builtin_archives.py
 ```
 
 ---
 
-## 致谢
+## 11. 已知注意点
 
-本系统面向医生设计，用于辅助自杀风险评估。所有数据均经过脱敏处理，不包含任何真实患者敏感信息。
+- `backend/` 下存在一些形如 `=0.10.0`、`=0.3.0` 的历史残留文件，不是正常源码入口
+- `frontend/tsconfig.json` 里有重复的 `noUnusedLocals / noUnusedParameters`，当前会告警，但不阻塞开发服务器启动
+- `frontend/.env.dev` 含有开发环境配置，生产部署不要直接照搬
+- 后端启动时会自动尝试把本地知识目录元信息同步到数据库
+- 后端启动时还会异步预热一次 Agent 池
 
 ---
 
-## 联系方式
+## 12. 推荐阅读顺序
 
-如有问题，请通过 GitHub Issues 提交。
+如果你第一次接这个项目，建议按下面的顺序理解：
+
+1. 看 `backend/src/app.py`，先理解服务启动流程
+2. 看 `frontend/src/App.tsx`，先理解页面与路由
+3. 跑通 `/api/health` 和前端首页
+4. 看 `datasets/`、`scales/`、`backend/scripts/`
+5. 再进入具体业务模块，例如档案导入、风险检测、知识库或聊天
+
+---
+
+## 13. 相关文档
+
+- `AGENTS.md`：当前仓库协作约束与本地开发要求
+- `docs/VIS4SRD_数据库设计文档.md`：数据库结构与字段设计
+- `docs/部署经验文档.md`：部署与运行经验
+- `docs/Chat页面_Agent返回结构交付文档.md`：聊天页面相关结构说明
+
+---
+
+## 14. 适用范围说明
+
+这个系统涉及心理健康、自杀风险、危机干预等敏感场景。当前仓库更适合用于：
+
+- 课程 / 毕设 / demo 演示
+- 算法与系统联调
+- 可视化展示与原型迭代
+- 数据管线、量表与问答模块整合
+
+不应将模型输出直接作为临床诊断结论使用。
