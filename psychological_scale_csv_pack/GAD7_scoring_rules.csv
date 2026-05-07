@@ -1,0 +1,5 @@
+﻿scale_code,score_name,question_nos,formula,range_min,range_max,risk_level,suggestion,special_trigger
+GAD7,total,"1,2,3,4,5,6,7",sum(q1:q7),0,4,无或极轻微焦虑,保持观察，可结合心理健康教育。,total >= 10 建议进一步评估
+GAD7,total,"1,2,3,4,5,6,7",sum(q1:q7),5,9,轻度焦虑,建议关注压力源和睡眠，可推荐放松训练。,total >= 10 建议进一步评估
+GAD7,total,"1,2,3,4,5,6,7",sum(q1:q7),10,14,中度焦虑,建议心理咨询或精神心理科进一步评估。,total >= 10 建议进一步评估
+GAD7,total,"1,2,3,4,5,6,7",sum(q1:q7),15,21,重度焦虑,建议尽快专业评估并进行干预。,total >= 10 建议进一步评估

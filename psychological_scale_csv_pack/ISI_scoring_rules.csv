@@ -1,0 +1,5 @@
+﻿scale_code,score_name,question_nos,formula,range_min,range_max,risk_level,suggestion,special_trigger
+ISI,total,"1,2,3,4,5,6,7",sum(q1:q7),0,7,无临床显著失眠,保持良好睡眠习惯。,total >= 15 建议进一步评估
+ISI,total,"1,2,3,4,5,6,7",sum(q1:q7),8,14,亚临床失眠,建议进行睡眠卫生教育和随访观察。,total >= 15 建议进一步评估
+ISI,total,"1,2,3,4,5,6,7",sum(q1:q7),15,21,中度临床失眠,建议进一步评估睡眠及共病情绪问题。,total >= 15 建议进一步评估
+ISI,total,"1,2,3,4,5,6,7",sum(q1:q7),22,28,重度临床失眠,建议专业评估与治疗。,total >= 15 建议进一步评估

@@ -1,0 +1,17 @@
+
+// 评分实现核心思路（伪代码）
+public int sum(List<Integer> scores) {
+    return scores.stream().mapToInt(Integer::intValue).sum();
+}
+
+// PHQ-9: total = q1+...+q9; q9>0 触发自杀风险复核
+// GAD-7: total = q1+...+q7
+// ISI: total = q1+...+q7
+// SDS: raw = 正向题score + 反向题reverse_score; index = raw * 1.25
+// DASS-21:
+// depression = (q3+q5+q10+q13+q16+q17+q21)*2
+// anxiety    = (q2+q4+q7+q9+q15+q19+q20)*2
+// stress     = (q1+q6+q8+q11+q12+q14+q18)*2
+
+// 数据库推荐读取 scale_questions_all.csv 和 scale_options_all.csv 初始化题库，
+// 提交答案后根据 scale_scoring_rules_all.csv 或后端固定策略计算。

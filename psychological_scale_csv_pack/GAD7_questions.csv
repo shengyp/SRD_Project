@@ -1,0 +1,8 @@
+﻿scale_code,scale_name,question_no,question_text_cn,dimension,reverse_score,option_group,period,text_status
+GAD7,GAD-7 广泛性焦虑量表,1,感到紧张、焦虑或坐立不安,anxiety,False,PHQ_GAD_0_3,过去两周,原型中文改写版；正式部署请核对授权中文版
+GAD7,GAD-7 广泛性焦虑量表,2,无法停止或控制担忧,anxiety,False,PHQ_GAD_0_3,过去两周,原型中文改写版；正式部署请核对授权中文版
+GAD7,GAD-7 广泛性焦虑量表,3,对各种事情担心得过多,anxiety,False,PHQ_GAD_0_3,过去两周,原型中文改写版；正式部署请核对授权中文版
+GAD7,GAD-7 广泛性焦虑量表,4,很难放松下来,anxiety,False,PHQ_GAD_0_3,过去两周,原型中文改写版；正式部署请核对授权中文版
+GAD7,GAD-7 广泛性焦虑量表,5,坐立不安，以至于难以安静坐着,anxiety,False,PHQ_GAD_0_3,过去两周,原型中文改写版；正式部署请核对授权中文版
+GAD7,GAD-7 广泛性焦虑量表,6,容易烦躁或易怒,anxiety,False,PHQ_GAD_0_3,过去两周,原型中文改写版；正式部署请核对授权中文版
+GAD7,GAD-7 广泛性焦虑量表,7,感到好像会发生可怕的事情,anxiety,False,PHQ_GAD_0_3,过去两周,原型中文改写版；正式部署请核对授权中文版

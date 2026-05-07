@@ -1,0 +1,6 @@
+﻿scale_code,score_name,question_nos,formula,range_min,range_max,risk_level,suggestion,special_trigger
+SDS,raw,1-20,sum(score if reverse_score=false else reverse_score_value),20,80,原始分,先计算原始分，再换算指数分。,q19 高分建议人工关注
+SDS,index,1-20,index_score = raw_score * 1.25,25,49,正常范围,保持观察。,
+SDS,index,1-20,index_score = raw_score * 1.25,50,59,轻度抑郁,建议关注情绪变化并适当随访。,
+SDS,index,1-20,index_score = raw_score * 1.25,60,69,中度抑郁,建议专业心理评估。,
+SDS,index,1-20,index_score = raw_score * 1.25,70,100,重度抑郁,建议尽快转介专业医生。,
