@@ -1,144 +1,233 @@
 {
   "code": "GAD-7",
-  "name": "广泛性焦虑障碍量表",
-  "full_name": "Generalized Anxiety Disorder Scale-7",
-  "version": "Chinese Simplified v1.0",
-  "description": "GAD-7由Spitzer等人于2006年开发，是评估广泛性焦虑障碍（GAD）的标准化筛查工具。共7道题目，询问过去两周内焦虑相关症状的频率。焦虑与抑郁高度共病，且是自杀风险的重要调节因素。",
-  "purpose": "焦虑筛查（与抑郁共病评估，自杀风险调节因素）",
+  "name": "广泛性焦虑量表",
+  "full_name": "Generalized Anxiety Disorder-7",
+  "version": "Chinese Prototype Pack v1.0",
+  "category": "anxiety",
+  "description": "GAD-7 用于评估过去两周内的焦虑严重程度，可与抑郁、睡眠等量表联动分析。",
+  "purpose": "焦虑筛查",
+  "system_classification": {
+    "tier": "core_default",
+    "tier_label": "核心默认量表",
+    "clinical_role": "screening"
+  },
+  "source_url": "https://www.mytopcare.org/wp-content/uploads/2013/06/gad7-validation.pdf",
+  "original_paper": "Spitzer RL, Kroenke K, Williams JBW, Lowe B. A brief measure for assessing generalized anxiety disorder: the GAD-7. Arch Intern Med. 2006;166(10):1092-1097.",
+  "license_note": "当前系统题干来自中文原型改写包，仅适用于课程项目、系统原型和演示。正式临床部署前应核对授权中文版、机构使用规范与伦理要求。",
+  "validated_population": "适用于普通成人、基层医疗和高校/社区焦虑筛查；中文人群已有验证研究。",
+  "screening_only": true,
   "estimated_minutes": 3,
   "total_questions": 7,
-  "instruction": "在过去两周内，您有多频繁地受到以下问题的困扰？",
+  "instruction": "请根据您过去两周内的实际情况，选择每一项描述与您相符的频率。",
   "scoring": {
     "type": "sum",
-    "max_score": 21,
-    "dimensions": []
+    "max_score": 21
   },
   "thresholds": [
     {
       "min": 0,
       "max": 4,
-      "level": "normal",
-      "label": "无焦虑",
-      "label_en": "Minimal Anxiety",
+      "level": "无或极轻微焦虑",
+      "label": "无或极轻微焦虑",
       "risk_level": "low",
-      "suggestion": "无需特殊干预"
+      "suggestion": "保持观察，可结合心理健康教育。"
     },
     {
       "min": 5,
       "max": 9,
-      "level": "mild",
+      "level": "轻度焦虑",
       "label": "轻度焦虑",
-      "label_en": "Mild Anxiety",
       "risk_level": "low",
-      "suggestion": "给予心理健康教育，1个月后随访"
+      "suggestion": "建议关注压力源和睡眠，可推荐放松训练。"
     },
     {
       "min": 10,
       "max": 14,
-      "level": "moderate",
+      "level": "中度焦虑",
       "label": "中度焦虑",
-      "label_en": "Moderate Anxiety",
       "risk_level": "medium",
-      "suggestion": "考虑进一步评估和干预，可联合PHQ-9评估共病"
+      "suggestion": "建议心理咨询或精神心理科进一步评估。"
     },
     {
       "min": 15,
       "max": 21,
-      "level": "severe",
+      "level": "重度焦虑",
       "label": "重度焦虑",
-      "label_en": "Severe Anxiety",
       "risk_level": "high",
-      "suggestion": "建议立即寻求专业帮助，进行综合心理评估"
+      "suggestion": "建议尽快专业评估并进行干预。"
     }
   ],
-  "cutoff_screening": 10,
-  "cutoff_note": "以10分为筛查阳性cutoff，灵敏度89%，特异度82%",
   "questions": [
     {
       "id": 1,
-      "text": "感觉紧张、焦虑或烦躁",
-      "dimension": null,
+      "text": "感到紧张、焦虑或坐立不安",
+      "dimension": "anxiety",
       "reverse": false,
       "options": [
-        { "value": 0, "label": "完全没有" },
-        { "value": 1, "label": "几天" },
-        { "value": 2, "label": "一半以上天数" },
-        { "value": 3, "label": "几乎每天" }
+        {
+          "value": 0,
+          "label": "完全没有"
+        },
+        {
+          "value": 1,
+          "label": "有几天"
+        },
+        {
+          "value": 2,
+          "label": "一半以上时间"
+        },
+        {
+          "value": 3,
+          "label": "几乎每天"
+        }
       ]
     },
     {
       "id": 2,
-      "text": "不能停止或控制担忧",
-      "dimension": null,
+      "text": "无法停止或控制担忧",
+      "dimension": "anxiety",
       "reverse": false,
       "options": [
-        { "value": 0, "label": "完全没有" },
-        { "value": 1, "label": "几天" },
-        { "value": 2, "label": "一半以上天数" },
-        { "value": 3, "label": "几乎每天" }
+        {
+          "value": 0,
+          "label": "完全没有"
+        },
+        {
+          "value": 1,
+          "label": "有几天"
+        },
+        {
+          "value": 2,
+          "label": "一半以上时间"
+        },
+        {
+          "value": 3,
+          "label": "几乎每天"
+        }
       ]
     },
     {
       "id": 3,
-      "text": "对各种各样的事情担忧过多",
-      "dimension": null,
+      "text": "对各种事情担心得过多",
+      "dimension": "anxiety",
       "reverse": false,
       "options": [
-        { "value": 0, "label": "完全没有" },
-        { "value": 1, "label": "几天" },
-        { "value": 2, "label": "一半以上天数" },
-        { "value": 3, "label": "几乎每天" }
+        {
+          "value": 0,
+          "label": "完全没有"
+        },
+        {
+          "value": 1,
+          "label": "有几天"
+        },
+        {
+          "value": 2,
+          "label": "一半以上时间"
+        },
+        {
+          "value": 3,
+          "label": "几乎每天"
+        }
       ]
     },
     {
       "id": 4,
       "text": "很难放松下来",
-      "dimension": null,
+      "dimension": "anxiety",
       "reverse": false,
       "options": [
-        { "value": 0, "label": "完全没有" },
-        { "value": 1, "label": "几天" },
-        { "value": 2, "label": "一半以上天数" },
-        { "value": 3, "label": "几乎每天" }
+        {
+          "value": 0,
+          "label": "完全没有"
+        },
+        {
+          "value": 1,
+          "label": "有几天"
+        },
+        {
+          "value": 2,
+          "label": "一半以上时间"
+        },
+        {
+          "value": 3,
+          "label": "几乎每天"
+        }
       ]
     },
     {
       "id": 5,
-      "text": "由于不安而无法静坐",
-      "dimension": null,
+      "text": "坐立不安，以至于难以安静坐着",
+      "dimension": "anxiety",
       "reverse": false,
       "options": [
-        { "value": 0, "label": "完全没有" },
-        { "value": 1, "label": "几天" },
-        { "value": 2, "label": "一半以上天数" },
-        { "value": 3, "label": "几乎每天" }
+        {
+          "value": 0,
+          "label": "完全没有"
+        },
+        {
+          "value": 1,
+          "label": "有几天"
+        },
+        {
+          "value": 2,
+          "label": "一半以上时间"
+        },
+        {
+          "value": 3,
+          "label": "几乎每天"
+        }
       ]
     },
     {
       "id": 6,
-      "text": "变得容易烦恼或急躁",
-      "dimension": null,
+      "text": "容易烦躁或易怒",
+      "dimension": "anxiety",
       "reverse": false,
       "options": [
-        { "value": 0, "label": "完全没有" },
-        { "value": 1, "label": "几天" },
-        { "value": 2, "label": "一半以上天数" },
-        { "value": 3, "label": "几乎每天" }
+        {
+          "value": 0,
+          "label": "完全没有"
+        },
+        {
+          "value": 1,
+          "label": "有几天"
+        },
+        {
+          "value": 2,
+          "label": "一半以上时间"
+        },
+        {
+          "value": 3,
+          "label": "几乎每天"
+        }
       ]
     },
     {
       "id": 7,
-      "text": "害怕将有可怕的事情发生",
-      "dimension": null,
+      "text": "感到好像会发生可怕的事情",
+      "dimension": "anxiety",
       "reverse": false,
       "options": [
-        { "value": 0, "label": "完全没有" },
-        { "value": 1, "label": "几天" },
-        { "value": 2, "label": "一半以上天数" },
-        { "value": 3, "label": "几乎每天" }
+        {
+          "value": 0,
+          "label": "完全没有"
+        },
+        {
+          "value": 1,
+          "label": "有几天"
+        },
+        {
+          "value": 2,
+          "label": "一半以上时间"
+        },
+        {
+          "value": 3,
+          "label": "几乎每天"
+        }
       ]
     }
   ],
-  "interpretation": "GAD-7专门用于评估广泛性焦虑障碍。焦虑与抑郁高度共病（共病率约50%），联合PHQ-9使用可全面评估情绪状态。焦虑程度是自杀风险的重要调节变量，GAD-7评分应与PHQ-9第9题联合分析。",
-  "references": "Spitzer RL, et al. A brief measure for assessing generalized anxiety disorder. Arch Intern Med. 2006;166(10):1092-1097. 中文版验证：He XY, et al. BMJ Open. 2010."
+  "special_rules": [],
+  "interpretation": "总分越高代表焦虑困扰越明显；达到中度及以上建议进行进一步专业评估。",
+  "references": "题目、选项、评分规则来自 psychological_scale_csv_pack；正式部署前请核对中文版授权、版权与临床适用范围。"
 }

@@ -1,0 +1,261 @@
+{
+  "code": "ISI",
+  "name": "失眠严重程度指数",
+  "full_name": "Insomnia Severity Index",
+  "version": "Chinese Prototype Pack v1.0",
+  "category": "sleep",
+  "description": "ISI 用于评估最近两周的失眠严重程度，适合与情绪量表结合用于睡眠-情绪联动筛查。",
+  "purpose": "睡眠问题筛查",
+  "system_classification": {
+    "tier": "core_default",
+    "tier_label": "核心默认量表",
+    "clinical_role": "screening"
+  },
+  "source_url": "https://www.i-sleep.nl/wp-content/uploads/2019/08/2011-Morin-psychometrics-ISI.pdf",
+  "original_paper": "Bastien CH, Vallieres A, Morin CM. Validation of the Insomnia Severity Index as an outcome measure for insomnia research. Sleep Med. 2001;2(4):297-307.",
+  "license_note": "当前系统题干来自中文原型改写包，仅适用于课程项目、系统原型和演示。正式临床部署前应核对授权中文版和机构使用规范。",
+  "validated_population": "适用于成人睡眠筛查、门诊随访以及与情绪症状联动分析场景；中文人群已有应用研究。",
+  "screening_only": true,
+  "estimated_minutes": 3,
+  "total_questions": 7,
+  "instruction": "请根据您最近两周的实际情况，评估以下睡眠相关问题的严重程度。",
+  "scoring": {
+    "type": "sum",
+    "max_score": 28
+  },
+  "thresholds": [
+    {
+      "min": 0,
+      "max": 7,
+      "level": "无临床显著失眠",
+      "label": "无临床显著失眠",
+      "risk_level": "low",
+      "suggestion": "保持良好睡眠习惯。"
+    },
+    {
+      "min": 8,
+      "max": 14,
+      "level": "亚临床失眠",
+      "label": "亚临床失眠",
+      "risk_level": "low",
+      "suggestion": "建议进行睡眠卫生教育和随访观察。"
+    },
+    {
+      "min": 15,
+      "max": 21,
+      "level": "中度临床失眠",
+      "label": "中度临床失眠",
+      "risk_level": "medium",
+      "suggestion": "建议进一步评估睡眠及共病情绪问题。"
+    },
+    {
+      "min": 22,
+      "max": 28,
+      "level": "重度临床失眠",
+      "label": "重度临床失眠",
+      "risk_level": "high",
+      "suggestion": "建议专业评估与治疗。"
+    }
+  ],
+  "questions": [
+    {
+      "id": 1,
+      "text": "入睡困难的严重程度",
+      "dimension": "insomnia",
+      "reverse": false,
+      "options": [
+        {
+          "value": 0,
+          "label": "无/完全不影响"
+        },
+        {
+          "value": 1,
+          "label": "轻微"
+        },
+        {
+          "value": 2,
+          "label": "中等"
+        },
+        {
+          "value": 3,
+          "label": "严重"
+        },
+        {
+          "value": 4,
+          "label": "非常严重"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "text": "睡眠维持困难的严重程度",
+      "dimension": "insomnia",
+      "reverse": false,
+      "options": [
+        {
+          "value": 0,
+          "label": "无/完全不影响"
+        },
+        {
+          "value": 1,
+          "label": "轻微"
+        },
+        {
+          "value": 2,
+          "label": "中等"
+        },
+        {
+          "value": 3,
+          "label": "严重"
+        },
+        {
+          "value": 4,
+          "label": "非常严重"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "text": "早醒问题的严重程度",
+      "dimension": "insomnia",
+      "reverse": false,
+      "options": [
+        {
+          "value": 0,
+          "label": "无/完全不影响"
+        },
+        {
+          "value": 1,
+          "label": "轻微"
+        },
+        {
+          "value": 2,
+          "label": "中等"
+        },
+        {
+          "value": 3,
+          "label": "严重"
+        },
+        {
+          "value": 4,
+          "label": "非常严重"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "text": "对当前睡眠状况的不满意程度",
+      "dimension": "insomnia",
+      "reverse": false,
+      "options": [
+        {
+          "value": 0,
+          "label": "无/完全不影响"
+        },
+        {
+          "value": 1,
+          "label": "轻微"
+        },
+        {
+          "value": 2,
+          "label": "中等"
+        },
+        {
+          "value": 3,
+          "label": "严重"
+        },
+        {
+          "value": 4,
+          "label": "非常严重"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "text": "睡眠问题对日间功能的影响程度",
+      "dimension": "insomnia",
+      "reverse": false,
+      "options": [
+        {
+          "value": 0,
+          "label": "无/完全不影响"
+        },
+        {
+          "value": 1,
+          "label": "轻微"
+        },
+        {
+          "value": 2,
+          "label": "中等"
+        },
+        {
+          "value": 3,
+          "label": "严重"
+        },
+        {
+          "value": 4,
+          "label": "非常严重"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "text": "他人能察觉到你的睡眠问题对生活质量的影响程度",
+      "dimension": "insomnia",
+      "reverse": false,
+      "options": [
+        {
+          "value": 0,
+          "label": "无/完全不影响"
+        },
+        {
+          "value": 1,
+          "label": "轻微"
+        },
+        {
+          "value": 2,
+          "label": "中等"
+        },
+        {
+          "value": 3,
+          "label": "严重"
+        },
+        {
+          "value": 4,
+          "label": "非常严重"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "text": "你对当前睡眠问题的担心或痛苦程度",
+      "dimension": "insomnia",
+      "reverse": false,
+      "options": [
+        {
+          "value": 0,
+          "label": "无/完全不影响"
+        },
+        {
+          "value": 1,
+          "label": "轻微"
+        },
+        {
+          "value": 2,
+          "label": "中等"
+        },
+        {
+          "value": 3,
+          "label": "严重"
+        },
+        {
+          "value": 4,
+          "label": "非常严重"
+        }
+      ]
+    }
+  ],
+  "special_rules": [],
+  "interpretation": "ISI 结果用于辅助识别失眠困扰程度；中度及以上建议进一步关注睡眠与共病情绪问题。",
+  "references": "题目、选项、评分规则来自 psychological_scale_csv_pack；正式部署前请核对中文版授权、版权与临床适用范围。"
+}

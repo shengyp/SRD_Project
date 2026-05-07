@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Check, X,
   Brain, Shield, Activity, FileText,
-  User, Search,
+  User, Search, MoonStar,
   Plus, Play, Eye, Clock, Target, Award, TrendingUp, Loader, TrendingDown
 } from 'lucide-react';
 import PaperStatCard from '../components/PaperStatCard';
@@ -12,7 +12,7 @@ import {
   createScaleTask,
   deleteScaleTask,
   fetchDatasets,
-  fetchArchives,
+  fetchArchiveUsers,
   type DatasetProfile,
 } from '../api';
 import {
@@ -103,6 +103,14 @@ const DATA_SOURCE_LABELS: Record<string, string> = {
   weibo: 'Weibo系列',
 };
 
+const SCALE_TIER_ORDER = ['core_default', 'supplemental_profile', 'specialized_risk', 'research_backup'] as const;
+const SCALE_TIER_LABELS: Record<(typeof SCALE_TIER_ORDER)[number], string> = {
+  core_default: '核心默认量表',
+  supplemental_profile: '补充画像量表',
+  specialized_risk: '专项风险量表',
+  research_backup: '研究/备用量表',
+};
+
 // ==================== 创建任务模态框 ====================
 
 function CreateTaskModal({
@@ -124,33 +132,82 @@ function CreateTaskModal({
   const [taskName, setTaskName] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [usersTotal, setUsersTotal] = useState(0);
   const [usersLoading, setUsersLoading] = useState(false);
+  const groupedScales = useMemo(() => {
+    const buckets = new Map<string, ScaleMeta[]>();
+    scales.forEach((scale) => {
+      const tier = scale.systemClassification.tier || 'research_backup';
+      const list = buckets.get(tier) || [];
+      list.push(scale);
+      buckets.set(tier, list);
+    });
+    return SCALE_TIER_ORDER
+      .map((tier) => ({
+        tier,
+        label: SCALE_TIER_LABELS[tier],
+        scales: buckets.get(tier) || [],
+      }))
+      .filter((group) => group.scales.length > 0);
+  }, [scales]);
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersTotalPages, setUsersTotalPages] = useState(0);
 
-  // 直接联动心理档案模块的数据
   useEffect(() => {
     if (!isOpen) return;
-    setUsersLoading(true);
-    fetchArchives({ dataset: selectedDataSource || undefined, page: 1, limit: 100 })
-      .then(data => {
-        const mapped: UserProfile[] = (data.archives || []).map((a) => ({
-          id: a.id,
-          userId: a.userId,
-          riskLevel: a.riskLevel?.toLowerCase() || 'low',
-          postCount: a.postCount || 0,
-          dataSource: a.dataSource || selectedDataSource || 'reddit',
-          importTime: a.importTime,
-        }));
-        setUsers(mapped);
-      })
-      .catch(() => setUsers([]))
-      .finally(() => setUsersLoading(false));
-  }, [isOpen, selectedDataSource]);
+    const timer = window.setTimeout(() => {
+      setUsersPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [isOpen, searchKeyword]);
 
-  const filteredUsers = users.filter(user => {
-    if (selectedDataSource && user.dataSource !== selectedDataSource) return false;
-    if (searchKeyword && !user.userId.toLowerCase().includes(searchKeyword.toLowerCase())) return false;
-    return true;
-  });
+  useEffect(() => {
+    if (!isOpen || !selectedDataSource) {
+      setUsers([]);
+      setUsersTotal(0);
+      setUsersTotalPages(0);
+      setUsersLoading(false);
+      return;
+    }
+    let cancelled = false;
+
+    const loadUsers = async () => {
+      setUsersLoading(true);
+      try {
+        const result = await fetchArchiveUsers({
+          dataset: selectedDataSource,
+          keyword: searchKeyword.trim() || undefined,
+          page: usersPage,
+          pageSize: 20,
+        });
+        if (!cancelled) {
+          setUsers(result.users.map((user) => ({
+            id: user.archiveId,
+            userId: user.userId,
+            riskLevel: user.riskLevel?.toLowerCase() || 'low',
+            postCount: user.postCount || 0,
+            dataSource: user.datasetSource || selectedDataSource,
+            importTime: user.importTime,
+          })));
+          setUsersTotal(result.total || 0);
+          setUsersTotalPages(result.totalPages || 0);
+        }
+      } catch {
+        if (!cancelled) {
+          setUsers([]);
+          setUsersTotal(0);
+          setUsersTotalPages(0);
+        }
+      } finally {
+        if (!cancelled) setUsersLoading(false);
+      }
+    };
+
+    loadUsers();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, selectedDataSource, searchKeyword, usersPage]);
 
   const handleCreate = () => {
     if (!selectedDataSource || !selectedUser || !selectedScale) return;
@@ -172,6 +229,8 @@ function CreateTaskModal({
     setSelectedUser(null);
     setSelectedScale(null);
     setTaskName('');
+    setSearchKeyword('');
+    setUsersPage(1);
   };
 
   if (!isOpen) return null;
@@ -213,7 +272,12 @@ function CreateTaskModal({
                   selectedDataSource === value ? 'border-[#2F6BFF] bg-[#F3F8FF]' : 'border-[#E2E8F0] hover:border-[#8FB4FF]'
                 }`}>
                   <input type="radio" name="datasource" value={value} checked={selectedDataSource === value}
-                    onChange={(e) => { setSelectedDataSource(e.target.value); setSelectedUser(null); }} className="sr-only" />
+                    onChange={(e) => {
+                      setSelectedDataSource(e.target.value);
+                      setSelectedUser(null);
+                      setSearchKeyword('');
+                      setUsersPage(1);
+                    }} className="sr-only" />
                   <span className="text-lg">
                     {value === 'reddit' && '🌐'}
                     {value === 'bigdata' && '📚'}
@@ -233,9 +297,15 @@ function CreateTaskModal({
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input type="text" placeholder="搜索用户ID..." value={searchKeyword}
+                  disabled={!selectedDataSource}
                   onChange={e => setSearchKeyword(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
               </div>
+            </div>
+            <div className="mb-2 text-xs text-[#94A3B8]">
+              {!selectedDataSource
+                ? '请先选择数据源'
+                : `当前数据系列共 ${usersTotal} 位用户，当前第 ${usersPage}/${Math.max(usersTotalPages, 1)} 页`}
             </div>
             <div className="border border-[#E2E8F0] rounded-xl overflow-hidden max-h-56 overflow-y-auto">
               {usersLoading ? (
@@ -243,9 +313,9 @@ function CreateTaskModal({
                   <Loader className="w-5 h-5 text-[#2F6BFF] animate-spin" />
                   <span className="ml-2 text-sm text-[#64748B]">加载用户...</span>
                 </div>
-              ) : filteredUsers.length === 0 ? (
+              ) : users.length === 0 ? (
                 <div className="py-8 text-center text-sm text-[#94A3B8]">
-                  {users.length === 0 ? '暂无可用用户' : '无匹配用户'}
+                  {!selectedDataSource ? '请选择数据源后再搜索用户' : searchKeyword ? '无匹配用户' : '暂无可用用户'}
                 </div>
               ) : (
                 <table className="w-full">
@@ -258,7 +328,7 @@ function CreateTaskModal({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E2E8F0]">
-                    {filteredUsers.map((user) => (
+                    {users.map((user) => (
                       <tr key={user.id} className="hover:bg-[#F7FAFD]">
                         <td className="px-3 py-2">
                           <input type="radio" name="user" checked={selectedUser?.id === user.id}
@@ -277,35 +347,89 @@ function CreateTaskModal({
                 </table>
               )}
             </div>
+            {selectedDataSource && (
+              <div className="mt-3 flex items-center justify-between text-xs text-[#64748B]">
+                <span>每页 20 位用户</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={usersPage <= 1 || usersLoading}
+                    onClick={() => setUsersPage((page) => Math.max(1, page - 1))}
+                    className="px-3 py-1 rounded-lg border border-[#E2E8F0] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#F7FAFD]"
+                  >
+                    上一页
+                  </button>
+                  <button
+                    type="button"
+                    disabled={usersLoading || usersPage >= Math.max(usersTotalPages, 1)}
+                    onClick={() => setUsersPage((page) => page + 1)}
+                    className="px-3 py-1 rounded-lg border border-[#E2E8F0] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#F7FAFD]"
+                  >
+                    下一页
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 选择量表 */}
           <div>
             <label className="block text-sm font-medium text-[#415168] mb-2">步骤3：选择量表</label>
-            <div className="grid grid-cols-2 gap-3">
-              {scales.map((scale) => (
-                <div key={scale.code} onClick={() => setSelectedScale(scale)}
-                  className={`relative p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                    selectedScale?.code === scale.code ? 'border-[#2F6BFF] bg-[#F3F8FF]' : 'border-[#E2E8F0] hover:border-[#8FB4FF]'
-                  }`}>
-                  <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-lg ${scale.bgColor} flex items-center justify-center shrink-0`}>
-                      {scale.category === 'suicide' && <Shield className="w-5 h-5 text-white" />}
-                      {scale.category === 'depression' && <Brain className="w-5 h-5 text-white" />}
-                      {scale.category === 'anxiety' && <Activity className="w-5 h-5 text-white" />}
-                      {scale.category === 'hopelessness' && <TrendingDown className="w-5 h-5 text-white" />}
+            <div className="space-y-4">
+              {groupedScales.map((group) => (
+                <div key={group.tier} className="rounded-2xl border border-[#E2E8F0] bg-[#FAFCFF] p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-semibold text-[#162033]">{group.label}</h4>
+                      <p className="text-xs text-[#94A3B8]">
+                        {group.tier === 'core_default' && '推荐优先使用的标准筛查组合'}
+                        {group.tier === 'supplemental_profile' && '用于补充情绪多维画像，不单独作为危机判定'}
+                        {group.tier === 'specialized_risk' && '用于专项自杀风险复核与危机识别'}
+                        {group.tier === 'research_backup' && '用于研究、对照或备用，不建议默认首选'}
+                      </p>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-[#162033] text-sm">{scale.name}</h4>
-                      <p className="text-xs text-[#64748B] truncate">{scale.full_name}</p>
-                      <p className="text-xs text-[#94A3B8] mt-1">{scale.questionCount}题 · {scale.estimatedTime}</p>
-                    </div>
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-[#5B78C7] border border-[#D8E5FF]">
+                      {group.scales.length} 个量表
+                    </span>
                   </div>
-                  {selectedScale?.code === scale.code && (
-                    <div className="absolute top-2 right-2 w-5 h-5 bg-[#2F6BFF] rounded-full flex items-center justify-center">
-                      <Check className="w-3 h-3 text-white" />
-                    </div>
-                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {group.scales.map((scale) => (
+                      <div key={scale.code} onClick={() => setSelectedScale(scale)}
+                        className={`relative p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                          selectedScale?.code === scale.code ? 'border-[#2F6BFF] bg-[#F3F8FF]' : 'border-[#E2E8F0] bg-white hover:border-[#8FB4FF]'
+                        }`}>
+                        <div className="flex items-start gap-3">
+                          <div className={`w-10 h-10 rounded-lg ${scale.bgColor} flex items-center justify-center shrink-0`}>
+                            {scale.category === 'suicide' && <Shield className="w-5 h-5 text-white" />}
+                            {scale.category === 'depression' && <Brain className="w-5 h-5 text-white" />}
+                            {scale.category === 'anxiety' && <Activity className="w-5 h-5 text-white" />}
+                            {scale.category === 'hopelessness' && <TrendingDown className="w-5 h-5 text-white" />}
+                            {scale.category === 'sleep' && <MoonStar className="w-5 h-5 text-white" />}
+                            {!['suicide', 'depression', 'anxiety', 'hopelessness', 'sleep'].includes(scale.category) && <Brain className="w-5 h-5 text-white" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="font-bold text-[#162033] text-sm">{scale.name}</h4>
+                              <span className="rounded-full bg-[#F3F6FB] px-2 py-0.5 text-[11px] text-[#5B6780]">
+                                {scale.systemClassification.clinical_role === 'screening' && '筛查'}
+                                {scale.systemClassification.clinical_role === 'profile' && '画像'}
+                                {scale.systemClassification.clinical_role === 'crisis' && '专项风险'}
+                                {scale.systemClassification.clinical_role === 'research' && '研究/备用'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-[#64748B] truncate">{scale.full_name}</p>
+                            <p className="text-xs text-[#94A3B8] mt-1">{scale.questionCount}题 · {scale.estimatedTime}</p>
+                          </div>
+                        </div>
+                        {selectedScale?.code === scale.code && (
+                          <div className="absolute top-2 right-2 w-5 h-5 bg-[#2F6BFF] rounded-full flex items-center justify-center">
+                            <Check className="w-3 h-3 text-white" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>

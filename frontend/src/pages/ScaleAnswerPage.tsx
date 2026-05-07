@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, Brain, ChevronLeft, ChevronRight, Check, Heart, Loader, Shield, Activity, TrendingDown,
+  ArrowLeft, Brain, ChevronLeft, ChevronRight, Check, Heart, Loader, Shield, Activity, TrendingDown, MoonStar,
 } from 'lucide-react';
 import { fetchScaleTaskResult, submitScaleAnswers, type ScaleTask } from '../api';
 import { getScaleByCode, getScaleMeta, loadScalesData, type ScaleDefinition } from '../scales';
@@ -19,6 +19,7 @@ function ScaleCategoryIcon({ type }: { type?: string }) {
   if (type === 'suicide') return <Shield className="w-7 h-7 text-white" />;
   if (type === 'anxiety') return <Activity className="w-7 h-7 text-white" />;
   if (type === 'hopelessness') return <TrendingDown className="w-7 h-7 text-white" />;
+  if (type === 'sleep') return <MoonStar className="w-7 h-7 text-white" />;
   return <Brain className="w-7 h-7 text-white" />;
 }
 

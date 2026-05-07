@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, Check, AlertTriangle, Heart, Shield, RefreshCw, MessageSquare, Brain, Activity, Loader, Sun, TrendingDown, Printer
+  ArrowLeft, Check, AlertTriangle, Heart, Shield, RefreshCw, MessageSquare, Brain, Activity, Loader, Sun, TrendingDown, Printer, MoonStar
 } from 'lucide-react';
 import {
   fetchScaleTaskResult,
@@ -23,6 +23,13 @@ interface RiskInfo {
   level: string;
   label: string;
   suggestion?: string;
+}
+
+interface WorkflowSignals {
+  needsFollowUp?: boolean;
+  needsCrisisIntervention?: boolean;
+  sleepSignal?: boolean;
+  profileOnly?: boolean;
 }
 
 export default function ScaleResultPage() {
@@ -98,7 +105,34 @@ export default function ScaleResultPage() {
   // 获取缓解话语
   const getComfortMessage = () => {
     if (!task) return null;
+    const workflowSignals: WorkflowSignals = task.assessmentResult?.workflowSignals || {};
     const isHighRisk = task.riskLevel === 'high' || task.riskLevel === 'medium';
+
+    if (workflowSignals.needsCrisisIntervention) {
+      return {
+        title: '需立即危机干预',
+        content: '当前结果出现高危自杀相关信号，应立即进入危机干预流程，并由专业人员进行人工复核与临床评估。',
+        suggestions: [
+          '立即通知专业心理/精神科人员介入',
+          '启动危机干预与安全保护流程',
+          '该结果不能仅靠系统自动化处理，需要人工接管',
+        ],
+        action: '立即危机干预',
+      };
+    }
+
+    if (workflowSignals.profileOnly) {
+      return {
+        title: '用于情绪画像',
+        content: '该量表更适合用于观察抑郁、焦虑、压力等多维状态变化，不单独作为危机判定依据。',
+        suggestions: [
+          '结合 PHQ-9、GAD-7、ISI 等核心筛查量表一起看',
+          '优先关注各维度变化趋势，而不是单次结果',
+          '若存在危机线索，仍需补做专项风险量表',
+        ],
+        action: null,
+      };
+    }
 
     if (isHighRisk) {
       return {
@@ -141,6 +175,7 @@ export default function ScaleResultPage() {
       case 'Heart': return <Heart className="w-8 h-8 text-white" />;
       case 'Sun': return <Sun className="w-8 h-8 text-white" />;
       case 'TrendingDown': return <TrendingDown className="w-8 h-8 text-white" />;
+      case 'sleep': return <MoonStar className="w-8 h-8 text-white" />;
       default: return <Brain className="w-8 h-8 text-white" />;
     }
   };
@@ -196,6 +231,16 @@ export default function ScaleResultPage() {
   const assessmentPayload = task.assessmentResult && typeof task.assessmentResult === 'object'
     ? task.assessmentResult
     : null;
+  const workflowSignals: WorkflowSignals = assessmentPayload?.workflowSignals || {};
+  const recommendedActions: string[] = assessmentPayload?.recommendedActions || [];
+  const recommendedNextScales: string[] = assessmentPayload?.recommendedNextScales || [];
+  const authority = assessmentPayload?.authority || (scaleMeta?.authority ? {
+    sourceUrl: scaleMeta.authority.sourceUrl,
+    originalPaper: scaleMeta.authority.originalPaper,
+    licenseNote: scaleMeta.authority.licenseNote,
+    validatedPopulation: scaleMeta.authority.validatedPopulation,
+    screeningOnly: scaleMeta.authority.screeningOnly,
+  } : null);
 
   return (
     <div className="flex flex-1 flex-col min-h-0 w-full animate-fade-in space-y-5">
@@ -305,6 +350,57 @@ export default function ScaleResultPage() {
               {assessmentPayload.alerts.map((alert: any, index: number) => (
                 <p key={`${alert.itemId}-${index}`}>{alert.message}</p>
               ))}
+            </div>
+          </div>
+        ) : null}
+
+        {(recommendedActions.length > 0 || recommendedNextScales.length > 0 || workflowSignals.sleepSignal) ? (
+          <div className="rounded-2xl border border-[#DCE7F5] bg-[#F7FAFD] p-5 mb-6">
+            <h4 className="font-bold text-[#162033] mb-3 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-[#2F6BFF]" />
+              后续建议
+            </h4>
+            <div className="space-y-2 text-sm text-[#415168]">
+              {recommendedActions.map((action, index) => (
+                <p key={`${action}-${index}`} className="flex items-start gap-2">
+                  <Check className="w-4 h-4 text-[#2F6BFF] mt-0.5 shrink-0" />
+                  <span>{action}</span>
+                </p>
+              ))}
+              {workflowSignals.sleepSignal ? (
+                <p className="flex items-start gap-2">
+                  <MoonStar className="w-4 h-4 text-teal-600 mt-0.5 shrink-0" />
+                  <span>已标记“睡眠异常线索”，建议与情绪结果联合查看。</span>
+                </p>
+              ) : null}
+            </div>
+            {recommendedNextScales.length ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {recommendedNextScales.map((code) => (
+                  <span key={code} className="rounded-full bg-white border border-[#D8E5FF] px-3 py-1 text-xs font-medium text-[#5B78C7]">
+                    建议补做 {code}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {authority ? (
+          <div className="rounded-2xl border border-[#E2E8F0] bg-white p-5 mb-6">
+            <h4 className="font-bold text-[#162033] mb-3">量表依据</h4>
+            <div className="space-y-2 text-sm text-[#415168]">
+              {authority.originalPaper ? <p><span className="font-medium text-[#162033]">原始文献：</span>{authority.originalPaper}</p> : null}
+              {authority.validatedPopulation ? <p><span className="font-medium text-[#162033]">适用人群：</span>{authority.validatedPopulation}</p> : null}
+              {authority.licenseNote ? <p><span className="font-medium text-[#162033]">使用说明：</span>{authority.licenseNote}</p> : null}
+              {authority.sourceUrl ? (
+                <p>
+                  <span className="font-medium text-[#162033]">来源链接：</span>
+                  <a href={authority.sourceUrl} target="_blank" rel="noreferrer" className="text-[#2F6BFF] hover:underline break-all">
+                    {authority.sourceUrl}
+                  </a>
+                </p>
+              ) : null}
             </div>
           </div>
         ) : null}

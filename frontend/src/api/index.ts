@@ -304,8 +304,8 @@ export async function fetchCSVUserKeywords(params: {
   if (params.topN) searchParams.set('top_n', String(params.topN));
 
   const endpoint = `/api/datasets/${encodeURIComponent(params.datasetKey)}/keywords?${searchParams.toString()}`;
-  const data = await request<{ success: boolean; data: { keywords: KeywordItem[]; total: number } }>(endpoint);
-  return data.data;
+  const data = await request<{ keywords: KeywordItem[]; total: number }>(endpoint);
+  return data;
 }
 
 export async function fetchExternalDatasets(): Promise<DatasetProfile[]> {
@@ -449,6 +449,23 @@ export interface ArchiveListResponse {
   totalPages: number;
 }
 
+export interface ArchiveUserOption {
+  archiveId: number | string;
+  userId: string;
+  datasetSource: string;
+  postCount: number;
+  riskLevel: string;
+  importTime?: string;
+}
+
+export interface ArchiveUserListResponse {
+  users: ArchiveUserOption[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export async function fetchArchives(params?: {
   page?: number;
   limit?: number;
@@ -487,6 +504,39 @@ export async function fetchArchives(params?: {
     page: data.page ?? params?.page ?? 1,
     pageSize: data.pageSize ?? data.page_size ?? params?.limit ?? 20,
     totalPages: data.totalPages ?? data.total_pages ?? 0,
+  };
+}
+
+export async function fetchArchiveUsers(params?: {
+  page?: number;
+  pageSize?: number;
+  dataset?: string;
+  keyword?: string;
+  riskLevel?: string;
+  status?: string;
+}): Promise<ArchiveUserListResponse> {
+  const data = await fetchArchives({
+    page: params?.page,
+    limit: params?.pageSize,
+    dataset: params?.dataset,
+    keyword: params?.keyword,
+    riskLevel: params?.riskLevel,
+    status: params?.status,
+  });
+
+  return {
+    users: (data.archives || []).map((archive) => ({
+      archiveId: archive.id,
+      userId: archive.userId,
+      datasetSource: archive.dataSource,
+      postCount: archive.postCount || 0,
+      riskLevel: archive.riskLevel || 'low',
+      importTime: archive.importTime,
+    })),
+    total: data.total,
+    page: data.page,
+    pageSize: data.pageSize,
+    totalPages: data.totalPages,
   };
 }
 

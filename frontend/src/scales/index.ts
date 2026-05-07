@@ -34,6 +34,7 @@ export interface ScaleScoringDimension {
   name_en?: string;
   questions: number[];
   max_score?: number;
+  multiplier?: number;
   thresholds?: ScaleThreshold[];
 }
 
@@ -48,6 +49,20 @@ export interface ScaleScoring {
   note?: string;
 }
 
+export interface ScaleAuthorityMeta {
+  sourceUrl?: string;
+  originalPaper?: string;
+  licenseNote?: string;
+  validatedPopulation?: string;
+  screeningOnly?: boolean;
+}
+
+export interface ScaleSystemClassification {
+  tier?: 'core_default' | 'supplemental_profile' | 'specialized_risk' | 'research_backup';
+  tier_label?: string;
+  clinical_role?: 'screening' | 'profile' | 'crisis' | 'research';
+}
+
 export interface ScaleDefinition {
   code: string;
   name: string;
@@ -56,6 +71,12 @@ export interface ScaleDefinition {
   category?: 'suicide' | 'depression' | 'anxiety' | 'hopelessness' | 'sleep' | 'general';
   description: string;
   purpose?: string;
+  system_classification?: ScaleSystemClassification;
+  source_url?: string;
+  original_paper?: string;
+  license_note?: string;
+  validated_population?: string;
+  screening_only?: boolean;
   estimated_minutes?: number;
   total_questions?: number;
   instruction?: string;
@@ -86,12 +107,15 @@ export interface ScaleMeta {
   color: string;
   bgColor: string;
   description: string;
+  systemClassification: ScaleSystemClassification;
+  authority: ScaleAuthorityMeta;
 }
 
 import bhsDefinitionRaw from '../../../scales/BHS.json?raw';
 import cssrsDefinitionRaw from '../../../scales/C-SSRS.json?raw';
 import dassDefinitionRaw from '../../../scales/DASS-21.json?raw';
 import gadDefinitionRaw from '../../../scales/GAD-7.json?raw';
+import isiDefinitionRaw from '../../../scales/ISI.json?raw';
 import phqDefinitionRaw from '../../../scales/PHQ-9.json?raw';
 import sdsDefinitionRaw from '../../../scales/SDS.json?raw';
 
@@ -117,6 +141,7 @@ const LOCAL_DEFINITION_STRINGS = [
   gadDefinitionRaw,
   dassDefinitionRaw,
   sdsDefinitionRaw,
+  isiDefinitionRaw,
   bhsDefinitionRaw,
 ];
 
@@ -141,8 +166,8 @@ function toMeta(definition: ScaleDefinition): ScaleMeta {
   const styles = CATEGORY_STYLES[category] || CATEGORY_STYLES.general;
   return {
     code: definition.code,
-    name: definition.code,
-    full_name: definition.name || definition.full_name || definition.code,
+    name: definition.name || definition.code,
+    full_name: definition.full_name || definition.name || definition.code,
     category,
     questionCount: definition.total_questions || definition.questions.length,
     maxScore: definition.scoring.max_standard_score || definition.scoring.max_score,
@@ -151,6 +176,14 @@ function toMeta(definition: ScaleDefinition): ScaleMeta {
     color: styles.color,
     bgColor: styles.bgColor,
     description: definition.purpose || definition.description || '',
+    systemClassification: definition.system_classification || {},
+    authority: {
+      sourceUrl: definition.source_url,
+      originalPaper: definition.original_paper,
+      licenseNote: definition.license_note,
+      validatedPopulation: definition.validated_population,
+      screeningOnly: Boolean(definition.screening_only),
+    },
   };
 }
 
@@ -220,15 +253,13 @@ function scoreBHS(answers: Record<number, number>, questions: ScaleQuestion[]): 
 }
 
 function scoreCSSRS(answers: Record<number, number>, questions: ScaleQuestion[]): number {
-  let ideationScore = 0;
-  let behaviorScore = 0;
+  let highestPositiveItem = 0;
   questions.forEach((question) => {
     const value = answers[question.id];
     if (!value) return;
-    if (question.id <= 4) ideationScore = Math.max(ideationScore, question.id);
-    else behaviorScore = Math.max(behaviorScore, question.id - 4);
+    highestPositiveItem = Math.max(highestPositiveItem, question.id);
   });
-  return behaviorScore > 0 ? behaviorScore + 4 : ideationScore;
+  return highestPositiveItem;
 }
 
 function scoreDASS21(answers: Record<number, number>, definition: ScaleDefinition): { total: number; dimensions: Record<string, number> } {
@@ -237,7 +268,9 @@ function scoreDASS21(answers: Record<number, number>, definition: ScaleDefinitio
   ) as Record<string, number>;
 
   for (const dimension of definition.scoring.dimensions || []) {
-    dimensions[dimension.id] = dimension.questions.reduce((sum, qid) => sum + (answers[qid] ?? 0), 0);
+    const rawScore = dimension.questions.reduce((sum, qid) => sum + (answers[qid] ?? 0), 0);
+    const multiplier = (dimension as ScaleScoringDimension & { multiplier?: number }).multiplier ?? 1;
+    dimensions[dimension.id] = rawScore * multiplier;
   }
 
   const total = Object.values(dimensions).reduce((sum, value) => sum + value, 0);
