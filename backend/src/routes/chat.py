@@ -10,6 +10,7 @@ import os
 import json
 import asyncio
 import time
+import re
 from collections import OrderedDict
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -190,6 +191,22 @@ class PostSessionMessageBody(BaseModel):
     ai_mode: Optional[str] = Field(None, alias="aiMode")
 
 
+def _build_references_from_sources(sources: Optional[List[dict]]) -> Optional[List[dict]]:
+    if not sources:
+        return None
+    references_list = []
+    for idx, src in enumerate(sources):
+        references_list.append({
+            "id": src.get("id", ""),
+            "title": src.get("title", ""),
+            "type": src.get("type", "md"),
+            "topic": src.get("topic", ""),
+            "subTopic": src.get("subTopic", ""),
+            "relevanceScore": 1.0 - (idx * 0.1) if idx < 10 else 0.5,
+        })
+    return references_list
+
+
 # ========================
 # 辅助函数
 # ========================
@@ -212,6 +229,124 @@ def _sui_knowledge_path() -> str:
 def _persisted_llm_model_name() -> str:
     name = os.getenv("LLM_MODEL", "deepseek-chat").strip()
     return name or "deepseek-chat"
+
+
+def _safe_str(value: Any, default: str = "") -> str:
+    if value is None:
+        return default
+    text = str(value).strip()
+    return text or default
+
+
+def _build_backend_knowledge_panel(
+    question: str,
+    answer: str,
+    references: Optional[List[dict]] = None,
+    evidence: Optional[List[dict]] = None,
+    mind_map: Optional[dict] = None,
+    context_sources: Optional[List[str]] = None,
+) -> dict:
+    """后端统一生成知识面板，避免前端本地拼装右侧内容。"""
+    references = references or []
+    evidence = evidence or []
+    context_sources = [str(item).strip() for item in (context_sources or []) if str(item).strip()]
+
+    normalized_evidence = []
+    for index, item in enumerate(evidence):
+        source_type = _safe_str(item.get("sourceType") or item.get("type"), "doc")
+        normalized_evidence.append(
+            {
+                "id": _safe_str(item.get("id"), f"evidence_{index + 1:03d}"),
+                "title": _safe_str(item.get("title") or item.get("source"), f"证据 {index + 1}"),
+                "sourceType": source_type,
+                "snippet": _safe_str(item.get("snippet") or item.get("content") or item.get("quote"), "暂无证据片段"),
+                "claim": _safe_str(item.get("claim") or item.get("relation"), "用于支撑当前回答中的对应判断。"),
+                "docId": _safe_str(item.get("docId")) if item.get("docId") else None,
+            }
+        )
+
+    normalized_refs = []
+    for index, item in enumerate(references):
+        normalized_refs.append(
+            {
+                "id": _safe_str(item.get("id"), f"ref_{index + 1}"),
+                "title": _safe_str(item.get("title"), f"来源 {index + 1}"),
+                "type": _safe_str(item.get("type"), "md"),
+                "topic": _safe_str(item.get("topic")),
+                "subTopic": _safe_str(item.get("subTopic")),
+                "relevanceScore": item.get("relevanceScore", 1.0 if index == 0 else max(0.5, 1.0 - index * 0.1)),
+            }
+        )
+
+    def pick_evidence_ids(start: int, limit: int = 2) -> List[str]:
+        return [item["id"] for item in normalized_evidence[start:start + limit]]
+
+    answer_paragraphs = [part.strip() for part in re.split(r"\n+", answer or "") if part.strip()]
+    answer_excerpt = answer_paragraphs[0] if answer_paragraphs else ""
+    first_ref = normalized_refs[0]["title"] if normalized_refs else "当前问答"
+
+    if not mind_map or not isinstance(mind_map, dict) or not isinstance(mind_map.get("nodes"), list):
+        question_label = question[:16] + "..." if len(question) > 16 else question
+        nodes = [
+            {
+                "id": "question",
+                "label": question_label or "当前问题",
+                "group": "question",
+                "description": "当前问答中心问题，图谱围绕它展开风险判断、事实依据与行动建议。",
+                "relatedEvidenceIds": pick_evidence_ids(0, 3),
+            }
+        ]
+        for idx, topic in enumerate(context_sources[:3]):
+            nodes.append(
+                {
+                    "id": f"context_{idx}",
+                    "label": topic[:20] + ("..." if len(topic) > 20 else ""),
+                    "group": "core" if idx < 2 else "support",
+                    "description": f"围绕“{topic}”补充当前问题的判断依据或处置线索。",
+                    "relatedEvidenceIds": pick_evidence_ids(idx, 1),
+                }
+            )
+        mind_map = {
+            "nodes": nodes,
+            "edges": [
+                {"source": "question", "target": node["id"], "label": "关联线索"}
+                for node in nodes[1:]
+            ],
+            "summary": "图谱展示当前问题与检索证据之间的核心关系，可用于解释回答依据与后续处置方向。",
+            "focusNodeId": "question",
+        }
+
+    table_rows = [
+        {
+            "topic": "问题焦点",
+            "knowledge": question[:24] + ("..." if len(question) > 24 else ""),
+            "description": answer_excerpt or "本轮回答未形成可展示摘要。",
+        },
+        {
+            "topic": "证据来源",
+            "knowledge": "、".join(item["title"] for item in normalized_refs[:2]) or "暂无独立来源",
+            "description": f"当前回答引用的主要来源为 {first_ref}，用于支撑本轮判断与建议。",
+        },
+        {
+            "topic": "处置线索",
+            "knowledge": "、".join(context_sources[:3]) or "暂无额外线索",
+            "description": "这些线索用于补充本轮风险判断、陪伴支持或升级处置方向。",
+        },
+    ]
+
+    follow_up_questions = [
+        f"围绕“{context_sources[0] if len(context_sources) > 0 else '即时危险信号核验'}”，当前最需要补问的一个细节是什么？",
+        "如果今晚只能做一件现实干预，最优先应该安排什么？",
+        "哪些迹象一旦出现，就不适合继续停留在普通安抚层面？",
+    ]
+
+    return {
+        "mindMap": mind_map,
+        "tableRows": table_rows,
+        "followUpQuestions": follow_up_questions,
+        "evidence": normalized_evidence,
+        "contextSources": context_sources,
+    }
 
 
 async def _run_suicide_agent_reply(
@@ -266,6 +401,73 @@ def _msg_row_to_response(row: dict) -> dict:
         "parentMessageId": str(row.get("parent_message_id")) if row.get("parent_message_id") else None,
         "createdAt": str(row.get("created_at")) if row.get("created_at") else None,
     }
+
+
+def _build_complete_rag_context(
+    question: str,
+    answer: str,
+    references: Optional[List[dict]] = None,
+    rag_context: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    rag_context = rag_context if isinstance(rag_context, dict) else {}
+    knowledge_panel = rag_context.get("knowledgePanel")
+    evidence = rag_context.get("evidence", [])
+    mind_map = rag_context.get("mindMap")
+    context_sources = rag_context.get("contextSources", [])
+
+    if not isinstance(knowledge_panel, dict):
+        knowledge_panel = _build_backend_knowledge_panel(
+            question=question,
+            answer=answer,
+            references=references or [],
+            evidence=evidence if isinstance(evidence, list) else [],
+            mind_map=mind_map if isinstance(mind_map, dict) else None,
+            context_sources=context_sources if isinstance(context_sources, list) else [],
+        )
+    else:
+        knowledge_panel = dict(knowledge_panel)
+
+    # 历史消息里可能还残留旧版字段，这里统一裁掉，前端只消费当前页面真实使用的数据。
+    knowledge_panel.pop("preKnowledge", None)
+    knowledge_panel.pop("relatedKnowledge", None)
+    knowledge_panel.pop("deepDiveItems", None)
+    knowledge_panel.pop("references", None)
+
+    completed_context = dict(rag_context)
+    completed_context["knowledgePanel"] = knowledge_panel
+    completed_context["evidence"] = knowledge_panel.get("evidence", [])
+    completed_context["mindMap"] = knowledge_panel.get("mindMap")
+    completed_context["contextSources"] = knowledge_panel.get("contextSources", [])
+    return completed_context
+
+
+def _normalize_messages_for_response(rows: List[dict]) -> List[dict]:
+    normalized_rows: List[dict] = []
+    last_user_question = "当前问题"
+
+    for row in rows:
+        message = dict(row)
+        role = message.get("role")
+        content = _safe_str(message.get("content"))
+
+        if role == "user" and content:
+            last_user_question = content
+            normalized_rows.append(message)
+            continue
+
+        if role == "ai":
+            references = _parse_references_row(message) or []
+            rag_context = message.get("rag_context")
+            message["rag_context"] = _build_complete_rag_context(
+                question=last_user_question,
+                answer=content,
+                references=references,
+                rag_context=rag_context if isinstance(rag_context, dict) else {},
+            )
+
+        normalized_rows.append(message)
+
+    return normalized_rows
 
 
 def _session_row_to_response(row: dict) -> dict:
@@ -529,10 +731,11 @@ async def get_chat_messages(
         raise HTTPException(status_code=404, detail="会话不存在")
 
     result = await chat_svc.get_messages(session_int, page=page, page_size=page_size)
+    normalized_messages = _normalize_messages_for_response(result.get("messages", []))
 
     return {
         "success": True,
-        "data": [_msg_row_to_response(m) for m in result.get("messages", [])],
+        "data": [_msg_row_to_response(m) for m in normalized_messages],
     }
 
 
@@ -556,10 +759,11 @@ async def get_session_messages(
         raise HTTPException(status_code=404, detail="会话不存在")
 
     result = await chat_svc.get_messages(session_int, page=page, page_size=page_size)
+    normalized_messages = _normalize_messages_for_response(result.get("messages", []))
 
     return {
         "success": True,
-        "data": [_msg_row_to_response(m) for m in result.get("messages", [])],
+        "data": [_msg_row_to_response(m) for m in normalized_messages],
     }
 
 
@@ -606,6 +810,7 @@ async def post_session_message_stream(
         rag_evidence_data = []
         mind_map_data = None
         context_sources_data = []
+        pre_knowledge_terms: List[str] = []
         references_json = None
         chunk_count = 0
         print(f"[event_generator] 开始处理会话 {session_int}")
@@ -649,7 +854,8 @@ async def post_session_message_stream(
                     yield f"data: {json.dumps({'type': 'rag_evidence', 'evidence': evidence}, ensure_ascii=False)}\n\n".encode("utf-8")
                 elif event_type == "pre_knowledge":
                     print(f"[event_generator] 收到 pre_knowledge 事件")
-                    yield f"data: {json.dumps({'type': 'pre_knowledge', 'terms': parsed.get('terms', [])}, ensure_ascii=False)}\n\n".encode("utf-8")
+                    pre_knowledge_terms = parsed.get("terms", []) or []
+                    yield f"data: {json.dumps({'type': 'pre_knowledge', 'terms': pre_knowledge_terms}, ensure_ascii=False)}\n\n".encode("utf-8")
                 elif event_type == "context_sources":
                     sources = parsed.get("sources", [])
                     context_sources_data = sources
@@ -673,6 +879,15 @@ async def post_session_message_stream(
             yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n".encode("utf-8")
             # 异步保存错误消息（不阻塞）
             try:
+                references_json = _build_references_from_sources(rag_sources_data)
+                knowledge_panel = _build_backend_knowledge_panel(
+                    question=content,
+                    answer=f"抱歉，发生了错误：{error_msg}",
+                    references=references_json or [],
+                    evidence=rag_evidence_data,
+                    mind_map=mind_map_data,
+                    context_sources=context_sources_data or pre_knowledge_terms,
+                )
                 assistant_msg_data = {
                     "session_id": session_int,
                     "role": "ai",
@@ -685,10 +900,11 @@ async def post_session_message_stream(
                     "references_json": references_json,
                     "retrieval_sources": rag_sources_data if rag_sources_data else None,
                     "rag_context": {
-                        "evidence": rag_evidence_data,
-                        "mindMap": mind_map_data,
-                        "contextSources": context_sources_data,
-                    } if (rag_evidence_data or mind_map_data or context_sources_data) else None,
+                        "evidence": knowledge_panel.get("evidence", []),
+                        "mindMap": knowledge_panel.get("mindMap"),
+                        "contextSources": knowledge_panel.get("contextSources", []),
+                        "knowledgePanel": knowledge_panel,
+                    },
                 }
                 await chat_svc.create_message(assistant_msg_data)
                 await chat_svc.update_session(session_int, {"status": "active"}, message_count_delta=2)
@@ -698,21 +914,20 @@ async def post_session_message_stream(
 
         # 流正常结束：保存助手消息（异步，不阻塞）
         # 构建 references_json：将 rag_sources 转为标准引用格式
-        if rag_sources_data:
-            references_list = []
-            for idx, src in enumerate(rag_sources_data):
-                references_list.append({
-                    "id": src.get("id", ""),
-                    "title": src.get("title", ""),
-                    "type": src.get("type", "md"),
-                    "topic": src.get("topic", ""),
-                    "subTopic": src.get("subTopic", ""),
-                    "relevanceScore": 1.0 - (idx * 0.1) if idx < 10 else 0.5,
-                })
-            references_json = references_list
+        references_json = _build_references_from_sources(rag_sources_data)
 
         # 构建 retrieval_sources：与 references_json 内容一致，作为备用字段
         retrieval_sources = rag_sources_data if rag_sources_data else None
+        knowledge_panel = _build_backend_knowledge_panel(
+            question=content,
+            answer=full_response,
+            references=references_json or [],
+            evidence=rag_evidence_data,
+            mind_map=mind_map_data,
+            context_sources=context_sources_data or pre_knowledge_terms,
+        )
+
+        yield f"data: {json.dumps({'type': 'knowledge_panel', 'knowledgePanel': knowledge_panel}, ensure_ascii=False)}\n\n".encode("utf-8")
 
         assistant_msg_data = {
             "session_id": session_int,
@@ -724,10 +939,11 @@ async def post_session_message_stream(
             "references_json": references_json,
             "retrieval_sources": retrieval_sources,
             "rag_context": {
-                "evidence": rag_evidence_data,
-                "mindMap": mind_map_data,
-                "contextSources": context_sources_data,
-            } if (rag_evidence_data or mind_map_data or context_sources_data) else None,
+                "evidence": knowledge_panel.get("evidence", []),
+                "mindMap": knowledge_panel.get("mindMap"),
+                "contextSources": knowledge_panel.get("contextSources", []),
+                "knowledgePanel": knowledge_panel,
+            },
         }
         await chat_svc.create_message(assistant_msg_data)
         await chat_svc.update_session(session_int, {"status": "active"}, message_count_delta=2)
@@ -787,6 +1003,14 @@ async def post_session_message(
         raise HTTPException(status_code=500, detail=f"消息处理失败：{str(e)}")
 
     # 保存助手消息
+    knowledge_panel = _build_backend_knowledge_panel(
+        question=content,
+        answer=assistant_content,
+        references=[],
+        evidence=[],
+        mind_map=None,
+        context_sources=[],
+    )
     assistant_msg_data = {
         "session_id": session_int,
         "role": "ai",
@@ -794,6 +1018,12 @@ async def post_session_message(
         "content_type": "text",
         "ai_model": _persisted_llm_model_name(),
         "ai_mode": ai_mode,
+        "rag_context": {
+            "evidence": knowledge_panel.get("evidence", []),
+            "mindMap": knowledge_panel.get("mindMap"),
+            "contextSources": knowledge_panel.get("contextSources", []),
+            "knowledgePanel": knowledge_panel,
+        },
     }
     assistant_msg_id = await chat_svc.create_message(assistant_msg_data)
 
@@ -804,6 +1034,8 @@ async def post_session_message(
     all_msgs = all_msgs_result.get("messages", [])
     user_msg = next((m for m in all_msgs if str(m.get("id")) == str(user_msg_id)), None)
     assistant_msg = next((m for m in all_msgs if str(m.get("id")) == str(assistant_msg_id)), None)
+    normalized_messages = _normalize_messages_for_response(all_msgs)
+    assistant_msg = next((m for m in normalized_messages if str(m.get("id")) == str(assistant_msg_id)), None)
 
     return {
         "success": True,

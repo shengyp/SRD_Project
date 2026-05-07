@@ -54,6 +54,14 @@ interface EvidenceItem {
   docId?: string;
 }
 
+interface EvidenceGroup {
+  id: string;
+  title: string;
+  sourceType: string;
+  docId?: string;
+  items: EvidenceItem[];
+}
+
 interface MindMapNode {
   id: string;
   label: string;
@@ -75,20 +83,9 @@ interface MindMapPayload {
   focusNodeId?: string;
 }
 
-interface KnowledgeItem {
-  id: string;
-  title: string;
-  description: string;
-  prompt: string;
-  relatedEvidenceIds?: string[];
-}
-
 interface KnowledgePanelPayload {
   mindMap: MindMapPayload;
   tableRows: Array<{ topic: string; knowledge: string; description: string }>;
-  preKnowledge: KnowledgeItem[];
-  relatedKnowledge: KnowledgeItem[];
-  deepDiveItems: KnowledgeItem[];
   followUpQuestions: string[];
 }
 
@@ -291,42 +288,30 @@ function extractKeywords(question: string, content: string): string[] {
   return uniqueBy(source, (item) => item).slice(0, 8);
 }
 
-const DOMAIN_KNOWLEDGE_LIBRARY = {
-  riskSignals: ['即时危险表达', '情绪耗竭轨迹', '现实失控征兆'],
-  evidence: ['对话证据片段', '量表与档案交叉验证', '既往危机事件回放'],
-  support: ['支持网络可用性', '校园协同响应', '专业转介资源'],
-  action: ['风险分层与升级阈值', '陪伴看护执行单', '紧急转介闭环'],
-};
-
-function pickDomainKeywords(question: string, content: string): string[] {
-  const text = `${question} ${content}`;
-  const candidates: string[] = [];
-  if (/自杀|轻生|活着没意义|不想活|结束生命|告别/i.test(text)) candidates.push('自杀意念强度');
-  if (/计划|方式|时间|地点|工具|跳楼|割腕|吃药/i.test(text)) candidates.push('计划与工具可得性');
-  if (/绝望|无助|崩溃|抑郁|焦虑|情绪|压抑|失眠|麻木/i.test(text)) candidates.push('情绪耗竭程度');
-  if (/家长|父母|家庭|老师|辅导员|同学|朋友|舍友/i.test(text)) candidates.push('支持网络可用性');
-  if (/牵挂|放不下|求助|愿意|还想|责任|家人/i.test(text)) candidates.push('保护性因素');
-  if (/转介|医院|热线|求助|报警|120|专业机构/i.test(text)) candidates.push('干预升级路径');
-  return uniqueBy([...candidates, ...extractKeywords(question, content)], (item) => item).slice(0, 6);
-}
-
-function buildEvidenceList(question: string, content: string, references: ReferenceItem[]): EvidenceItem[] {
-  const paragraphs = content.split('\n').map((item) => item.trim()).filter(Boolean);
-  if (paragraphs.length === 0 && references.length === 0) return [];
-  const fallback = paragraphs.length > 0 ? paragraphs : ['当前回答未检索到独立文档证据，以下为回答中的关键摘要。'];
-  const sourceList = references.length > 0 ? references : [{ id: 'answer-summary', title: '回答摘要', type: 'answer' }];
-  return sourceList.slice(0, 2).map((ref, index) => ({
-    id: `evidence-${ref.id}-${index}`,
-    title: ref.title,
-    sourceType: ref.type || 'doc',
-    snippet: fallback[index % fallback.length].slice(0, 100),
-    claim: index === 0 ? `支撑“${question.slice(0, 14)}”的核心判断。` : '补充回答中的干预路径、支持依据或求助建议。',
-    docId: ref.type && ref.type !== 'answer' ? ref.id : undefined,
-  }));
-}
-
 function canOpenEvidenceDoc(evidence: Pick<EvidenceItem, 'docId' | 'sourceType'>): boolean {
   return Boolean(evidence.docId && evidence.sourceType !== 'answer');
+}
+
+function groupEvidenceItems(items: EvidenceItem[] = []): EvidenceGroup[] {
+  const groups = new Map<string, EvidenceGroup>();
+
+  items.forEach((item, index) => {
+    const groupKey = item.docId || `${item.sourceType}::${item.title}`;
+    const existing = groups.get(groupKey);
+    if (existing) {
+      existing.items.push(item);
+      return;
+    }
+    groups.set(groupKey, {
+      id: `evidence-group-${index}`,
+      title: item.title,
+      sourceType: item.sourceType,
+      docId: item.docId,
+      items: [item],
+    });
+  });
+
+  return Array.from(groups.values());
 }
 
 function buildMindMap(question: string, keywords: string[], evidenceList: EvidenceItem[]): MindMapPayload {
@@ -380,118 +365,6 @@ function buildMindMap(question: string, keywords: string[], evidenceList: Eviden
   };
 }
 
-function buildKnowledgePanel(question: string, content: string, references: ReferenceItem[]): KnowledgePanelPayload {
-  const keywords = pickDomainKeywords(question, content);
-  const evidenceList = buildEvidenceList(question, content, references);
-  const makeItem = (
-    title: string,
-    index: number,
-    promptPrefix: string,
-    description: string,
-    prompt?: string,
-  ): KnowledgeItem => ({
-    id: `${promptPrefix}-${index}`,
-    title,
-    description,
-    prompt: prompt || `请围绕“${title}”继续展开说明，并结合当前问题补充解释。`,
-    relatedEvidenceIds: evidenceList[index] ? [evidenceList[index].id] : evidenceList[0] ? [evidenceList[0].id] : [],
-  });
-  return {
-    mindMap: buildMindMap(question, keywords, evidenceList),
-    tableRows: [
-      {
-        topic: '风险判断',
-        knowledge: '意念强度、行动距离、情绪耗竭',
-        description: '先把对话中的危险表达、计划细节和情绪状态拆开看，明确风险究竟停留在想法、准备还是行动边缘。',
-      },
-      {
-        topic: '证据依据',
-        knowledge: '对话片段、量表档案、家校观察',
-        description: '把结论落回原始证据，避免只给情绪化安慰而没有依据，便于老师或辅导员后续接手。',
-      },
-      {
-        topic: '处置动作',
-        knowledge: '陪伴看护、校内协同、紧急转介',
-        description: '根据风险层级决定是继续稳定情绪、立即联系家属辅导员，还是直接进入医疗与应急处置。',
-      },
-    ],
-    preKnowledge: [
-      makeItem(
-        DOMAIN_KNOWLEDGE_LIBRARY.riskSignals[0],
-        0,
-        'pre',
-        '先抓最硬的信号：是否直接说出不想活、想结束生命、想消失、像在告别，或者已经开始交代后事。',
-        '请结合当前对话，指出哪些表达属于即时危险表达，并说明它们为什么会触发更高等级处置。',
-      ),
-      makeItem(
-        DOMAIN_KNOWLEDGE_LIBRARY.riskSignals[1],
-        1,
-        'pre',
-        '系统不只看一句“想不开”，还要看绝望、空心感、持续失眠、强烈羞耻或无助是否在持续堆积。',
-        '请分析当前案例中的情绪耗竭轨迹，说明它更像短时崩溃还是持续恶化。',
-      ),
-      makeItem(
-        '现实安全约束核验',
-        2,
-        'pre',
-        '还要确认他现在是不是独处、身边有没有危险工具、今晚有没有人陪、能不能联系到现实中的看护人。',
-        '请结合当前信息梳理现实安全约束，包括是否独处、是否有工具、是否有人可立即陪伴。',
-      ),
-    ],
-    relatedKnowledge: [
-      makeItem(
-        '保护性因素核验',
-        0,
-        'related',
-        '除了危险信号，也要核验还有没有牵挂家人、学业目标、求助意愿、宗教伦理或同伴支持等保护因素。',
-        '请结合当前案例分析还有哪些保护性因素可被激活，它们能在多大程度上降低即时风险。',
-      ),
-      makeItem(
-        '量表与档案交叉验证',
-        1,
-        'related',
-        'PHQ-9、GAD-7、既往危机记录和辅导档案是辅助证据，用来校正判断，而不是替代对话本身。',
-        '请说明当前问答如果叠加量表分数和既往档案，应如何修正风险判断。',
-      ),
-      makeItem(
-        DOMAIN_KNOWLEDGE_LIBRARY.support[1],
-        2,
-        'related',
-        '对高校场景来说，辅导员、班主任、宿舍同伴、家属和心理中心是否能快速联动，决定了方案能不能真正落地。',
-        '请从校园协同角度梳理当前案例最合适的联动顺序和通知对象。',
-      ),
-    ],
-    deepDiveItems: [
-      makeItem(
-        DOMAIN_KNOWLEDGE_LIBRARY.action[0],
-        0,
-        'deep',
-        '系统最终要把状态落到明确层级，不然老师看完回答还是不知道该不该马上找人、要不要升级。',
-        '请结合当前案例做一版风险分层，明确哪些条件会把它从预警推进到高危或紧急。',
-      ),
-      makeItem(
-        DOMAIN_KNOWLEDGE_LIBRARY.action[1],
-        1,
-        'deep',
-        '回答里不能只说“多陪陪他”，而要细化到谁来陪、多久复核一次、哪些话能说、哪些动作要立刻做。',
-        '请输出一版可执行的陪伴看护清单，按接下来1小时、今晚、24小时三个时间段拆开。',
-      ),
-      makeItem(
-        DOMAIN_KNOWLEDGE_LIBRARY.action[2],
-        2,
-        'deep',
-        '一旦出现明确计划、工具到手、拒绝保证安全、无法联系陪护人等情况，就不能停留在普通安抚层面。',
-        '请说明哪些触发条件意味着必须立刻升级处置，并给出紧急转介闭环步骤。',
-      ),
-    ],
-    followUpQuestions: [
-      '这段对话里最需要立即核实的危险细节是什么？',
-      '如果今晚只能安排一次现实干预，最优先应该做哪三步？',
-      '哪些迹象一旦出现，就必须从普通支持升级为紧急转介？',
-    ],
-  };
-}
-
 function parseEvidencePayload(raw: any, fallback: EvidenceItem[]): EvidenceItem[] {
   const parsed = parseJsonSafely(raw);
   if (!Array.isArray(parsed)) return fallback;
@@ -532,6 +405,30 @@ function parseMindMapPayload(raw: any, question: string, fallbackEvidence: Evide
   return buildMindMap(question, extractKeywords(question, ''), fallbackEvidence);
 }
 
+function parseKnowledgePanelPayload(
+  raw: any,
+  question: string,
+  fallbackEvidence: EvidenceItem[],
+): KnowledgePanelPayload | null {
+  const parsed = parseJsonSafely(raw);
+  if (!parsed || typeof parsed !== 'object') return null;
+  const tableRows = Array.isArray((parsed as any).tableRows)
+    ? (parsed as any).tableRows.map((row: any, index: number) => ({
+        topic: String(row?.topic || `主题${index + 1}`),
+        knowledge: String(row?.knowledge || ''),
+        description: String(row?.description || ''),
+      }))
+    : [];
+
+  return {
+    mindMap: parseMindMapPayload((parsed as any).mindMap, question, fallbackEvidence),
+    tableRows,
+    followUpQuestions: Array.isArray((parsed as any).followUpQuestions)
+      ? (parsed as any).followUpQuestions.map((item: any) => String(item))
+      : [],
+  };
+}
+
 function createUserMessage(message: ChatMessage): MessageViewModel {
   return {
     id: message.id,
@@ -565,9 +462,8 @@ function saveFeedbackMap(map: Record<string, 'up' | 'down'>) {
 function createAiMessage(message: ChatMessage, question: string): MessageViewModel {
   const references = normalizeReferences(message.references ?? message.referencesJson ?? message.retrievalSources ?? message.retrieval_sources);
   const ragContext = parseJsonSafely(message.ragContext ?? message.rag_context);
-  const fallbackEvidence = buildEvidenceList(question, message.content, references);
-  const evidenceList = parseEvidencePayload(ragContext?.evidence || ragContext, fallbackEvidence);
-  const panel = buildKnowledgePanel(question, message.content, references);
+  const evidenceList = parseEvidencePayload(ragContext?.knowledgePanel?.evidence ?? ragContext?.evidence ?? ragContext, []);
+  const panel = parseKnowledgePanelPayload(ragContext?.knowledgePanel, question, evidenceList);
   const resolvedMode = message.aiMode && message.aiMode in CHAT_MODE_LABELS
     ? (message.aiMode as ChatSession['aiMode'])
     : 'deep_think';
@@ -578,10 +474,7 @@ function createAiMessage(message: ChatMessage, question: string): MessageViewMod
     references,
     evidenceList,
     contextSources: Array.isArray(ragContext?.contextSources) ? ragContext.contextSources.map(String) : [],
-    knowledgePanel: {
-      ...panel,
-      mindMap: parseMindMapPayload(ragContext?.mindMap, question, evidenceList),
-    },
+    knowledgePanel: panel || undefined,
     modeLabel: CHAT_MODE_LABELS[resolvedMode],
     durationLabel: message.processingTimeMs ? `用时${(message.processingTimeMs / 1000).toFixed(2)}秒` : undefined,
     isGenerating: false,
@@ -625,7 +518,7 @@ function buildSessionItem(session: ChatSession, chatMessages: ChatMessage[]): Se
   const previewSource = userMessages[userMessages.length - 1]?.content || aiMessages[aiMessages.length - 1]?.content || '开始新的风险研判与支持建议。';
   const anchorTime = session.lastMessageAt || session.createdAt;
   return {
-    id: session.id,
+    id: Number(session.id),
     title: titleSource.length > 18 ? `${titleSource.slice(0, 18)}...` : titleSource,
     preview: previewSource.length > 26 ? `${previewSource.slice(0, 26)}...` : previewSource,
     groupLabel: getSessionGroupLabel(anchorTime),
@@ -1124,6 +1017,11 @@ export default function ChatPage() {
     return activeAnswer.evidenceList.find((item) => item.id === selectedEvidenceId) || activeAnswer.evidenceList[0] || null;
   }, [activeAnswer, selectedEvidenceId]);
 
+  const groupedActiveEvidence = useMemo(
+    () => groupEvidenceItems(activeAnswer?.evidenceList || []),
+    [activeAnswer?.evidenceList],
+  );
+
   const selectedRelations = useMemo(() => {
     if (!activeAnswer?.knowledgePanel?.mindMap || !selectedNode) return [];
     const nodeMap = new Map(activeAnswer.knowledgePanel.mindMap.nodes.map((node) => [node.id, node]));
@@ -1144,6 +1042,13 @@ export default function ChatPage() {
     () => RECOMMENDED_QUESTIONS_BY_MODE[currentChatMode] || RECOMMENDED_QUESTIONS_BY_MODE.deep_think,
     [currentChatMode],
   );
+
+  const resetConversationView = () => {
+    setMessages([]);
+    setActiveAnswerId(null);
+    setSelectedNodeId(null);
+    setSelectedEvidenceId(null);
+  };
 
   const loadSessionMessages = async (sessionId: number) => {
     const rawMessages = await fetchChatMessages(sessionId);
@@ -1168,11 +1073,15 @@ export default function ChatPage() {
     return rawMessages;
   };
 
-  const refreshSessions = async (preferredSessionId?: number | null) => {
+  const refreshSessions = async (
+    preferredSessionId?: number | null,
+    options?: { preferActive?: boolean },
+  ) => {
     const sessionsRes = await fetchChatSessions({ limit: 20 });
     const sessions = sessionsRes.sessions || [];
+    const visibleSessions = sessions.filter((session) => session.status === 'active');
     const previewEntries = await Promise.all(
-      sessions.map(async (session) => {
+      visibleSessions.map(async (session) => {
         try {
           const sessionMessages = await fetchChatMessages(Number(session.id));
           return buildSessionItem(session, sessionMessages);
@@ -1183,33 +1092,50 @@ export default function ChatPage() {
     );
     setSessionItems(previewEntries);
 
+    const activeSessions = visibleSessions;
     const nextSessionId =
-      preferredSessionId && sessions.some((session) => Number(session.id) === preferredSessionId)
-        ? preferredSessionId
-        : sessions.length > 0
-          ? Number(sessions[0].id)
+      preferredSessionId != null && visibleSessions.some((session) => Number(session.id) === Number(preferredSessionId))
+        ? Number(preferredSessionId)
+        : options?.preferActive
+          ? activeSessions.length > 0
+            ? Number(activeSessions[0].id)
+            : null
+          : visibleSessions.length > 0
+          ? Number(visibleSessions[0].id)
           : null;
 
-    return { sessions, nextSessionId };
+    return { sessions: visibleSessions, nextSessionId };
+  };
+
+  const applySessionSelection = async (sessionId: number, sessions?: ChatSession[]) => {
+    const normalizedSessionId = Number(sessionId);
+    setCurrentSessionId(normalizedSessionId);
+    const targetSession =
+      sessions?.find((item) => Number(item.id) === normalizedSessionId) ||
+      sessionItems.find((item) => Number(item.id) === normalizedSessionId);
+    if (targetSession?.aiMode) {
+      setCurrentChatMode(targetSession.aiMode);
+    }
+    await loadSessionMessages(normalizedSessionId);
+  };
+
+  const clearCurrentSessionView = () => {
+    setCurrentSessionId(null);
+    resetConversationView();
   };
 
   useEffect(() => {
     const loadInitialData = async () => {
       setIsLoading(true);
       try {
-        const { sessions, nextSessionId } = await refreshSessions();
+        const { sessions, nextSessionId } = await refreshSessions(undefined, { preferActive: true });
         if (nextSessionId) {
-          setCurrentSessionId(nextSessionId);
-          const targetSession = sessions.find((item) => Number(item.id) === nextSessionId);
-          if (targetSession?.aiMode) {
-            setCurrentChatMode(targetSession.aiMode);
-          }
-          await loadSessionMessages(nextSessionId);
+          await applySessionSelection(nextSessionId, sessions);
         } else {
           const newSession = await createChatSession({ aiMode: currentChatMode, contextType: 'general' });
           const sessionId = Number(newSession.id);
+          clearCurrentSessionView();
           setCurrentSessionId(sessionId);
-          setMessages([]);
           await refreshSessions(sessionId);
         }
       } catch (error) {
@@ -1265,12 +1191,7 @@ export default function ChatPage() {
     if (sessionId === currentSessionId) return;
     setIsLoading(true);
     try {
-      setCurrentSessionId(sessionId);
-      const targetSession = sessionItems.find((item) => item.id === sessionId);
-      if (targetSession?.aiMode) {
-        setCurrentChatMode(targetSession.aiMode);
-      }
-      await loadSessionMessages(sessionId);
+      await applySessionSelection(sessionId);
     } catch (error) {
       console.error('切换会话失败:', error);
     } finally {
@@ -1283,12 +1204,9 @@ export default function ChatPage() {
     try {
       const newSession = await createChatSession({ aiMode: currentChatMode, contextType: 'general' });
       const sessionId = Number(newSession.id);
+      clearCurrentSessionView();
       setCurrentSessionId(sessionId);
-      setMessages([]);
       setInputText('');
-      setActiveAnswerId(null);
-      setSelectedNodeId(null);
-      setSelectedEvidenceId(null);
       await refreshSessions(sessionId);
     } catch (error) {
       console.error('创建会话失败:', error);
@@ -1312,29 +1230,22 @@ export default function ChatPage() {
 
   const handleDeleteSession = async (sessionId: number) => {
     const targetSession = sessionItems.find((item) => item.id === sessionId);
+    const isCurrentSession = currentSessionId === sessionId;
     const confirmed = window.confirm(`确定删除会话“${targetSession?.title || `#${sessionId}`}”吗？删除后将不再显示在会话列表中。`);
     if (!confirmed) return;
 
     setOpenSessionMenuId(null);
     setIsLoading(true);
     try {
+      if (isCurrentSession) {
+        clearCurrentSessionView();
+      }
       await deleteChatSession(sessionId);
-      const fallbackCurrent = currentSessionId === sessionId ? null : currentSessionId;
-      const { sessions, nextSessionId } = await refreshSessions(fallbackCurrent);
-      if (currentSessionId === sessionId) {
+      const fallbackCurrent = isCurrentSession ? null : currentSessionId;
+      const { sessions, nextSessionId } = await refreshSessions(fallbackCurrent, { preferActive: true });
+      if (isCurrentSession) {
         if (nextSessionId) {
-          setCurrentSessionId(nextSessionId);
-          const targetSession = sessions.find((item) => Number(item.id) === nextSessionId);
-          if (targetSession?.aiMode) {
-            setCurrentChatMode(targetSession.aiMode);
-          }
-          await loadSessionMessages(nextSessionId);
-        } else {
-          setCurrentSessionId(null);
-          setMessages([]);
-          setActiveAnswerId(null);
-          setSelectedNodeId(null);
-          setSelectedEvidenceId(null);
+          await applySessionSelection(nextSessionId, sessions);
         }
       }
     } catch (error) {
@@ -1368,30 +1279,6 @@ export default function ChatPage() {
     }
   };
 
-  const handleToggleArchiveSession = async (session: SessionListItem) => {
-    try {
-      await updateChatSession(session.id, { status: session.status === 'archived' ? 'active' : 'archived' });
-      const nextPreferred = currentSessionId === session.id && session.status !== 'archived' ? null : currentSessionId;
-      const { sessions, nextSessionId } = await refreshSessions(nextPreferred);
-      if (currentSessionId === session.id && session.status !== 'archived') {
-        if (nextSessionId) {
-          setCurrentSessionId(nextSessionId);
-          const targetSession = sessions.find((item) => Number(item.id) === nextSessionId);
-          if (targetSession?.aiMode) {
-            setCurrentChatMode(targetSession.aiMode);
-          }
-          await loadSessionMessages(nextSessionId);
-        } else {
-          setCurrentSessionId(null);
-          setMessages([]);
-        }
-      }
-      setOpenSessionMenuId(null);
-    } catch (error) {
-      console.error('归档会话失败:', error);
-    }
-  };
-
   const handleSendMessage = async (overrideText?: string, overrideMode?: ChatSession['aiMode']) => {
     const question = (overrideText ?? inputText).trim();
     if (!question || !currentSessionId) return;
@@ -1405,7 +1292,6 @@ export default function ChatPage() {
       createdAt: new Date().toISOString(),
     };
 
-    const initialPanel = buildKnowledgePanel(question, '', []);
     const placeholderId = Date.now() + 1;
     const aiMessage: MessageViewModel = {
       id: placeholderId,
@@ -1414,7 +1300,6 @@ export default function ChatPage() {
       references: [],
       evidenceList: [],
       contextSources: [],
-      knowledgePanel: initialPanel,
       modeLabel: CHAT_MODE_LABELS[activeMode],
       durationLabel: '用时生成中',
       isGenerating: true,
@@ -1425,8 +1310,8 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, userMessage, aiMessage]);
     setInputText('');
     setActiveAnswerId(placeholderId);
-    setSelectedNodeId(initialPanel.mindMap.nodes[0]?.id || null);
-    setSelectedEvidenceId(aiMessage.evidenceList?.[0]?.id || null);
+    setSelectedNodeId(null);
+    setSelectedEvidenceId(null);
 
     let streamedContent = '';
 
@@ -1445,16 +1330,11 @@ export default function ChatPage() {
         },
         () => {
           updateAiMessage(placeholderId, (message) => {
-            const refs = message.references;
-            const evidenceList = message.evidenceList && message.evidenceList.length > 0 ? message.evidenceList : buildEvidenceList(question, streamedContent, refs);
-            const panel = message.knowledgePanel || buildKnowledgePanel(question, streamedContent, refs);
-            setSelectedEvidenceId(evidenceList[0]?.id || null);
-            setSelectedNodeId(panel.mindMap.nodes[0]?.id || null);
+            setSelectedEvidenceId(message.evidenceList?.[0]?.id || null);
+            setSelectedNodeId(message.knowledgePanel?.mindMap.nodes[0]?.id || null);
             return {
               ...message,
               content: streamedContent,
-              evidenceList,
-              knowledgePanel: panel,
               durationLabel: `用时${Math.max(3.8, streamedContent.length / 70).toFixed(2)}秒`,
               isGenerating: false,
             };
@@ -1473,20 +1353,16 @@ export default function ChatPage() {
           updateAiMessage(placeholderId, (message) => ({
             ...message,
             references: refs,
-            evidenceList: message.evidenceList && message.evidenceList.length > 0 ? message.evidenceList : buildEvidenceList(question, streamedContent, refs),
-            knowledgePanel: buildKnowledgePanel(question, streamedContent, refs),
           }));
         },
         (mindMap) => {
           updateAiMessage(placeholderId, (message) => {
-            const refs = message.references;
-            const evidenceList = message.evidenceList || buildEvidenceList(question, streamedContent, refs);
-            const panel = message.knowledgePanel || buildKnowledgePanel(question, streamedContent, refs);
+            if (!message.knowledgePanel) return message;
             return {
               ...message,
               knowledgePanel: {
-                ...panel,
-                mindMap: parseMindMapPayload(mindMap, question, evidenceList),
+                ...message.knowledgePanel,
+                mindMap: parseMindMapPayload(mindMap, question, message.evidenceList || []),
               },
             };
           });
@@ -1498,31 +1374,25 @@ export default function ChatPage() {
           }));
         },
         (terms) => {
-          updateAiMessage(placeholderId, (message) => {
-            const panel = message.knowledgePanel || buildKnowledgePanel(question, streamedContent, message.references);
-            const parsed = parseJsonSafely(terms);
-            if (Array.isArray(parsed)) {
-              return {
-                ...message,
-                knowledgePanel: {
-                  ...panel,
-                  preKnowledge: parsed.slice(0, 3).map((item, index) => ({
-                    id: `pre-${index}`,
-                    title: String(item),
-                    description: `围绕“${String(item)}”补齐本轮风险识别里最先要核实的前置信息。`,
-                    prompt: `请解释“${String(item)}”在当前自杀风险检测场景中的判断作用，并结合这轮问答展开说明。`,
-                  })),
-                },
-              };
-            }
-            return message;
-          });
+          void terms;
         },
         (sources) => {
           updateAiMessage(placeholderId, (message) => ({
             ...message,
             contextSources: Array.isArray(sources) ? sources : [],
           }));
+        },
+        (panel) => {
+          updateAiMessage(placeholderId, (message) => {
+            const parsedPanel = parseKnowledgePanelPayload(panel, question, message.evidenceList || []);
+            if (!parsedPanel) return message;
+            setSelectedEvidenceId(message.evidenceList?.[0]?.id || null);
+            setSelectedNodeId(parsedPanel.mindMap.nodes[0]?.id || null);
+            return {
+              ...message,
+              knowledgePanel: parsedPanel,
+            };
+          });
         },
       );
       await refreshSessions(currentSessionId);
@@ -1719,12 +1589,6 @@ export default function ChatPage() {
                                     <span>已置顶</span>
                                   </>
                                 )}
-                                {session.status === 'archived' && (
-                                  <>
-                                    <span className="h-1 w-1 rounded-full bg-[#CBD5E1]" />
-                                    <span>已归档</span>
-                                  </>
-                                )}
                               </div>
                             </div>
                           </button>
@@ -1770,17 +1634,6 @@ export default function ChatPage() {
                                 >
                                   <Pin className="h-4 w-4" />
                                   {session.isPinned ? '取消置顶' : '置顶会话'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    handleToggleArchiveSession(session);
-                                  }}
-                                  className="flex w-full items-center gap-2 rounded-[12px] px-3 py-2.5 text-left text-[14px] text-[#314255] transition hover:bg-[#F5F8FC]"
-                                >
-                                  <Archive className="h-4 w-4" />
-                                  {session.status === 'archived' ? '恢复会话' : '归档会话'}
                                 </button>
                                 <button
                                   type="button"
@@ -2002,29 +1855,40 @@ export default function ChatPage() {
                         证据片段
                       </div>
                       <div className="space-y-3">
-                        {message.evidenceList.slice(0, 2).map((evidence) => (
-                          <button
-                            key={evidence.id}
-                            onClick={() => {
-                              setSelectedEvidenceId(evidence.id);
-                              setRightPanelVisible(true);
-                              if (canOpenEvidenceDoc(evidence)) handleOpenDocPreview(evidence.docId, evidence.snippet);
-                            }}
-                            className={`block w-full rounded-[16px] border border-[#E4EBF3] bg-white px-4 py-3 text-left transition ${
-                              canOpenEvidenceDoc(evidence) ? 'hover:bg-[#F8FBFF]' : 'cursor-default'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="text-[14px] font-semibold text-[#24364A]">{evidence.title}</div>
-                                <div className="mt-2 line-clamp-3 text-[13px] leading-6 text-[#53677D]">{evidence.snippet}</div>
+                        {groupEvidenceItems(message.evidenceList)
+                          .slice(0, 2)
+                          .map((group) => (
+                            <div key={group.id} className="rounded-[16px] border border-[#E4EBF3] bg-white px-4 py-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="text-[14px] font-semibold text-[#24364A]">{group.title}</div>
+                                  <div className="mt-1 text-[12px] text-[#7B8DA2]">
+                                    共 {group.items.length} 条证据片段，已按同一文档归并
+                                  </div>
+                                </div>
+                                <span className="shrink-0 rounded-full border border-[#D9E4F0] bg-[#F8FBFF] px-2.5 py-1 text-[12px] text-[#6B7F95]">
+                                  {group.sourceType || 'doc'}
+                                </span>
                               </div>
-                              <span className="shrink-0 rounded-full border border-[#D9E4F0] bg-[#F8FBFF] px-2.5 py-1 text-[12px] text-[#6B7F95]">
-                                {evidence.sourceType || 'doc'}
-                              </span>
+                              <div className="mt-3 space-y-2">
+                                {group.items.slice(0, 2).map((evidence) => (
+                                  <button
+                                    key={evidence.id}
+                                    onClick={() => {
+                                      setSelectedEvidenceId(evidence.id);
+                                      setRightPanelVisible(true);
+                                      if (canOpenEvidenceDoc(evidence)) handleOpenDocPreview(evidence.docId, evidence.snippet);
+                                    }}
+                                    className={`block w-full rounded-[14px] border border-[#E8EEF5] bg-[#F8FBFF] px-3 py-2.5 text-left transition ${
+                                      canOpenEvidenceDoc(evidence) ? 'hover:border-[#D8E5F2] hover:bg-white' : 'cursor-default'
+                                    }`}
+                                  >
+                                    <div className="line-clamp-2 text-[13px] leading-6 text-[#53677D]">{evidence.snippet}</div>
+                                  </button>
+                                ))}
+                              </div>
                             </div>
-                          </button>
-                        ))}
+                          ))}
                       </div>
                     </div>
                   )}
@@ -2070,6 +1934,18 @@ export default function ChatPage() {
 
         <div className="relative px-4 pb-4 pt-2">
           <div className="mx-auto w-full max-w-[1120px] rounded-[30px] border border-[#ECECEC] bg-white px-5 pb-4 pt-5 shadow-[0_18px_42px_rgba(0,0,0,0.07)] md:px-7">
+            <div className="mb-4 flex flex-wrap gap-2 border-b border-[#EEF2F7] pb-4">
+              {recommendedQuestions.map((question) => (
+                <button
+                  key={question}
+                  type="button"
+                  onClick={() => handleSendMessage(question, currentChatMode)}
+                  className="rounded-full border border-[#DCE6F2] bg-[#F8FBFE] px-3.5 py-2 text-[13px] text-[#4D647C] transition hover:border-[#BFD4F4] hover:bg-white"
+                >
+                  {question}
+                </button>
+              ))}
+            </div>
             <textarea
               ref={inputRef}
               value={inputText}
@@ -2113,26 +1989,14 @@ export default function ChatPage() {
                 </button>
               </div>
             </div>
-            <div className="mt-4 flex flex-wrap gap-2 border-t border-[#EEF2F7] pt-4">
-              {recommendedQuestions.map((question) => (
-                <button
-                  key={question}
-                  type="button"
-                  onClick={() => handleSendMessage(question, currentChatMode)}
-                  className="rounded-full border border-[#DCE6F2] bg-[#F8FBFE] px-3.5 py-2 text-[13px] text-[#4D647C] transition hover:border-[#BFD4F4] hover:bg-white"
-                >
-                  {question}
-                </button>
-              ))}
-            </div>
           </div>
           <div className="mt-3 text-center text-[14px] text-[#C0C0C0]">内容为AI生成，使用请注意辨别</div>
         </div>
       </div>
 
-      <div className={`hidden lg:flex lg:shrink-0 lg:transition-[width] lg:duration-200 ${rightPanelVisible ? 'lg:w-[300px] xl:w-[360px] 2xl:w-[420px]' : 'lg:w-[56px]'}`}>
+      <div className={`hidden lg:flex lg:shrink-0 lg:transition-[width] lg:duration-200 ${rightPanelVisible ? 'lg:w-[308px] xl:w-[368px] 2xl:w-[428px]' : 'lg:w-[56px]'}`}>
         {rightPanelVisible ? (
-          <aside className="relative flex h-full flex-1 flex-col border-l border-[#E2E8F0] bg-[#F8FAFD]">
+          <aside className="relative flex h-full flex-1 flex-col overflow-hidden rounded-[28px] border border-[#E2E8F0] bg-[#F8FAFD] shadow-[0_18px_40px_rgba(97,118,146,0.08)]">
             <div className="flex items-center justify-between border-b border-[#E8E8E8] px-5 py-5">
               <div className="text-[18px] font-semibold text-[#202020]">
                 知识清单
@@ -2196,16 +2060,16 @@ export default function ChatPage() {
 
                     <div className="border-t border-[#EEF2F6] px-4 pb-4 pt-4">
                       <div className="overflow-hidden rounded-[18px] border border-[#E5EAF1] bg-white">
-                        <div className="grid grid-cols-[76px_92px_1fr] bg-[#F4F6F8] text-[13px] font-medium text-[#4A5662]">
+                        <div className="grid grid-cols-[72px_88px_minmax(0,1fr)] bg-[#F4F6F8] text-[13px] font-medium text-[#4A5662]">
                           <div className="border-r border-[#E5EAF1] px-3 py-3">主题</div>
                           <div className="border-r border-[#E5EAF1] px-3 py-3">知识</div>
                           <div className="px-3 py-3">描述</div>
                         </div>
                         {activeAnswer.knowledgePanel.tableRows.map((row, index) => (
-                          <div key={`${row.topic}-${index}`} className="grid grid-cols-[76px_92px_1fr] border-t border-[#EEF2F6] text-[13px] leading-6 text-[#485565]">
+                          <div key={`${row.topic}-${index}`} className="grid grid-cols-[72px_88px_minmax(0,1fr)] border-t border-[#EEF2F6] text-[13px] leading-6 text-[#485565]">
                             <div className="border-r border-[#EEF2F6] px-3 py-3 text-[#2E3640]">{row.topic}</div>
                             <div className="border-r border-[#EEF2F6] px-3 py-3 text-[#31465B]">{row.knowledge}</div>
-                            <div className="px-3 py-3">{row.description}</div>
+                            <div className="break-words px-3 py-3">{row.description}</div>
                           </div>
                         ))}
                       </div>
@@ -2218,31 +2082,55 @@ export default function ChatPage() {
                       证据片段
                     </div>
                     <div className="space-y-3 px-4 py-4">
-                      {activeAnswer.evidenceList && activeAnswer.evidenceList.length > 0 ? activeAnswer.evidenceList.map((item) => (
-                        <button
-                          key={item.id}
-                          onClick={() => {
-                            setSelectedEvidenceId(item.id);
-                            if (canOpenEvidenceDoc(item)) handleOpenDocPreview(item.docId, item.snippet);
-                          }}
-                          className={`block w-full rounded-[16px] border px-4 py-3 text-left transition ${
-                            selectedEvidenceId === item.id
-                              ? 'border-[#C9DCF2] bg-[#F4F8FD]'
-                              : `border-[#EBF0F5] bg-[#F8FBFE] ${canOpenEvidenceDoc(item) ? 'hover:bg-[#F1F6FB]' : ''}`
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="mb-1 text-[15px] font-semibold text-[#213042]">{item.title}</div>
-                              <div className="text-[13px] leading-6 text-[#617386]">{item.snippet}</div>
-                              <div className="mt-2 text-[12px] leading-5 text-[#7B8DA2]">{item.claim}</div>
+                      {groupedActiveEvidence.length > 0 ? groupedActiveEvidence.map((group) => {
+                        const groupSelected = group.items.some((item) => item.id === selectedEvidenceId);
+                        return (
+                          <div
+                            key={group.id}
+                            className={`rounded-[16px] border px-4 py-3 transition ${
+                              groupSelected ? 'border-[#C9DCF2] bg-[#F4F8FD]' : 'border-[#EBF0F5] bg-[#F8FBFE]'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="mb-1 text-[15px] font-semibold text-[#213042]">{group.title}</div>
+                                <div className="text-[12px] text-[#7B8DA2]">
+                                  共 {group.items.length} 条片段，已归并到同一文档模块
+                                </div>
+                              </div>
+                              <span className="shrink-0 rounded-full border border-[#DCE6F2] bg-white px-2.5 py-1 text-[12px] text-[#6D8197]">
+                                {group.sourceType}
+                              </span>
                             </div>
-                            <span className="shrink-0 rounded-full border border-[#DCE6F2] bg-white px-2.5 py-1 text-[12px] text-[#6D8197]">
-                              {item.sourceType}
-                            </span>
+                            <div className="mt-3 space-y-2.5">
+                              {group.items.map((item, snippetIndex) => (
+                                <button
+                                  key={item.id}
+                                  onClick={() => {
+                                    setSelectedEvidenceId(item.id);
+                                    if (canOpenEvidenceDoc(item)) handleOpenDocPreview(item.docId, item.snippet);
+                                  }}
+                                  className={`block w-full rounded-[14px] border px-3 py-2.5 text-left transition ${
+                                    selectedEvidenceId === item.id
+                                      ? 'border-[#C9DCF2] bg-white'
+                                      : `border-[#E5ECF4] bg-white/80 ${canOpenEvidenceDoc(item) ? 'hover:border-[#D7E4F1] hover:bg-white' : ''}`
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <span className="mt-0.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#EAF1FB] px-1.5 text-[11px] font-semibold text-[#4B6783]">
+                                      {snippetIndex + 1}
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-[13px] leading-6 text-[#617386]">{item.snippet}</div>
+                                      <div className="mt-2 text-[12px] leading-5 text-[#7B8DA2]">{item.claim}</div>
+                                    </div>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                        </button>
-                      )) : (
+                        );
+                      }) : (
                         <div className="rounded-[16px] border border-dashed border-[#D8E3EF] bg-[#FBFCFE] px-4 py-5 text-[14px] leading-6 text-[#7A8CA1]">
                           本轮回答暂未返回独立证据片段；若知识库命中成功，这里会展示原文摘录与对应论点。
                         </div>
