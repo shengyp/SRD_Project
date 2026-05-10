@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict I4lLcRTJYo2b3cYQ3Hjcooi1KWwPnlwccCNNmSnYhGpNJNdxjSZW5IrPD9AzEh4
+\restrict gg3D0TA4q4wsFleGxmF55f5mlaXeAjFDT4OuarcPsztf7nGYCmWV0EHBzI0Vcga
 
 -- Dumped from database version 15.17
 -- Dumped by pg_dump version 15.17
@@ -18,30 +18,27 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
---
--- Name: mental_health; Type: DATABASE; Schema: -; Owner: LEGION
---
-
-CREATE DATABASE mental_health WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PROVIDER = libc LOCALE = 'Chinese (Simplified)_China.936';
-
-
-ALTER DATABASE mental_health OWNER TO "LEGION";
-
-\unrestrict I4lLcRTJYo2b3cYQ3Hjcooi1KWwPnlwccCNNmSnYhGpNJNdxjSZW5IrPD9AzEh4
-\connect mental_health
-\restrict I4lLcRTJYo2b3cYQ3Hjcooi1KWwPnlwccCNNmSnYhGpNJNdxjSZW5IrPD9AzEh4
-
-SET statement_timeout = 0;
-SET lock_timeout = 0;
-SET idle_in_transaction_session_timeout = 0;
-SET client_encoding = 'UTF8';
-SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
-SET check_function_bodies = false;
-SET xmloption = content;
-SET client_min_messages = warning;
-SET row_security = off;
-
+DROP INDEX IF EXISTS public.idx_institutions_type;
+DROP INDEX IF EXISTS public.idx_institutions_rating;
+DROP INDEX IF EXISTS public.idx_institutions_province;
+DROP INDEX IF EXISTS public.idx_institutions_district;
+DROP INDEX IF EXISTS public.idx_institutions_city;
+DROP INDEX IF EXISTS public.idx_hotlines_type;
+DROP INDEX IF EXISTS public.idx_hotlines_region;
+DROP INDEX IF EXISTS public.idx_hotlines_province;
+DROP INDEX IF EXISTS public.idx_hotlines_hotline;
+DROP INDEX IF EXISTS public.idx_hotlines_emergency;
+DROP INDEX IF EXISTS public.idx_hotlines_city;
+ALTER TABLE IF EXISTS ONLY public.institutions DROP CONSTRAINT IF EXISTS institutions_poi_id_unique;
+ALTER TABLE IF EXISTS ONLY public.institutions DROP CONSTRAINT IF EXISTS institutions_pkey;
+ALTER TABLE IF EXISTS ONLY public.hotlines DROP CONSTRAINT IF EXISTS hotlines_pkey;
+ALTER TABLE IF EXISTS ONLY public.hotlines DROP CONSTRAINT IF EXISTS hotlines_hotline_unique;
+ALTER TABLE IF EXISTS public.institutions ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.hotlines ALTER COLUMN id DROP DEFAULT;
+DROP SEQUENCE IF EXISTS public.institutions_id_seq;
+DROP TABLE IF EXISTS public.institutions;
+DROP SEQUENCE IF EXISTS public.hotlines_id_seq;
+DROP TABLE IF EXISTS public.hotlines;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -3432,17 +3429,7 @@ COPY public.institutions (id, name, type, province, city, district, address, pho
 10251	临汾市心理咨询师协会	心理咨询中心		山西省	临汾市	财神楼南街与姚家胡同交叉口北40米			111.519232	36.080065	\N	B0L67YMXYY	补充爬取-区县	2026-04-19 17:52:46.925271	2026-04-19 17:52:46.925271
 10252	山西望归心心理教育有限公司	其他		山西省	临汾市	亚好公寓南侧170米			111.535725	36.111725	\N	B0L1C64XZC	补充爬取-区县	2026-04-19 17:52:46.925981	2026-04-19 17:52:46.925981
 10253	JN倾听心理工作室	其他		山西省	临汾市	府前广场二楼			111.719063	35.737236	\N	B0L2FS1T1E	补充爬取-区县	2026-04-19 17:52:46.92817	2026-04-19 17:52:46.92817
-10254	无锡市精神卫生中心	精神专科医院	江苏省	无锡市	滨湖区	钱荣路156号	0510-83012698;0510-83219336	24小时营业	120.232563	31.591807	\N	B0FFH0N5U4	补充爬取-区县	2026-04-19 17:52:46.929282	2026-04-19 17:52:46.929282
-10255	汕头大学精神卫生中心	精神专科医院	广东省	汕头市	龙湖区	泰山北路万吉工业区	0754-82902229;0754-82902704		116.716660	23.427258	\N	B0FFGZGAPD	补充爬取-区县	2026-04-19 17:52:46.930172	2026-04-19 17:52:46.930172
-10256	许昌市建安医院	其他	河南省	许昌市	魏都区	华佗路1号	0374-3310012	24小时营业	113.793750	34.028561	\N	B017600OY4	补充爬取-区县	2026-04-19 17:52:46.931067	2026-04-19 17:52:46.931067
-10257	开滦精神卫生中心	精神专科医院	河北省	唐山市	路北区	建华东道26号		08:00-12:00 13:30-17:30	118.191290	39.645267	\N	B0J02CPBHP	补充爬取-区县	2026-04-19 17:52:46.932176	2026-04-19 17:52:46.932176
-10258	株洲市三医院	其他	湖南省	株洲市	荷塘区	新华东路820号	0731-22494837		113.180691	27.866384	\N	B02DD01291	补充爬取-区县	2026-04-19 17:52:46.932877	2026-04-19 17:52:46.932877
-10259	聊城市第四人民医院	其他	山东省	聊城市	东昌府区	花园北路49号	0635-8321088	24小时营业	115.997131	36.464073	\N	B027B016C8	补充爬取-区县	2026-04-19 17:52:46.933587	2026-04-19 17:52:46.933587
-10260	吉林市第六人民医院	其他	吉林省	吉林市	船营区	吉长北路33号	0432-63279999	08:30-16:00	126.512241	43.871791	\N	B0FFG6BTG3	补充爬取-区县	2026-04-19 17:52:46.934483	2026-04-19 17:52:46.934483
-10261	衡水京大心理康复医院	其他	河北省	衡水市	桃城区	程富路38号	0318-2105678;0318-2123147		115.720761	37.717173	\N	B013E00CQT	补充爬取-区县	2026-04-19 17:52:46.936415	2026-04-19 17:52:46.936415
-10262	戴庄医院	其他	山东省	济宁市	任城区	李营镇济戴路1号	0537-2030000;0537-3165656	24小时营业	116.586548	35.464796	\N	B02190ABBF	补充爬取-区县	2026-04-19 17:52:46.937501	2026-04-19 17:52:46.937501
-10263	江苏省扬州五台山医院	其他	江苏省	扬州市	广陵区	五台山路2号	0514-87207250;0514-87244871	08:00-11:30 14:00-17:30	119.451962	32.413043	\N	B020200BIF	补充爬取-区县	2026-04-19 17:52:46.938372	2026-04-19 17:52:46.938372
-10264	中山市未成年人心理健康辅导中心	心理咨询中心	广东省	中山市		湖滨路59号	0760-88884120;0760-89980050	09:00-21:00	113.374328	22.529847	\N	B0FFIP32P9	补充爬取-区县	2026-04-19 17:52:46.939244	2026-04-19 17:52:46.939244
+10255	汕头大学精神卫生中心	精神专科医院	广东省	汕头市	龙湖区	泰山北路万吉工业区	0754-82902229;0754-82902704		116.716660	23.427258	\N	B0FFGZGAPD	补充爬取-区县	2026-04-19 17:52:46.930172	2026-05-05 14:05:07.532906
 10265	重庆市渝北区精神卫生中心	精神专科医院	重庆市	重庆市	两江新区	桃源大道与碧湖路交叉口西北280米			106.628141	29.759689	\N	B0FFKMUKLA	补充爬取-区县	2026-04-19 17:52:46.940188	2026-04-19 17:52:46.940188
 10266	重庆市精神卫生中心住院部	精神专科医院	重庆市	重庆市	两江新区	金紫山102号重庆市精神卫生中心内			106.530759	29.593352	\N	B0FFF027MY	补充爬取-区县	2026-04-19 17:52:46.941035	2026-04-19 17:52:46.941035
 10267	江北区公安分局红旗河沟派出所驻重庆市精神卫生中心	精神专科医院	重庆市	重庆市	两江新区	紫荆路与紫福路交叉口西180米			106.530898	29.592048	\N	B0KAPPMXRB	补充爬取-区县	2026-04-19 17:52:46.941809	2026-04-19 17:52:46.941809
@@ -3467,6 +3454,13 @@ COPY public.institutions (id, name, type, province, city, district, address, pho
 10286	重庆市合川区精神卫生中心(思居院区)	精神专科医院	重庆市	重庆市	合川区	钓鱼城街道金马村13社	023-42812032;19146103725	08:30-17:30	106.318913	30.076790	\N	B0FFHOHHVO	补充爬取-区县	2026-04-19 17:52:46.96106	2026-04-19 17:52:46.96106
 10287	重庆市合川区精神卫生中心	精神专科医院	重庆市	重庆市	合川区	三庙镇西街26号	023-42692167		106.129381	30.235859	\N	B0FFIARNX3	补充爬取-区县	2026-04-19 17:52:46.962439	2026-04-19 17:52:46.962439
 10288	合川区心理卫生中心护士站	其他	重庆市	重庆市	合川区	金马假日广场与双牌坊街交叉口南160米			106.265175	29.988175	\N	B0GUBCO52E	补充爬取-区县	2026-04-19 17:52:46.963601	2026-04-19 17:52:46.963601
+10258	株洲市三医院	其他	湖南省	株洲市	荷塘区	新华东路820号	0731-22494837		113.180691	27.866384	\N	B02DD01291	补充爬取-区县	2026-04-19 17:52:46.932877	2026-05-05 14:05:07.536994
+10259	聊城市第四人民医院	其他	山东省	聊城市	东昌府区	花园北路49号	0635-8321088	24小时营业	115.997131	36.464073	\N	B027B016C8	补充爬取-区县	2026-04-19 17:52:46.933587	2026-05-05 14:05:07.538074
+10260	吉林市第六人民医院	其他	吉林省	吉林市	船营区	吉长北路33号	0432-63279999	08:30-16:00	126.512241	43.871791	\N	B0FFG6BTG3	补充爬取-区县	2026-04-19 17:52:46.934483	2026-05-05 14:05:07.538917
+10261	衡水京大心理康复医院	其他	河北省	衡水市	桃城区	程富路38号	0318-2105678;0318-2123147		115.720761	37.717173	\N	B013E00CQT	补充爬取-区县	2026-04-19 17:52:46.936415	2026-05-05 14:05:07.539406
+10262	戴庄医院	其他	山东省	济宁市	任城区	李营镇济戴路1号	0537-2030000;0537-3165656	24小时营业	116.586548	35.464796	\N	B02190ABBF	补充爬取-区县	2026-04-19 17:52:46.937501	2026-05-05 14:05:07.539977
+10263	江苏省扬州五台山医院	其他	江苏省	扬州市	广陵区	五台山路2号	0514-87207250;0514-87244871	08:00-11:30 14:00-17:30	119.451962	32.413043	\N	B020200BIF	补充爬取-区县	2026-04-19 17:52:46.938372	2026-05-05 14:05:07.540598
+10264	中山市未成年人心理健康辅导中心	心理咨询中心	广东省	中山市		湖滨路59号	0760-88884120;0760-89980050	09:00-21:00	113.374328	22.529847	\N	B0FFIP32P9	补充爬取-区县	2026-04-19 17:52:46.939244	2026-05-05 14:05:07.541311
 10289	合川区中西医结合医院城北医院神经内科(脑病科)	其他	重庆市	重庆市	合川区	中国石化江城加气站西北侧			106.265510	30.006782	\N	B0I6VO82VH	补充爬取-区县	2026-04-19 17:52:46.964879	2026-04-19 17:52:46.964879
 10290	新乡医学院第二附属医院停车场(入口)	其他		新乡市	牧野区	新乡医学院第二附属医院停车场			113.897189	35.329308	\N	B0H1RS8H82	补充爬取-医院	2026-04-19 17:52:46.965998	2026-04-19 17:52:46.965998
 10291	新乡医学院第二附属医院停车场	其他		新乡市	牧野区	前进路207号河南医药大学第二附属医院			113.897846	35.328735	\N	B0H1RS9JP4	补充爬取-医院	2026-04-19 17:52:46.966997	2026-04-19 17:52:46.966997
@@ -3709,6 +3703,9 @@ COPY public.institutions (id, name, type, province, city, district, address, pho
 10528	京欣医疗	其他	北京市	北京市	西城区	新街高和2楼(积水潭地铁站F口旁)		09:00-22:00	116.371430	39.946060	\N	B0JB2SQXHH	补充爬取-医院	2026-04-19 17:52:47.222011	2026-04-19 17:52:47.222011
 10529	安定医院	精神专科医院		赤峰市	红山区	贡格尔大街18号		24小时营业	118.948602	42.292334	\N	B01DC15LIN	补充爬取-医院	2026-04-19 17:52:47.222539	2026-04-19 17:52:47.222539
 10530	赤峰市安定医院-门诊部	精神专科医院		赤峰市	红山区	贡格尔大街18号赤峰市安定医院门诊部			118.948626	42.291770	\N	B0FFM0WGIG	补充爬取-医院	2026-04-19 17:52:47.223036	2026-04-19 17:52:47.223036
+10254	无锡市精神卫生中心	精神专科医院	江苏省	无锡市	滨湖区	钱荣路156号	0510-83012698;0510-83219336	24小时营业	120.232563	31.591807	\N	B0FFH0N5U4	补充爬取-区县	2026-04-19 17:52:46.929282	2026-05-05 14:05:07.512565
+10256	许昌市建安医院	其他	河南省	许昌市	魏都区	华佗路1号	0374-3310012	24小时营业	113.793750	34.028561	\N	B017600OY4	补充爬取-区县	2026-04-19 17:52:46.931067	2026-05-05 14:05:07.534338
+10257	开滦精神卫生中心	精神专科医院	河北省	唐山市	路北区	建华东道26号		08:00-12:00 13:30-17:30	118.191290	39.645267	\N	B0J02CPBHP	补充爬取-区县	2026-04-19 17:52:46.932176	2026-05-05 14:05:07.535905
 \.
 
 
@@ -3839,5 +3836,5 @@ CREATE INDEX idx_institutions_type ON public.institutions USING btree (type);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict I4lLcRTJYo2b3cYQ3Hjcooi1KWwPnlwccCNNmSnYhGpNJNdxjSZW5IrPD9AzEh4
+\unrestrict gg3D0TA4q4wsFleGxmF55f5mlaXeAjFDT4OuarcPsztf7nGYCmWV0EHBzI0Vcga
 
