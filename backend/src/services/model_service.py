@@ -487,20 +487,59 @@ class ModelService:
     async def init_builtin_data(mysql_pool):
         """初始化预置模型和指令模板数据（幂等操作，已存在则跳过）"""
 
-        # Emocc 预置模型 - 仅保留 Emocc-Reddit
+        # Emocc 预置模型 - 四个数据集各自一套
         emoji_models = [
             {
                 'model_name': 'Emocc-Reddit', 'model_code': 'emocc-reddit',
-                'model_category': 'detection', 'model_type': 'emocc_local',
-                'detection_type': 'emocc',
-                'model_file_path': 'Emocc/Emocc_model/checkpoints/emocc_model.pth',
-                'embedding_file_path': 'datasets/reddit/reddit_500_bert_embeddings.pkl',
-                'emoji_csv_path': 'datasets/reddit/reddit_500_emoji_batch.csv',
+                'model_category': 'detection', 'model_type': 'emoji',
+                'detection_type': 'emoji',
+                'model_file_path': 'Emocc/reddit/Emocc_model/checkpoints/emocc_model.pth',
+                'embedding_file_path': 'Emocc/reddit/data/reddit_500_bert_embeddings.pkl',
+                'emoji_csv_path': 'Emocc/reddit/data/reddit_500_emoji.csv',
                 'description': '基于 BERT + Emoji 双模态层次融合的自杀风险检测模型。支持输出每个帖子的注意力分数，五分类任务（无风险/极低风险/低风险/中风险/高风险）。',
                 'version': 'v1.0', 'is_available': True, 'is_default': True, 'is_builtin': True,
                 'status': 'active',
                 'performance_metrics': '{"accuracy": 0.849, "precision": 0.835, "recall": 0.828, "f1": 0.831, "auc": 0.889}',
                 'supported_datasets': '["reddit"]', 'provider': 'VIS4SRD',
+            },
+            {
+                'model_name': 'Emocc-Bigdata', 'model_code': 'emocc-bigdata',
+                'model_category': 'detection', 'model_type': 'emoji',
+                'detection_type': 'emoji',
+                'model_file_path': 'Emocc/bigdata/Emocc_model/checkpoints/emocc_model.pth',
+                'embedding_file_path': 'Emocc/bigdata/data/bigdata_bert.pkl',
+                'emoji_csv_path': 'Emocc/bigdata/data/bigdata_emoji_batch.csv',
+                'description': 'Bigdata 四分类 Emocc 模型。输出类别概率、帖子重要性分数和风险等级。',
+                'version': 'v1.0', 'is_available': True, 'is_default': False, 'is_builtin': True,
+                'status': 'active',
+                'performance_metrics': '{"acc": 0.6000, "gp": 0.79, "gr": 0.71, "f_score": 0.75, "oe": 0.12, "macro_f1": 0.4649}',
+                'supported_datasets': '["bigdata"]', 'provider': 'VIS4SRD',
+            },
+            {
+                'model_name': 'Emocc-SIGIR', 'model_code': 'emocc-sigir',
+                'model_category': 'detection', 'model_type': 'emoji',
+                'detection_type': 'emoji',
+                'model_file_path': 'Emocc/sigir/Emocc_model/checkpoints/emocc_model.pth',
+                'embedding_file_path': 'Emocc/sigir/data/sigir_bert.pkl',
+                'emoji_csv_path': 'Emocc/sigir/data/sigir_emojis.csv',
+                'description': 'SIGIR 二分类 Emocc 模型。适配单帖子高风险检测场景。',
+                'version': 'v1.0', 'is_available': True, 'is_default': False, 'is_builtin': True,
+                'status': 'active',
+                'performance_metrics': '{}',
+                'supported_datasets': '["sigir"]', 'provider': 'VIS4SRD',
+            },
+            {
+                'model_name': 'Emocc-Weibo', 'model_code': 'emocc-weibo',
+                'model_category': 'detection', 'model_type': 'emoji',
+                'detection_type': 'emoji',
+                'model_file_path': 'Emocc/weibo/Emocc_model/checkpoints/emocc_model.pth',
+                'embedding_file_path': 'Emocc/weibo/data/user_post_embeddings_filtered.pkl',
+                'emoji_csv_path': 'Emocc/weibo/data/weibo_1000_emoji_batch.csv',
+                'description': 'Weibo 二分类 Emocc 模型。适配中文微博文本与 Emoji 风险检测。',
+                'version': 'v1.0', 'is_available': True, 'is_default': False, 'is_builtin': True,
+                'status': 'active',
+                'performance_metrics': '{}',
+                'supported_datasets': '["weibo"]', 'provider': 'VIS4SRD',
             },
         ]
 
@@ -948,10 +987,22 @@ Emocc 情绪检测：
                         ON DUPLICATE KEY UPDATE
                             model_name=VALUES(model_name),
                             model_type=VALUES(model_type),
+                            provider=VALUES(provider),
+                            api_base_url=VALUES(api_base_url),
+                            config_template=VALUES(config_template),
+                            detection_type=VALUES(detection_type),
                             ollama_model_name=VALUES(ollama_model_name),
                             ollama_base_url=VALUES(ollama_base_url),
                             model_file_path=VALUES(model_file_path),
+                            embedding_file_path=VALUES(embedding_file_path),
+                            performance_metrics=VALUES(performance_metrics),
+                            supported_datasets=VALUES(supported_datasets),
                             description=VALUES(description),
+                            version=VALUES(version),
+                            is_available=VALUES(is_available),
+                            is_default=VALUES(is_default),
+                            is_builtin=VALUES(is_builtin),
+                            status=VALUES(status),
                             updated_at=NOW()
                     """, (
                         model['model_name'], model['model_code'], model['model_category'], model['model_type'],

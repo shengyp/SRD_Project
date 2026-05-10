@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Download, FileText, Loader2 } from 'lucide-react';
 import { downloadKnowledgeDocument } from '../../api';
+import { pickSearchSnippet } from '../../utils/highlightMatch';
 
 interface DocumentPreviewProps {
   documentId: number | string;
   fileName?: string;
   format?: string;
   className?: string;
+  highlightSnippet?: string | null;
 }
 
 function PreviewFallback({
@@ -32,7 +34,15 @@ function PreviewFallback({
   );
 }
 
-function PdfPreview({ documentId, fileName }: { documentId: number | string; fileName?: string }) {
+function PdfPreview({
+  documentId,
+  fileName,
+  highlightSnippet,
+}: {
+  documentId: number | string;
+  fileName?: string;
+  highlightSnippet?: string | null;
+}) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +65,11 @@ function PdfPreview({ documentId, fileName }: { documentId: number | string; fil
           throw new Error('PDF 文件为空');
         }
 
+        const searchSnippet = pickSearchSnippet(highlightSnippet);
         objectUrl = URL.createObjectURL(blob);
+        if (searchSnippet) {
+          objectUrl = `${objectUrl}#search=${encodeURIComponent(searchSnippet)}`;
+        }
         setPdfUrl(objectUrl);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'PDF 预览加载失败');
@@ -69,7 +83,7 @@ function PdfPreview({ documentId, fileName }: { documentId: number | string; fil
     return () => {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [documentId]);
+  }, [documentId, highlightSnippet]);
 
   if (loading) {
     return (
@@ -93,7 +107,78 @@ function PdfPreview({ documentId, fileName }: { documentId: number | string; fil
   );
 }
 
-function DocxPreview({ documentId, fileName }: { documentId: number | string; fileName?: string }) {
+function highlightDocxSnippet(container: HTMLDivElement, rawSnippet?: string | null): boolean {
+  const snippet = pickSearchSnippet(rawSnippet);
+  if (!snippet) return false;
+
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const text = node.textContent || '';
+      return text.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    },
+  });
+
+  const textNodes: Text[] = [];
+  const texts: string[] = [];
+  let current = walker.nextNode();
+  while (current) {
+    textNodes.push(current as Text);
+    texts.push(current.textContent || '');
+    current = walker.nextNode();
+  }
+
+  if (!textNodes.length) return false;
+
+  const fullText = texts.join('');
+  const searchIndex = fullText.toLowerCase().indexOf(snippet.toLowerCase());
+  if (searchIndex < 0) return false;
+
+  let consumed = 0;
+  let startNodeIndex = -1;
+  let endNodeIndex = -1;
+  let startOffset = 0;
+  let endOffset = 0;
+
+  for (let i = 0; i < texts.length; i += 1) {
+    const nextConsumed = consumed + texts[i].length;
+    if (startNodeIndex === -1 && searchIndex < nextConsumed) {
+      startNodeIndex = i;
+      startOffset = Math.max(0, searchIndex - consumed);
+    }
+    if (startNodeIndex !== -1 && searchIndex + snippet.length <= nextConsumed) {
+      endNodeIndex = i;
+      endOffset = Math.max(0, searchIndex + snippet.length - consumed);
+      break;
+    }
+    consumed = nextConsumed;
+  }
+
+  if (startNodeIndex === -1 || endNodeIndex === -1) return false;
+
+  const range = document.createRange();
+  range.setStart(textNodes[startNodeIndex], startOffset);
+  range.setEnd(textNodes[endNodeIndex], endOffset);
+
+  const mark = document.createElement('mark');
+  mark.className = 'rounded-[6px] bg-[#FFF2A8] px-1 py-0.5 text-inherit shadow-[0_0_0_1px_rgba(233,188,50,0.25)]';
+  try {
+    range.surroundContents(mark);
+    mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function DocxPreview({
+  documentId,
+  fileName,
+  highlightSnippet,
+}: {
+  documentId: number | string;
+  fileName?: string;
+  highlightSnippet?: string | null;
+}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -129,6 +214,10 @@ function DocxPreview({ documentId, fileName }: { documentId: number | string; fi
           ignoreHeight: false,
           breakPages: true,
         });
+
+        if (!disposed && containerRef.current) {
+          highlightDocxSnippet(containerRef.current, highlightSnippet);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Word 预览加载失败');
       } finally {
@@ -146,7 +235,7 @@ function DocxPreview({ documentId, fileName }: { documentId: number | string; fi
         containerRef.current.innerHTML = '';
       }
     };
-  }, [documentId]);
+  }, [documentId, highlightSnippet]);
 
   if (loading) {
     return (
@@ -178,15 +267,16 @@ export default function DocumentPreview({
   fileName,
   format,
   className = '',
+  highlightSnippet,
 }: DocumentPreviewProps) {
   const normalizedFormat = (format || '').toLowerCase();
 
   if (normalizedFormat === 'pdf') {
-    return <PdfPreview documentId={documentId} fileName={fileName} />;
+    return <PdfPreview documentId={documentId} fileName={fileName} highlightSnippet={highlightSnippet} />;
   }
 
   if (normalizedFormat === 'docx') {
-    return <DocxPreview documentId={documentId} fileName={fileName} />;
+    return <DocxPreview documentId={documentId} fileName={fileName} highlightSnippet={highlightSnippet} />;
   }
 
   if (normalizedFormat === 'doc') {

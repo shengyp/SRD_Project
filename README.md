@@ -13,6 +13,11 @@ VIS4SRD 是一个面向心理健康服务与自杀风险识别场景的前后端
 
 这份 README 只描述当前仓库里真实存在、能对应到代码与脚本的内容。
 
+说明：
+
+- `Emocc/` 为本地推理资源目录，包含大量 `.pth`、`.pkl`、`.bin` 文件，默认不纳入 GitHub 仓库。
+- 如需在新环境运行 Emocc 推理，请按现有目录结构单独同步该目录。
+
 ---
 
 ## 1. 项目结构
@@ -44,7 +49,7 @@ vis4srd/
 ├─ scales/                       # 量表 JSON 定义
 ├─ map_data/                     # 地图机构数据资源
 ├─ Fealeaner/                    # FeaLearner 模型与推理脚本
-├─ Emocc/                        # Emocc 模型资源
+├─ Emocc/                        # Emocc 本地模型资源（默认不纳入 Git）
 ├─ docs/                         # 设计/数据库/部署文档
 └─ deploy/production/            # 生产部署脚本
 ```

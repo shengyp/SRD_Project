@@ -68,6 +68,26 @@ interface RiskResultSummary {
     confidence: number;
     postCount: number;
     classProbs: number[];
+    classNum?: number;
+    classLabels?: Record<number, string>;
+    coarseRiskMapping?: Record<number, string>;
+    performanceMetrics?: Record<string, number>;
+    datasetKey?: string;
+    modelName?: string;
+    mappingInfo?: {
+      datasetKey?: string;
+      userHash?: string;
+      mappingMode?: string;
+      sourceRowIndex?: number;
+      rawUserId?: string;
+      dbPostCount?: number;
+      samplePostCount?: number;
+      embeddingPostCount?: number;
+      matchedPostCount?: number;
+      isExactAligned?: boolean;
+      alignmentStatus?: string;
+      attentionPreviewSource?: string;
+    };
     postAttentionScores?: { 
       post_index?: number;
       postIndex?: number; 
@@ -77,6 +97,10 @@ interface RiskResultSummary {
       textPreview?: string; 
       emoji_count?: number;
       emojiCount?: number;
+      preview_source?: string;
+      previewSource?: string;
+      is_exact_aligned?: boolean;
+      isExactAligned?: boolean;
     }[];
     modelType: string;
   };
@@ -223,6 +247,7 @@ interface CreateTaskModalProps {
 }
 
 function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTaskModalProps) {
+  const modalBodyRef = useRef<HTMLDivElement | null>(null);
   const [modelCategory, setModelCategory] = useState<'api' | 'local_llm' | 'emocc'>('api');
   const [taskName, setTaskName] = useState('');
   const [selectedSource, setSelectedSource] = useState('');
@@ -315,6 +340,26 @@ function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTask
     return () => controller.abort();
   }, [selectedSource, userSearchKeyword, usersPage]);
 
+  const compatibleDetectionModels = detectionModels.filter((model) => {
+    if (!selectedSource) return true;
+    if (!model.supportedDatasets || model.supportedDatasets.length === 0) return true;
+    return model.supportedDatasets.includes(selectedSource);
+  });
+
+  useEffect(() => {
+    if (modelCategory !== 'emocc') return;
+    if (!selectedSource) return;
+    if (selectedDetectionModel && compatibleDetectionModels.some((model) => model.id === selectedDetectionModel.id)) {
+      return;
+    }
+    setSelectedDetectionModel(compatibleDetectionModels[0] || null);
+  }, [modelCategory, selectedSource, selectedDetectionModel, compatibleDetectionModels]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    modalBodyRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [isOpen, modelCategory]);
+
   const handleCreate = async () => {
     if (!selectedUser || !selectedSource) return;
     // 取消之前的请求
@@ -339,7 +384,7 @@ function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTask
           const result = await createEmoccDetectionTask({
             userHash: selectedUser.userHash,
             dataSource: selectedSource,
-            fusionModelId: selectedDetectionModel ? parseInt(selectedDetectionModel.id) : undefined,
+            detectionModelId: selectedDetectionModel ? parseInt(selectedDetectionModel.id) : undefined,
             taskName: taskName,
           });
           newTask = {
@@ -506,7 +551,7 @@ function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTask
   const canProceed = !!(
     selectedSource &&
     selectedUser &&
-    (modelCategory === 'emocc' && selectedDetectionModel ||
+    (modelCategory === 'emocc' && selectedDetectionModel && compatibleDetectionModels.some(model => model.id === selectedDetectionModel.id) ||
       (modelCategory === 'api' && selectedApiModel && selectedTemplate) ||
       (modelCategory === 'local_llm' && selectedLlmModel && selectedTemplate))
   );
@@ -526,7 +571,7 @@ function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTask
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        <div ref={modalBodyRef} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
           {/* 任务名称 */}
           <div>
             <label className="block text-sm font-semibold text-[#415168] mb-2">
@@ -809,15 +854,15 @@ function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTask
           {modelCategory === 'emocc' && (
             <div>
               <label className="block text-sm font-medium text-[#64748B] mb-2">检测模型</label>
-              {detectionModels.length === 0 ? (
+              {compatibleDetectionModels.length === 0 ? (
                 <div className="flex flex-col items-center justify-center p-6 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50">
                   <Brain className="w-8 h-8 text-gray-300 mb-2" />
-                  <p className="text-sm text-gray-500">暂无可用的检测模型</p>
-                  <p className="text-xs text-gray-400 mt-1">请在模型中心配置 Emocc 或 FeaLearner 模型</p>
+                  <p className="text-sm text-gray-500">当前数据源没有可用的检测模型</p>
+                  <p className="text-xs text-gray-400 mt-1">请切换数据源或在模型中心补充该数据集对应模型</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
-                  {detectionModels.map(model => (
+                  {compatibleDetectionModels.map(model => (
                     <label
                       key={model.id}
                       className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all bg-white ${
@@ -835,6 +880,11 @@ function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTask
                       <Brain className={`w-6 h-6 mb-1 ${model.status === 'active' ? 'text-purple-500' : 'text-gray-300'}`} />
                       <span className="font-medium text-sm text-[#162033]">{model.name}</span>
                       <span className="text-xs text-[#64748B] mt-0.5 truncate w-full text-center">{model.path}</span>
+                      {model.supportedDatasets && model.supportedDatasets.length > 0 && (
+                        <span className="mt-1 text-[11px] text-[#64748B]">
+                          适用：{model.supportedDatasets.join(' / ')}
+                        </span>
+                      )}
                       <span className={`mt-1 text-xs px-2 py-0.5 rounded-full ${model.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
                         {model.status === 'active' ? '可用' : '不可用'}
                       </span>
@@ -888,14 +938,19 @@ function buildReportHtml(reportData: any): string {
     return `<ul style="margin:6px 0 6px 20px;padding:0;list-style:none;">${items.map((item: string) => `<li style="margin-bottom:4px;padding-left:8px;">${escapeHtml(item)}</li>`).join('')}</ul>`;
   };
 
-  const probLabels = ['无风险', '极低风险', '低风险', '中风险', '高风险'];
+  const classLabelsMap = emocc?.classLabels || {};
+  const mappingInfo = emocc?.mappingInfo || {};
+  const probLabels = Object.keys(classLabelsMap)
+    .map(key => Number(key))
+    .sort((a, b) => a - b)
+    .map(key => classLabelsMap[key]);
   const probColors = ['#22c55e', '#86efac', '#fde047', '#f97316', '#ef4444'];
   const classProbs = emocc?.classProbs || [];
   const probBars = classProbs.map((prob: number | string, i: number) => {
     const probNum = typeof prob === 'number' ? prob : parseFloat(prob);
     const barWidth = probNum * 100;
     return `<div style="display:flex;align-items:center;margin-bottom:4px;">
-      <span style="width:64px;font-size:11px;">${probLabels[i]}</span>
+      <span style="width:72px;font-size:11px;">${escapeHtml(probLabels[i] || `类别${i}`)}</span>
       <div style="flex:1;background:#f0f0f0;border-radius:4px;height:12px;margin:0 8px;">
         <div style="width:${barWidth.toFixed(1)}%;background:${probColors[i]};border-radius:4px;height:100%;"></div>
       </div>
@@ -908,14 +963,20 @@ function buildReportHtml(reportData: any): string {
   const attRows = attScores.map((s: any) => {
     const attention = parseFloat(s.attentionScore ?? s.attention_score ?? 0);
     const percentage = totalAttention > 0 ? ((attention / totalAttention) * 100).toFixed(1) : '0.0';
+    const previewSource = s.previewSource ?? s.preview_source ?? mappingInfo.attentionPreviewSource ?? 'unknown';
+    const postIndex = ((s.postIndex ?? s.post_index ?? 0) as number) + 1;
     return `<tr>
-      <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">Post-${s.postIndex ?? s.post_index ?? '-'}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">${postIndex}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">${attention.toFixed(4)} (${percentage}%)</td>
       <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(s.textPreview ?? s.text_preview ?? '')}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">${escapeHtml(previewSource === 'database' ? '数据库原帖' : '样本窗口')}</td>
     </tr>`;
   }).join('');
 
   const completedAt = reportData.completedAt ? new Date(reportData.completedAt).toLocaleString('zh-CN') : new Date().toLocaleString('zh-CN');
+  const scaleHint = Object.keys(classLabelsMap)
+    .map(key => `${key}=${classLabelsMap[key]}`)
+    .join(' / ');
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -978,7 +1039,7 @@ function buildReportHtml(reportData: any): string {
     <div class="risk-card">
       <div class="label">风险分数</div>
       <div class="value">${riskScore.toFixed(2)}</div>
-      <div class="sub">0=无风险，1=高风险</div>
+      <div class="sub">${escapeHtml(scaleHint)}</div>
     </div>
     <div class="risk-card">
       <div class="label">置信度</div>
@@ -1003,9 +1064,16 @@ function buildReportHtml(reportData: any): string {
         <div style="font-weight:bold;color:#7c3aed;">${parseFloat(emocc.riskScore || emocc.risk_score || 0).toFixed(4)}</div>
       </div>
       <div style="background:white;padding:8px;border-radius:6px;text-align:center;">
-        <div style="font-size:11px;color:#888;">五分类结果</div>
-        <div style="font-weight:bold;color:#7c3aed;">Class ${emocc.riskClass || emocc.risk_class || '-'}</div>
+        <div style="font-size:11px;color:#888;">分类结果</div>
+        <div style="font-weight:bold;color:#7c3aed;">${escapeHtml(emocc.classLabels?.[emocc.riskClass as keyof typeof emocc.classLabels] || `类别 ${emocc.riskClass || emocc.risk_class || '-'}`)}</div>
       </div>
+    </div>
+    <div style="font-size:11px;color:#6b7280;margin-bottom:10px;line-height:1.6;">
+      样本映射: ${escapeHtml(mappingInfo.mappingMode || 'unknown')} /
+      行号 ${escapeHtml(String(mappingInfo.sourceRowIndex ?? '-'))} /
+      对齐状态 ${escapeHtml(String(mappingInfo.alignmentStatus || 'unknown'))} /
+      数据库帖子 ${escapeHtml(String(mappingInfo.dbPostCount ?? '-'))} /
+      样本帖子 ${escapeHtml(String(mappingInfo.samplePostCount ?? '-'))}
     </div>
     <div style="font-size:12px;color:#555;margin-bottom:6px;">概率分布</div>
     ${probBars}
@@ -1024,6 +1092,7 @@ function buildReportHtml(reportData: any): string {
         <th style="padding:6px 8px;text-align:left;font-size:12px;">序号</th>
         <th style="padding:6px 8px;text-align:left;font-size:12px;">注意力分数</th>
         <th style="padding:6px 8px;text-align:left;font-size:12px;">内容预览</th>
+        <th style="padding:6px 8px;text-align:left;font-size:12px;">预览来源</th>
       </tr></thead>
       <tbody>${attRows}</tbody>
     </table>
@@ -1050,6 +1119,7 @@ function ResultPage({ task, onBack }: ResultPageProps) {
   const rc = result ? RISK_COLORS[result.riskLevel] : null;
   const emocc = result?.emoccModelResult;
   const fealearner = result?.fealearnerModelResult;
+  const mappingInfo = emocc?.mappingInfo;
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   const formatTime = (ms?: number) => {
@@ -1195,8 +1265,10 @@ function ResultPage({ task, onBack }: ResultPageProps) {
                     <p className="font-bold text-purple-800">{(emocc.riskScore ?? 0).toFixed(4)}</p>
                   </div>
                   <div className="bg-white rounded-lg p-3 border border-purple-100 text-center">
-                    <p className="text-xs text-purple-600 mb-1">五分类结果</p>
-                    <p className="font-bold text-purple-800">Class {emocc.riskClass}</p>
+                    <p className="text-xs text-purple-600 mb-1">分类结果</p>
+                    <p className="font-bold text-purple-800">
+                      {emocc.classLabels?.[emocc.riskClass as keyof typeof emocc.classLabels] || `类别 ${emocc.riskClass}`}
+                    </p>
                   </div>
                   <div className="bg-white rounded-lg p-3 border border-purple-100 text-center">
                     <p className="text-xs text-purple-600 mb-1">置信度</p>
@@ -1204,19 +1276,38 @@ function ResultPage({ task, onBack }: ResultPageProps) {
                   </div>
                 </div>
 
-                {/* 概率分布条形图 */}
-                {emocc.classProbs && emocc.classProbs.length === 5 && (
+                {mappingInfo && (
                   <div className="bg-white rounded-lg p-3 border border-purple-100 mb-3">
-                    <p className="text-xs text-purple-600 mb-2 font-medium">五分类概率分布</p>
+                    <p className="text-xs text-purple-600 mb-2 font-medium">样本映射链路</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                      <div>映射方式：<span className="font-medium text-slate-800">{mappingInfo.mappingMode || '-'}</span></div>
+                      <div>源数据行号：<span className="font-medium text-slate-800">{mappingInfo.sourceRowIndex ?? '-'}</span></div>
+                      <div>数据库帖子数：<span className="font-medium text-slate-800">{mappingInfo.dbPostCount ?? '-'}</span></div>
+                      <div>样本帖子数：<span className="font-medium text-slate-800">{mappingInfo.samplePostCount ?? '-'}</span></div>
+                      <div>已匹配帖子数：<span className="font-medium text-slate-800">{mappingInfo.matchedPostCount ?? '-'}</span></div>
+                      <div>对齐状态：<span className="font-medium text-slate-800">{mappingInfo.isExactAligned ? '完全一致' : (mappingInfo.alignmentStatus || '部分一致')}</span></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 概率分布条形图 */}
+                {emocc.classProbs && emocc.classProbs.length > 0 && (
+                  <div className="bg-white rounded-lg p-3 border border-purple-100 mb-3">
+                    <p className="text-xs text-purple-600 mb-2 font-medium">分类概率分布</p>
                     <div className="space-y-1.5">
                       {emocc.classProbs.map((prob: number, idx: number) => {
-                        const labels = ['无风险', '极低风险', '低风险', '中风险', '高风险'];
+                        const labels = emocc.classLabels
+                          ? Object.keys(emocc.classLabels)
+                            .map(key => Number(key))
+                            .sort((a, b) => a - b)
+                            .map(key => emocc.classLabels[key as keyof typeof emocc.classLabels])
+                          : [];
                         const colors = ['bg-green-400', 'bg-green-300', 'bg-yellow-300', 'bg-blue-500', 'bg-red-400'];
                         return (
                           <div key={idx} className="flex items-center gap-2">
-                            <span className="text-xs text-purple-600 w-16 shrink-0">{labels[idx]}</span>
+                            <span className="text-xs text-purple-600 w-16 shrink-0">{labels[idx] || `类别${idx}`}</span>
                             <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                              <div className={`h-full rounded-full ${colors[idx]}`} style={{ width: `${prob * 100}%` }} />
+                              <div className={`h-full rounded-full ${colors[idx] || 'bg-slate-400'}`} style={{ width: `${prob * 100}%` }} />
                             </div>
                             <span className="text-xs text-purple-600 w-10 text-right">{(prob * 100).toFixed(1)}%</span>
                           </div>
@@ -1244,6 +1335,7 @@ function ResultPage({ task, onBack }: ResultPageProps) {
                         {emocc.postAttentionScores.map((s: any, idx: number) => {
                           const attention = (s.attentionScore as number) ?? (s.attention_score as number) ?? 0;
                           const percentage = totalAttention > 0 ? ((attention / totalAttention) * 100).toFixed(1) : '0.0';
+                          const previewSource = (s.previewSource as string) ?? (s.preview_source as string) ?? mappingInfo?.attentionPreviewSource ?? 'unknown';
                           return (
                             <div key={idx} className="flex items-start gap-2">
                               <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded shrink-0 mt-0.5">#{idx + 1}</span>
@@ -1252,6 +1344,9 @@ function ResultPage({ task, onBack }: ResultPageProps) {
                                   <span className="text-xs text-purple-500">
                                     注意力: <span className="font-bold text-purple-700">{attention.toFixed(4)}</span>
                                     <span className="text-purple-400 ml-1">({percentage}%)</span>
+                                  </span>
+                                  <span className="text-[11px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                                    {previewSource === 'database' ? '数据库原帖' : '样本窗口'}
                                   </span>
                                 </div>
                                 <p className="text-xs text-purple-700 leading-relaxed truncate">{((s.textPreview as string) ?? (s.text_preview as string) ?? '')}</p>
@@ -1491,7 +1586,7 @@ export default function RiskPage() {
             userHash: t.userHash,
             dataSource: t.dataSource,
             postCount: t.postCount,
-            modelName: t.modelName || 'Emocc-Reddit',
+            modelName: t.modelName || `Emocc-${String(t.dataSource || 'reddit').toUpperCase()}`,
             status: t.status as TaskStatus,
             progress: t.progress,
             resultSummary: t.resultSummary ? {

@@ -1443,7 +1443,7 @@ export interface Model {
   modelPath?: string;
   loraPath?: string;
   // 检测模型
-  detectionType?: 'emoji';
+  detectionType?: 'emoji' | 'emocc';
   modelFilePath?: string;
   embeddingFilePath?: string;
   supportedDatasets?: string[];
@@ -1942,6 +1942,8 @@ export interface RiskPageLocalModel {
   status: 'active' | 'inactive';
   createdAt: string;
   provider?: string;
+  supportedDatasets?: string[];
+  modelCode?: string;
 }
 
 export interface RiskPageLlmModel {
@@ -1991,15 +1993,39 @@ export async function fetchPromptTemplatesForRiskPage(): Promise<RiskPagePromptT
 export async function fetchDetectionModelsForRiskPage(): Promise<RiskPageLocalModel[]> {
   try {
     const models = await fetchModels({ category: 'detection', status: 'active' });
+    const normalizeSupportedDatasets = (value: unknown): string[] => {
+      if (Array.isArray(value)) {
+        return value.map((item) => String(item)).filter(Boolean);
+      }
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return [];
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            return parsed.map((item) => String(item)).filter(Boolean);
+          }
+        } catch {
+          return [trimmed];
+        }
+      }
+      return [];
+    };
     return models.map(m => ({
       id: String(m.id),
       name: m.modelName,
-      // 根据 modelType 动态设置 type：emoji -> emoji, fealearner -> fealearner, 其他 -> llm
-      type: (m.modelType === 'emoji' ? 'emoji' : m.modelType === 'fealearner' ? 'fealearner' : 'llm') as 'emoji' | 'fealearner' | 'llm',
-      // 优先使用 modelFilePath，其次是 modelCode
+      type: (
+        m.modelType === 'emoji' || m.detectionType === 'emocc'
+          ? 'emoji'
+          : m.modelType === 'fealearner'
+            ? 'fealearner'
+            : 'llm'
+      ) as 'emoji' | 'fealearner' | 'llm',
       path: m.modelFilePath || m.modelPath || m.modelCode || '',
       status: m.status === 'active' ? 'active' as const : 'inactive' as const,
       createdAt: new Date().toISOString(),
+      supportedDatasets: normalizeSupportedDatasets(m.supportedDatasets),
+      modelCode: m.modelCode,
     }));
   } catch {
     return [];
@@ -2087,6 +2113,12 @@ export interface EmoccTaskResult {
       classProbs: number[];
       postAttentionScores?: { postIndex: number; attentionScore: number; textPreview: string }[];
       modelType: string;
+      modelName?: string;
+      datasetKey?: string;
+      classNum?: number;
+      classLabels?: Record<number, string>;
+      coarseRiskMapping?: Record<number, string>;
+      performanceMetrics?: Record<string, number>;
     };
     fusionMethod: string;
     symptomDescription?: string;
@@ -2114,6 +2146,7 @@ export interface EmoccTaskResult {
 export async function createEmoccDetectionTask(params: {
   userHash: string;
   dataSource?: string;
+  detectionModelId?: number;
   useLlmFusion?: boolean;
   temperature?: number;
   maxTokens?: number;
@@ -2132,6 +2165,9 @@ export async function createEmoccDetectionTask(params: {
   // 如果指定了 fusionModelId，添加到请求体
   if (params.fusionModelId) {
     body.fusionModelId = params.fusionModelId;
+  }
+  if (params.detectionModelId) {
+    body.detectionModelId = params.detectionModelId;
   }
   
   // 如果用户提供了 taskName，添加到请求体
@@ -2241,8 +2277,9 @@ export async function fetchEmoccModelInfo(): Promise<{
       input_format: Record<string, string>;
       output_format: Record<string, string>;
     };
+    models?: any[];
   }>(endpoint);
-  return data.data;
+  return (data as any).data || (data as any);
 }
 
 // ==================== 档案导入 API ====================

@@ -72,6 +72,44 @@ def _resolve_knowledge_file_path(file_path: str) -> str:
     return os.path.normpath(os.path.join(backend_dir, normalized_path))
 
 
+def _extract_preview_text_from_file(actual_path: str, doc_format: str) -> str:
+    """按文档格式抽取可用于预览和定位的纯文本。"""
+    if not actual_path or not os.path.isfile(actual_path):
+        return ""
+
+    try:
+        if doc_format in ("txt", "md"):
+            with open(actual_path, "r", encoding="utf-8", errors="ignore") as f:
+                return f.read()
+
+        if doc_format == "pdf":
+            import io
+            from PyPDF2 import PdfReader
+
+            with open(actual_path, "rb") as f:
+                reader = PdfReader(io.BytesIO(f.read()))
+            text_parts = []
+            for page in reader.pages:
+                text = page.extract_text()
+                if text:
+                    text_parts.append(text)
+            return "\n".join(text_parts)
+
+        if doc_format == "docx":
+            from docx import Document as DocxDocument
+
+            doc = DocxDocument(actual_path)
+            return "\n".join(
+                para.text.strip()
+                for para in doc.paragraphs
+                if para.text and para.text.strip()
+            )
+    except Exception:
+        return ""
+
+    return ""
+
+
 class KnowledgeService:
     """知识库服务，依赖 MySQL 连接池。"""
 
@@ -991,12 +1029,7 @@ class KnowledgeService:
         return result
 
     async def get_document_preview(self, doc_id: int, max_length: int = 500) -> Optional[Dict[str, Any]]:
-        """获取文档预览内容。
-
-        优先从本地文件读取内容（直接从 rag-skill/knowledge 目录）；
-        仅在文件读取失败时使用数据库 description 字段。
-        支持 .txt / .md 文件的直接读取；PDF/DOCX 等二进制格式返回占位提示。
-        """
+        """获取文档预览内容，尽量返回可用于前端定位的纯文本。"""
         async with self.mysql_pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cursor:
                 await cursor.execute("SET NAMES utf8mb4")
@@ -1013,20 +1046,12 @@ class KnowledgeService:
         if not row:
             return None
 
-        # 优先从本地文件读取内容
         preview_text = ""
         file_path = row.get("file_path", "")
         doc_format = row.get("format", "")
-
-        if file_path and doc_format in ("txt", "md"):
+        if file_path:
             actual_path = _resolve_knowledge_file_path(file_path)
-
-            if os.path.isfile(actual_path):
-                try:
-                    with open(actual_path, "r", encoding="utf-8", errors="ignore") as f:
-                        preview_text = f.read()
-                except Exception:
-                    pass
+            preview_text = _extract_preview_text_from_file(actual_path, doc_format)
 
         # 如果文件读取失败，使用数据库中的简短描述
         if not preview_text:
@@ -1038,27 +1063,6 @@ class KnowledgeService:
             content_snippet += "\n\n... [内容已截断，仅显示前 {} 字符] ...".format(max_length)
 
         uploaded_at = row.get("uploaded_at") or row.get("created_at")
-
-        # 二进制格式提示
-        binary_formats = {"pdf", "docx", "doc", "pptx", "ppt", "xlsx"}
-        if row.get("format", "") in binary_formats:
-            file_size = row.get("file_size", 0) or 0
-            if file_size < 1024:
-                size_str = f"{file_size} B"
-            elif file_size < 1024 * 1024:
-                size_str = f"{file_size / 1024:.1f} KB"
-            else:
-                size_str = f"{file_size / 1024 / 1024:.2f} MB"
-
-            content_snippet = (
-                f"【{row.get('format', '').upper()} 文档】\n"
-                f"文件名：{row.get('file_name', '未知')}\n"
-                f"文件大小：{size_str}\n"
-                f"文件路径：{row.get('file_path', '未知')}\n\n"
-                f"此为二进制格式文档，无法直接预览内容。\n"
-                f"如需查看完整内容，请在知识库文档列表页下载该文件。"
-            )
-            content_snippet = content_snippet[:max_length]
 
         return {
             "id": row["id"],

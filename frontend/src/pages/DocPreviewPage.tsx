@@ -3,84 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, FileText, Download, Loader2, AlertCircle } from 'lucide-react';
 import { fetchDocumentPreview, fetchKnowledgeDocument, downloadKnowledgeDocument, type KnowledgeDocument } from '../api';
 import DocumentPreview from '../components/knowledge/DocumentPreview';
-
-interface HighlightRange {
-  start: number;
-  end: number;
-}
-
-function normalizeWhitespaceWithMap(text: string): { normalized: string; indexMap: number[] } {
-  let normalized = '';
-  const indexMap: number[] = [];
-  let lastWasSpace = false;
-
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i];
-    if (/\s/.test(char)) {
-      if (!lastWasSpace && normalized.length > 0) {
-        normalized += ' ';
-        indexMap.push(i);
-        lastWasSpace = true;
-      }
-      continue;
-    }
-    normalized += char;
-    indexMap.push(i);
-    lastWasSpace = false;
-  }
-
-  if (normalized.endsWith(' ')) {
-    normalized = normalized.slice(0, -1);
-    indexMap.pop();
-  }
-
-  return { normalized, indexMap };
-}
-
-function findHighlightRange(content: string, snippet: string | null): HighlightRange | null {
-  const rawSnippet = snippet?.trim();
-  if (!content || !rawSnippet) return null;
-
-  const contentMap = normalizeWhitespaceWithMap(content);
-  const tryMatch = (candidate: string): HighlightRange | null => {
-    const trimmedCandidate = candidate.trim();
-    if (!trimmedCandidate) return null;
-
-    const directIndex = content.indexOf(trimmedCandidate);
-    if (directIndex >= 0) {
-      return { start: directIndex, end: directIndex + trimmedCandidate.length };
-    }
-
-    const snippetMap = normalizeWhitespaceWithMap(trimmedCandidate);
-    if (!snippetMap.normalized) return null;
-
-    const normalizedIndex = contentMap.normalized.indexOf(snippetMap.normalized);
-    if (normalizedIndex >= 0) {
-      const start = contentMap.indexMap[normalizedIndex];
-      const lastCharIndex = normalizedIndex + snippetMap.normalized.length - 1;
-      const end = (contentMap.indexMap[lastCharIndex] ?? start) + 1;
-      return { start, end };
-    }
-
-    return null;
-  };
-
-  const directMatch = tryMatch(rawSnippet);
-  if (directMatch) return directMatch;
-
-  const fallbackFragments = rawSnippet
-    .split(/[\n。！？!?]/)
-    .map((item) => item.trim())
-    .filter((item) => item.length >= 16 && item.length < rawSnippet.length)
-    .sort((a, b) => b.length - a.length);
-
-  for (const fragment of fallbackFragments) {
-    const fragmentRange = tryMatch(fragment);
-    if (fragmentRange) return fragmentRange;
-  }
-
-  return null;
-}
+import { findHighlightRange } from '../utils/highlightMatch';
 
 export default function DocPreviewPage() {
   const [searchParams] = useSearchParams();
@@ -112,13 +35,6 @@ export default function DocPreviewPage() {
 
       try {
         const docData = await fetchKnowledgeDocument(docId);
-        const format = docData.format?.toLowerCase();
-
-        if (format === 'pdf' || format === 'docx' || format === 'doc') {
-          setDoc(docData);
-          return;
-        }
-
         const previewData = await fetchDocumentPreview(docId);
         setDoc({ ...docData, content: previewData.content } as KnowledgeDocument);
       } catch (err) {
@@ -159,6 +75,18 @@ export default function DocPreviewPage() {
       before: doc.content.slice(0, highlightRange.start),
       match: doc.content.slice(highlightRange.start, highlightRange.end),
       after: doc.content.slice(highlightRange.end),
+    };
+  }, [doc?.content, highlightRange]);
+
+  const highlightedExcerpt = useMemo(() => {
+    if (!doc?.content || !highlightRange) return null;
+    const excerptPadding = 120;
+    const start = Math.max(0, highlightRange.start - excerptPadding);
+    const end = Math.min(doc.content.length, highlightRange.end + excerptPadding);
+    return {
+      before: `${start > 0 ? '... ' : ''}${doc.content.slice(start, highlightRange.start)}`,
+      match: doc.content.slice(highlightRange.start, highlightRange.end),
+      after: `${doc.content.slice(highlightRange.end, end)}${end < doc.content.length ? ' ...' : ''}`,
     };
   }, [doc?.content, highlightRange]);
 
@@ -248,7 +176,30 @@ export default function DocPreviewPage() {
 
             {/* 文档正文 */}
             {['pdf', 'docx', 'doc'].includes(doc.format?.toLowerCase() || '') ? (
-              <DocumentPreview documentId={doc.id} fileName={doc.fileName} format={doc.format} />
+              <div className="space-y-4">
+                {highlightedContent ? (
+                  <div className="rounded-[18px] border border-[#E8D98E] bg-[#FFFBE6] px-4 py-3 text-[14px] leading-7 text-[#5E4B14]">
+                    <div className="mb-1 text-[13px] font-semibold text-[#8A6B11]">定位片段</div>
+                    <div className="whitespace-pre-wrap break-words">
+                      {highlightedExcerpt?.before}
+                      <span className="rounded-[8px] bg-[#FFF2A8] px-1 py-0.5 text-[#223248] shadow-[0_0_0_1px_rgba(233,188,50,0.25)]">
+                        {highlightedExcerpt?.match}
+                      </span>
+                      {highlightedExcerpt?.after}
+                    </div>
+                  </div>
+                ) : snippet ? (
+                  <div className="rounded-[18px] border border-[#E7EDF5] bg-[#F8FBFE] px-4 py-3 text-[13px] leading-6 text-[#617386]">
+                    当前文档已打开，但这条证据片段未能在抽取文本中精确定位，下面继续展示原文预览。
+                  </div>
+                ) : null}
+                <DocumentPreview
+                  documentId={doc.id}
+                  fileName={doc.fileName}
+                  format={doc.format}
+                  highlightSnippet={snippet}
+                />
+              </div>
             ) : doc.content ? (
               <div className="rounded-[20px] border border-[#E7EDF5] bg-[#FCFDFE] px-5 py-5 text-[15px] leading-8 text-[#415168] whitespace-pre-wrap break-words">
                 {highlightedContent ? (

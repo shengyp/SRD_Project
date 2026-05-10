@@ -77,6 +77,7 @@ async def lifespan(app: FastAPI):
         user_svc = UserService(mysql_pool, get_dataset_config)
         map_svc = MapService(pg_pool)
         model_svc = ModelService(mysql_pool)
+        await ModelService.init_builtin_data(mysql_pool)
         knowledge_svc = KnowledgeService(mysql_pool)
         chat_svc = ChatService(mysql_pool)
         await chat_svc.ensure_chat_session_title_column()

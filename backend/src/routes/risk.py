@@ -11,6 +11,8 @@ import hashlib
 import uuid
 import aiomysql
 
+from src.services.emocc_config import get_emocc_dataset_spec, list_emocc_dataset_specs
+
 router = APIRouter(prefix="", tags=["risk"])
 
 
@@ -977,14 +979,31 @@ def _infer_report_model_name(task: Dict[str, Any], result_summary: Dict[str, Any
 
     model_type = detection_configs.get("model_type", "")
     base_name = detection_configs.get("model_name") or ""
+    dataset_key = (task.get("data_source") or detection_configs.get("dataset_key") or "reddit").strip().lower()
 
     if result_summary.get("emoccModelResult") or model_type == "emocc_local":
-        return "Emocc-Reddit + qwen-flash"
+        try:
+            spec = get_emocc_dataset_spec(dataset_key)
+            return f"{spec.model_name} + qwen-flash"
+        except KeyError:
+            return "Emocc + qwen-flash"
     if result_summary.get("fealearnerModelResult") or model_type == "fealearner_local":
         return "FeaLearner-Reddit + qwen-flash"
     if base_name:
         return base_name
     return "qwen-flash"
+
+
+def _get_emocc_detection_config(dataset_key: str, model_name: Optional[str] = None) -> Dict[str, Any]:
+    spec = get_emocc_dataset_spec(dataset_key)
+    return {
+        "model_type": "emocc_local",
+        "dataset_key": spec.dataset_key,
+        "model_name": model_name or spec.model_name,
+        "class_num": spec.class_num,
+        "class_labels": spec.class_labels,
+        "coarse_risk_mapping": spec.coarse_risk_mapping,
+    }
 
 
 # ========================
@@ -1959,35 +1978,17 @@ async def _get_user_data_for_emocc(user_hash: str, data_source: str, pool) -> Op
         }
     """
     try:
-        import pickle
-        from pathlib import Path
-
-        rows, _ = await _get_user_posts_from_db(pool, user_hash=user_hash, data_source=data_source, page_size=50)
+        spec = get_emocc_dataset_spec(data_source)
+        rows, _ = await _get_user_posts_from_db(
+            pool,
+            user_hash=user_hash,
+            data_source=data_source,
+            page_size=spec.max_posts,
+        )
         if not rows:
             return None
 
         post_texts = [row["content"] for row in rows if row.get("content")]
-
-        # 尝试加载BERT嵌入（从Emocc/data目录）
-        bert_embeddings = None
-        project_root = Path(__file__).resolve().parent.parent.parent.parent
-        bert_path = project_root / "Emocc" / "data" / "reddit_500_bert_embeddings.pkl"
-        bert_data = None
-
-        if bert_path.exists():
-            try:
-                with open(bert_path, 'rb') as f:
-                    bert_data = pickle.load(f)
-
-                # 查找该用户的嵌入
-                # 注意：user_hash是通过md5生成的
-                for item in bert_data:
-                    expected_hash = _generate_user_hash(data_source, item['user'])
-                    if expected_hash == user_hash:
-                        bert_embeddings = item['embeddings']
-                        break
-            except Exception as e:
-                print(f"[Emocc] 加载BERT嵌入失败: {e}")
 
         emoji_sequences = []
         for row in rows:
@@ -1998,7 +1999,7 @@ async def _get_user_data_for_emocc(user_hash: str, data_source: str, pool) -> Op
             'user_hash': user_hash,
             'posts': post_texts,
             'emoji_sequences': emoji_sequences,
-            'bert_embeddings': bert_embeddings,
+            'bert_embeddings': None,
             'post_count': len(post_texts)
         }
 
@@ -2073,6 +2074,7 @@ async def _get_emocc_task_by_id_from_db(pool, task_id: int) -> Optional[Dict]:
 async def _call_llm_for_emocc_fusion(
     emocc_result: dict,
     posts: List[str],
+    dataset_key: str = "reddit",
     temperature: float = 0.7,
     max_tokens: int = 2048,
     fusion_model_config: Optional[Dict[str, Any]] = None
@@ -2090,6 +2092,12 @@ async def _call_llm_for_emocc_fusion(
     Returns:
         整合后的结果
     """
+    spec = get_emocc_dataset_spec(dataset_key)
+    class_labels = emocc_result.get("class_labels") or spec.class_labels
+    performance_metrics = emocc_result.get("performance_metrics") or spec.performance_metrics
+    class_label_text = "；".join(f"{idx}={label}" for idx, label in class_labels.items())
+    metrics_text = json.dumps(performance_metrics, ensure_ascii=False) if performance_metrics else "暂无离线评测指标"
+
     # 检测模型后的整理模型固定为 qwen-flash
     model_name = "qwen-flash"
     if fusion_model_config and fusion_model_config.get('api_key'):
@@ -2117,17 +2125,21 @@ async def _call_llm_for_emocc_fusion(
 3. 所有评估结果仅供参考，最终诊断应由持证专业医生做出
 4. 报告应具备临床参考价值，语言准确、条理清晰
 
-【Emocc模型说明】
-- Emocc是BERT+Emoji双模态层次融合模型，在Reddit数据集上达到84.9%准确率
-- 模型输出5分类结果：0=无风险，1=极低风险，2=低风险，3=中风险，4=高风险
-- 模型输出的注意力分数反映了模型对每个帖子的关注程度，高注意力帖子可能包含更多风险信号
-- Emoji表情分析用于捕捉用户情绪状态和表达方式"""
+【当前数据集与模型说明】
+- 当前数据集：{spec.display_name}
+- 检测模型：{spec.model_name}
+- 标签体系：{class_label_text}
+- 模型输出的注意力分数反映模型对每个帖子的关注程度，高注意力帖子通常包含更多风险线索
+- Emoji 表情分析用于捕捉用户情绪状态和表达方式
+- 已登记的模型评测指标：{metrics_text}"""
 
     posts_text = "\n".join([f"- {p[:100]}..." if len(p) > 100 else f"- {p}" for p in posts[:15]])
     
     post_attention = emocc_result.get("post_attention_scores", [])
+    mapping_info = emocc_result.get("mapping_info") or {}
+    mapping_text = json.dumps(mapping_info, ensure_ascii=False) if mapping_info else "无"
     attention_text = "\n".join([
-        f"- 帖子{i+1} (注意力分数: {p.get('attention_score', 0):.4f}): {p.get('text_preview', '')[:50]}..."
+        f"- 帖子{i+1} (注意力分数: {p.get('attention_score', 0):.4f}, 预览来源: {p.get('preview_source', 'unknown')}): {p.get('text_preview', '')[:50]}..."
         for i, p in enumerate(post_attention[:5])
     ]) if post_attention else "无详细注意力分数"
     
@@ -2143,17 +2155,28 @@ async def _call_llm_for_emocc_fusion(
 - 风险等级: {emocc_result.get('risk_level', 'unknown')}
 - 风险分数: {emocc_result.get('risk_score', 0)}
 - 置信度: {emocc_result.get('confidence', 0)}
-- 五分类结果: {emocc_result.get('risk_class', 'unknown')} (0=无风险, 1=极低风险, 2=低风险, 3=中风险, 4=高风险)
+- 分类结果: {emocc_result.get('risk_class', 'unknown')} ({class_label_text})
 - 分析帖子数: {emocc_result.get('post_count', 0)}
+
+【样本映射链路】:
+{mapping_text}
 
 【各类别概率分布】:
 {json.dumps(emocc_result.get('class_probs', []), ensure_ascii=False)}
 
+【类别标签映射】:
+{json.dumps(class_labels, ensure_ascii=False)}
+
+【模型评测指标】:
+{metrics_text}
+
 【分析要求】
-1. 说明 Emocc 的五分类结果、注意力分数和类别概率分别代表什么
+1. 说明 Emocc 的分类结果、注意力分数和类别概率分别代表什么
 2. 从模型检测证据、帖子文本证据两个角度做互补与增强分析
 3. 判断模型证据与文本证据是否一致，如有矛盾要解释不确定性来源
-4. 输出必须可直接作为检测报告展示
+4. 结合 {spec.display_name} 的标签体系解释当前风险等级为什么成立
+5. 必须参考“样本映射链路”判断 attention 预览能否直接视为数据库原帖；如果 isExactAligned=false，要明确说明这是样本窗口证据，不要误写成数据库原帖逐条定位
+6. 输出必须可直接作为检测报告展示
 
 【输出格式】（必须严格遵循JSON格式）
 {{
@@ -2269,8 +2292,10 @@ async def create_emocc_detection_task(
     
     user_hash = task_data.get("userHash") or task_data.get("user_hash") or ""
     data_source = task_data.get("dataSource") or task_data.get("data_source") or "reddit"
+    detection_model_id = task_data.get("detectionModelId") or task_data.get("detection_model_id")
     fusion_model_id = task_data.get("fusionModelId") or task_data.get("fusion_model_id")
     task_name_input = task_data.get("taskName") or task_data.get("task_name")
+    emocc_spec = get_emocc_dataset_spec(data_source)
     
     if not user_hash:
         return {"success": False, "error": "用户哈希不能为空"}
@@ -2301,7 +2326,10 @@ async def create_emocc_detection_task(
         "post_count": post_count,
         "status": "pending",
         "progress": 0,
-        "detection_model_configs": {"model_type": "emocc_local"},
+        "detection_model_configs": {
+            **_get_emocc_detection_config(data_source),
+            "detection_model_id": detection_model_id,
+        },
         "result_summary": None,
         "fusion_model_id": fusion_model_id,
         "started_at": None,
@@ -2322,7 +2350,7 @@ async def create_emocc_detection_task(
             "userHash": user_hash,
             "dataSource": data_source,
             "postCount": post_count,
-            "modelName": "Emocc-Reddit",
+            "modelName": emocc_spec.model_name,
             "progress": 0,
             "status": "pending",
             "resultSummary": None,
@@ -2362,6 +2390,7 @@ async def execute_emocc_detection_task(
     user_hash = task.get("user_hash", "")
     data_source = task.get("data_source", "reddit")
     fusion_model_id = task.get("fusion_model_id")
+    emocc_spec = get_emocc_dataset_spec(data_source)
     
     # 获取融合模型配置
     fusion_model_config = None
@@ -2399,39 +2428,44 @@ async def execute_emocc_detection_task(
     # 2. 调用Emocc模型
     emocc_result = None
     
-    if bert_embeddings is not None:
-        try:
-            from src.services.emocc_service import get_emocc_service, load_emocc_model
-            
-            service = get_emocc_service()
-            
-            if not service.is_loaded:
-                loaded = load_emocc_model()
-                if not loaded:
-                    print("[Emocc Execute] 模型加载失败，使用模拟结果")
-            
-            if service.is_loaded:
-                result = service.predict_single_user(
-                    user_hash=user_hash,
-                    bert_embeddings=bert_embeddings,
-                    emoji_sequences=emoji_sequences,
-                    post_texts=posts
-                )
-                
-                emocc_result = {
-                    "risk_level": result.risk_level,
-                    "risk_score": result.risk_score,
-                    "risk_class": result.risk_class,
-                    "confidence": result.confidence,
-                    "post_attention_scores": result.post_attention_scores,
-                    "class_probs": result.model_info.get("class_probs", []),
-                    "post_count": len(posts),
-                    "model_type": "emocc_local"
-                }
-        except Exception as e:
-            print(f"[Emocc Execute] 模型推理失败: {e}")
-            import traceback
-            traceback.print_exc()
+    try:
+        from src.services.emocc_service import get_emocc_service, load_emocc_model
+
+        service = get_emocc_service()
+        if not service.is_dataset_loaded(data_source):
+            loaded = load_emocc_model(dataset_key=data_source)
+            if not loaded:
+                print(f"[Emocc Execute] {emocc_spec.model_name} 模型加载失败，使用回退结果")
+
+        if service.is_dataset_loaded(data_source):
+            result = service.predict_single_user(
+                user_hash=user_hash,
+                dataset_key=data_source,
+                bert_embeddings=bert_embeddings,
+                emoji_sequences=emoji_sequences,
+                post_texts=posts
+            )
+            emocc_result = {
+                "risk_level": result.risk_level,
+                "risk_score": result.risk_score,
+                "risk_class": result.risk_class,
+                "confidence": result.confidence,
+                "post_attention_scores": result.post_attention_scores,
+                "class_probs": result.model_info.get("class_probs", []),
+                "post_count": result.model_info.get("analyzed_posts", len(posts)),
+                "model_type": "emocc_local",
+                "model_name": result.model_name,
+                "dataset_key": result.dataset_key,
+                "class_num": result.model_info.get("class_num", emocc_spec.class_num),
+                "class_labels": result.model_info.get("class_labels", emocc_spec.class_labels),
+                "coarse_risk_mapping": result.model_info.get("coarse_risk_mapping", emocc_spec.coarse_risk_mapping),
+                "performance_metrics": result.model_info.get("performance_metrics", emocc_spec.performance_metrics),
+                "mapping_info": result.mapping_info,
+            }
+    except Exception as e:
+        print(f"[Emocc Execute] 模型推理失败: {e}")
+        import traceback
+        traceback.print_exc()
     
     # 如果Emocc模型不可用，使用模拟结果
     if emocc_result is None:
@@ -2439,11 +2473,18 @@ async def execute_emocc_detection_task(
         import random
         random.seed(hash(user_hash) % (2**32))
         
-        risk_keywords = ["death", "suicide", "kill", "die", "hopeless", "depressed", "alone", "empty", "tired", "hurt"]
+        risk_keywords = [
+            "death", "suicide", "kill", "die", "hopeless", "depressed", "alone", "empty", "tired", "hurt",
+            "自杀", "结束自己", "想死", "活不下去", "绝望", "没有意义"
+        ]
         keyword_count = sum(1 for post in posts for kw in risk_keywords if kw.lower() in post.lower())
         
         base_score = min(0.9, 0.2 + keyword_count * 0.05)
-        risk_class = 0 if base_score < 0.3 else 1 if base_score < 0.5 else 2 if base_score < 0.7 else 3 if base_score < 0.85 else 4
+        thresholds = list(emocc_spec.risk_score_mapping.values())
+        risk_class = 0
+        for idx, score_threshold in enumerate(thresholds):
+            if base_score >= score_threshold:
+                risk_class = idx
         
         post_attention_scores = []
         for i, post in enumerate(posts):
@@ -2461,27 +2502,44 @@ async def execute_emocc_detection_task(
             })
         post_attention_scores.sort(key=lambda x: x["attention_score"], reverse=True)
         
-        risk_levels = ["low", "low", "medium", "medium", "high"]
-        risk_scores = [0.1, 0.3, 0.5, 0.7, 0.9]
+        class_probs = [round(random.uniform(0.05, 0.4), 4) for _ in range(emocc_spec.class_num)]
+        total = sum(class_probs)
+        class_probs = [round(p / total, 4) for p in class_probs]
         
         emocc_result = {
-            "risk_level": risk_levels[risk_class],
-            "risk_score": risk_scores[risk_class],
+            "risk_level": emocc_spec.coarse_risk_mapping.get(risk_class, "medium"),
+            "risk_score": emocc_spec.risk_score_mapping.get(risk_class, round(base_score, 4)),
             "risk_class": risk_class,
             "confidence": round(random.uniform(0.7, 0.95), 4),
             "post_attention_scores": post_attention_scores,
-            "class_probs": [round(random.uniform(0.05, 0.4), 4) for _ in range(5)],
+            "class_probs": class_probs,
             "post_count": len(posts),
-            "model_type": "emocc_mock"
+            "model_type": "emocc_mock",
+            "model_name": emocc_spec.model_name,
+            "dataset_key": data_source,
+            "class_num": emocc_spec.class_num,
+            "class_labels": emocc_spec.class_labels,
+            "coarse_risk_mapping": emocc_spec.coarse_risk_mapping,
+            "performance_metrics": emocc_spec.performance_metrics,
+            "mapping_info": {
+                "datasetKey": data_source,
+                "userHash": user_hash,
+                "mappingMode": "mock",
+                "dbPostCount": len(posts),
+                "samplePostCount": len(posts),
+                "embeddingPostCount": len(posts),
+                "matchedPostCount": len(posts),
+                "isExactAligned": True,
+                "alignmentStatus": "mock",
+                "attentionPreviewSource": "database",
+            },
         }
-        
-        total = sum(emocc_result["class_probs"])
-        emocc_result["class_probs"] = [round(p / total, 4) for p in emocc_result["class_probs"]]
     
     # 3. 调用LLM融合
     fusion_result = await _call_llm_for_emocc_fusion(
         emocc_result=emocc_result,
         posts=posts,
+        dataset_key=data_source,
         temperature=0.7,
         max_tokens=2048,
         fusion_model_config=fusion_model_config
@@ -2511,7 +2569,14 @@ async def execute_emocc_detection_task(
             "postCount": emocc_result.get("post_count"),
             "classProbs": emocc_result.get("class_probs", []),
             "postAttentionScores": emocc_result.get("post_attention_scores", [])[:10],
-            "modelType": emocc_result.get("model_type", "emocc_local")
+            "modelType": emocc_result.get("model_type", "emocc_local"),
+            "modelName": emocc_result.get("model_name", emocc_spec.model_name),
+            "datasetKey": emocc_result.get("dataset_key", data_source),
+            "classNum": emocc_result.get("class_num", emocc_spec.class_num),
+            "classLabels": emocc_result.get("class_labels", emocc_spec.class_labels),
+            "coarseRiskMapping": emocc_result.get("coarse_risk_mapping", emocc_spec.coarse_risk_mapping),
+            "performanceMetrics": emocc_result.get("performance_metrics", emocc_spec.performance_metrics),
+            "mappingInfo": emocc_result.get("mapping_info", {}),
         },
         "fusionMethod": fr.get("fusion_method", "direct") if fr else "direct",
         "symptomDescription": structured["symptomDescription"],
@@ -2547,7 +2612,7 @@ async def execute_emocc_detection_task(
         "userHash": user_hash,
         "dataSource": data_source,
         "postCount": len(posts),
-        "modelName": "Emocc-Reddit",
+        "modelName": emocc_spec.model_name,
         "progress": 100,
         "status": "completed",
         "resultSummary": result_summary,
@@ -2595,6 +2660,7 @@ async def get_emocc_tasks(
                 result_summary = json.loads(result_summary)
             except:
                 result_summary = None
+        spec = get_emocc_dataset_spec(t.get("data_source", "reddit"))
         
         return {
             "id": t.get("id"),
@@ -2605,7 +2671,7 @@ async def get_emocc_tasks(
             "userHash": t.get("user_hash", ""),
             "dataSource": t.get("data_source", ""),
             "postCount": t.get("post_count", 0),
-            "modelName": "Emocc-Reddit",
+            "modelName": spec.model_name,
             "progress": t.get("progress", 0),
             "status": t.get("status", "pending"),
             "resultSummary": result_summary,
@@ -2653,6 +2719,7 @@ async def get_emocc_task_detail(task_id: str, request: Request):
     return {
         "success": True,
         "data": {
+            "modelName": get_emocc_dataset_spec(task.get("data_source", "reddit")).model_name,
             "id": task.get("id"),
             "taskCode": f"EMOCC-{task.get('task_code', '')}",
             "taskName": task.get("task_name", "Emocc检测任务"),
@@ -2661,7 +2728,6 @@ async def get_emocc_task_detail(task_id: str, request: Request):
             "userHash": task.get("user_hash", ""),
             "dataSource": task.get("data_source", ""),
             "postCount": task.get("post_count", 0),
-            "modelName": "Emocc-Reddit",
             "progress": task.get("progress", 0),
             "status": task.get("status", "pending"),
             "resultSummary": result_summary,
@@ -2765,6 +2831,10 @@ def _build_clinical_report_html(task: dict, rs: dict, emocc: dict = None) -> str
     risk_labels = {"low": "低风险", "medium": "中风险", "high": "高风险"}
     risk_color = risk_colors.get(risk_level, "#f59e0b")
     risk_label = risk_labels.get(risk_level, "未知")
+    dataset_key = (task.get("dataSource") or task.get("data_source") or (emocc or {}).get("datasetKey") or "reddit").strip().lower()
+    spec = get_emocc_dataset_spec(dataset_key)
+    class_labels = (emocc or {}).get("classLabels") or spec.class_labels
+    class_labels_list = [class_labels[idx] for idx in sorted(class_labels.keys())]
 
     def render_list(items, color):
         if not items:
@@ -2787,7 +2857,10 @@ def _build_clinical_report_html(task: dict, rs: dict, emocc: dict = None) -> str
     emocc_section = ""
     if emocc:
         class_probs = emocc.get("classProbs", [])
-        prob_labels = ["无风险", "极低风险", "低风险", "中风险", "高风险"]
+        mapping_info = emocc.get("mappingInfo", {}) or {}
+        class_labels = emocc.get("classLabels", {}) or {}
+        current_label = class_labels.get(str(emocc.get("riskClass"))) or class_labels.get(emocc.get("riskClass")) or f"类别 {emocc.get('riskClass', '-')}"
+        prob_labels = class_labels_list
         prob_bars = ""
         prob_colors = ["#22c55e", "#86efac", "#fde047", "#f97316", "#ef4444"]
         for i, prob in enumerate(class_probs):
@@ -2813,9 +2886,15 @@ def _build_clinical_report_html(task: dict, rs: dict, emocc: dict = None) -> str
                     <div style="font-weight:bold;color:#7c3aed;">{float(emocc.get('riskScore', 0)):.4f}</div>
                 </div>
                 <div style="background:white;padding:8px;border-radius:6px;text-align:center;">
-                    <div style="font-size:11px;color:#888;">五分类结果</div>
-                    <div style="font-weight:bold;color:#7c3aed;">Class {emocc.get('riskClass', '-')}</div>
+                    <div style="font-size:11px;color:#888;">分类结果</div>
+                    <div style="font-weight:bold;color:#7c3aed;">{html.escape(str(current_label))}</div>
                 </div>
+            </div>
+            <div style="font-size:11px;color:#6b7280;margin-bottom:10px;line-height:1.6;">
+                样本映射: {html.escape(str(mapping_info.get('mappingMode', 'unknown')))} /
+                行号 {html.escape(str(mapping_info.get('sourceRowIndex', '-')))} /
+                对齐状态 {html.escape(str(mapping_info.get('alignmentStatus', 'unknown')))} /
+                预览来源 {html.escape(str(mapping_info.get('attentionPreviewSource', 'unknown')))}
             </div>
             <div style="font-size:12px;color:#555;margin-bottom:6px;">概率分布</div>
             {prob_bars}
@@ -2826,9 +2905,9 @@ def _build_clinical_report_html(task: dict, rs: dict, emocc: dict = None) -> str
         att_scores = emocc.get("postAttentionScores", [])[:5]
         att_rows = "".join(
             f"""<tr>
-                <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">Post-{s.get('postIndex', '')}</td>
-                <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">{float(s.get('attentionScore', 0)):.4f}</td>
-                <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{html.escape(str(s.get('textPreview', '')))}</td>
+                <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">{html.escape(str((s.get('postIndex', s.get('post_index', 0)) or 0) + 1))}</td>
+                <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">{float(s.get('attentionScore', s.get('attention_score', 0))):.4f}</td>
+                <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{html.escape(str(s.get('textPreview', s.get('text_preview', ''))))}</td>
             </tr>"""
             for s in att_scores
         )
@@ -2847,6 +2926,7 @@ def _build_clinical_report_html(task: dict, rs: dict, emocc: dict = None) -> str
 
     llm_model = rs.get("llmModel", "")
     completed_at = task.get("completedAt", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    scale_hint = " / ".join(f"{idx}={label}" for idx, label in class_labels.items())
     return f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -2910,7 +2990,7 @@ def _build_clinical_report_html(task: dict, rs: dict, emocc: dict = None) -> str
     <div class="risk-card">
       <div class="label">风险分数</div>
       <div class="value">{float(risk_score):.2f}</div>
-      <div class="sub">0=无风险，1=高风险</div>
+      <div class="sub">{html.escape(scale_hint)}</div>
     </div>
     <div class="risk-card">
       <div class="label">置信度</div>
@@ -3037,6 +3117,7 @@ async def export_risk_task_report(task_id: str, request: Request):
 
     task_display = {
         "userHash": task.get("user_hash", ""),
+        "dataSource": task.get("data_source", ""),
         "postCount": task.get("post_count", 0),
         "completedAt": task.get("completed_at").strftime('%Y-%m-%d %H:%M:%S') if task.get("completed_at") else datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
     }
@@ -3050,45 +3131,14 @@ async def export_risk_task_report(task_id: str, request: Request):
 @router.get("/api/risk/emocc-models")
 async def get_emocc_model_info():
     """获取Emocc模型信息"""
+    from src.services.emocc_service import get_emocc_service
+
+    service = get_emocc_service()
+    models = service.list_model_descriptions()
     return {
         "success": True,
-        "data": {
-            "model_name": "Emocc-Reddit",
-            "model_type": "emocc_local",
-            "description": "BERT + Emoji 双模态层次融合模型",
-            "architecture": {
-                "text_encoder": "BERT embeddings (768dim) → BiGRU",
-                "emoji_encoder": "Emoji2Vec embeddings (300dim)",
-                "fusion": "Adaptive Gate Fusion",
-                "output": "5-class classification (0-4)"
-            },
-            "features": [
-                "支持输出每个帖子的注意力分数",
-                "分析用户帖子中的emoji表情",
-                "建模帖子之间的时间关系",
-                "提取全局情感共性",
-                "五分类风险评估"
-            ],
-            "performance": {
-                "accuracy": 0.849,
-                "precision": 0.835,
-                "recall": 0.828,
-                "f1": 0.831,
-                "auc": 0.889
-            },
-            "supported_datasets": ["reddit"],
-            "input_format": {
-                "bert_embeddings": "(T, 768) numpy array",
-                "emoji_sequences": "List[List[str]]",
-                "post_texts": "List[str]"
-            },
-            "output_format": {
-                "risk_level": "high|medium|low",
-                "risk_score": "0.0-1.0",
-                "risk_class": "0-4",
-                "post_attention_scores": "List[{post_index, attention_score, text_preview}]"
-            }
-        }
+        "data": models[0] if models else {},
+        "models": models,
     }
 
 
