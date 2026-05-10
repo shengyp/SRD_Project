@@ -89,6 +89,7 @@ tmp_*.json
 # ---- Cursor / Agent rules ----
 .cursor/
 .agent-transcripts/
+AGENTS.md
 
 # ---- Project docs (not needed in repo) ----
 VIS4SRD前端页面架构图.md
