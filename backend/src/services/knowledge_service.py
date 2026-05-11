@@ -7,6 +7,7 @@ import os
 import re
 import time
 import hashlib
+from urllib.parse import unquote
 from functools import wraps
 from pathlib import Path
 
@@ -108,6 +109,14 @@ def _extract_preview_text_from_file(actual_path: str, doc_format: str) -> str:
         return ""
 
     return ""
+
+
+def _normalize_document_lookup_key(text: str) -> str:
+    """将标题/文件名统一为可比对的查找键。"""
+    value = unquote((text or "").strip())
+    value = re.sub(r"\.[A-Za-z0-9]+$", "", value)
+    value = re.sub(r"\s+", "", value)
+    return value.lower()
 
 
 class KnowledgeService:
@@ -821,20 +830,51 @@ class KnowledgeService:
         return doc
 
     async def get_document_by_title(self, title: str) -> Optional[Dict[str, Any]]:
-        """根据标题或文件名模糊查找文档（用于 RAG 引用场景）"""
+        """根据标题、文件名或去后缀文件名查找文档（用于 RAG 引用场景）"""
+        raw_title = unquote((title or "").strip())
+        if not raw_title:
+            return None
+
+        normalized_lookup = _normalize_document_lookup_key(raw_title)
         async with self.mysql_pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cursor:
                 await cursor.execute("SET NAMES utf8mb4")
-                # 优先精确匹配 title，其次精确匹配 file_name，最后模糊匹配
                 await cursor.execute(
                     """SELECT d.*, t.topic_name, st.sub_topic_name
                        FROM knowledge_documents d
                        LEFT JOIN knowledge_topics t ON d.topic_id = t.id
                        LEFT JOIN knowledge_sub_topics st ON d.sub_topic_id = st.id
                        WHERE d.is_deleted = FALSE
-                         AND (d.title = %s OR d.file_name = %s)
+                         AND (
+                           d.title = %s
+                           OR d.file_name = %s
+                           OR LOWER(REPLACE(d.title, ' ', '')) = %s
+                           OR LOWER(REPLACE(d.file_name, ' ', '')) = %s
+                           OR LOWER(REPLACE(SUBSTRING_INDEX(d.file_name, '.', 1), ' ', '')) = %s
+                         )
+                       ORDER BY
+                         CASE
+                           WHEN d.title = %s THEN 1
+                           WHEN d.file_name = %s THEN 2
+                           WHEN LOWER(REPLACE(SUBSTRING_INDEX(d.file_name, '.', 1), ' ', '')) = %s THEN 3
+                           WHEN LOWER(REPLACE(d.title, ' ', '')) = %s THEN 4
+                           WHEN LOWER(REPLACE(d.file_name, ' ', '')) = %s THEN 5
+                           ELSE 99
+                         END,
+                         d.id DESC
                        LIMIT 1""",
-                    (title, title)
+                    (
+                        raw_title,
+                        raw_title,
+                        normalized_lookup,
+                        normalized_lookup,
+                        normalized_lookup,
+                        raw_title,
+                        raw_title,
+                        normalized_lookup,
+                        normalized_lookup,
+                        normalized_lookup,
+                    )
                 )
                 row = await cursor.fetchone()
 
