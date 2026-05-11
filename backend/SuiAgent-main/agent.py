@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Optional
@@ -21,17 +22,44 @@ class DialoguePlanner:
 
     def _get_knowledge_overview(self) -> str:
         index_path = self.knowledge_base_path / "data_structure.md"
-        if not index_path.exists():
-            return "知识库包含心理健康障碍、自杀预防、危机资源、临床路径和统计资料。"
+        catalog_path = self.knowledge_base_path / "knowledge_catalog.json"
+
+        fallback_text = "知识库包含心理健康障碍、自杀预防、危机资源、临床路径和统计资料。"
+        sections: List[str] = []
+
         try:
-            return index_path.read_text(encoding="utf-8")
+            if index_path.exists():
+                sections.append(index_path.read_text(encoding="utf-8"))
         except Exception as e:
             print(f"读取知识库索引失败: {e}")
-            return "知识库结构未知，请根据用户问题直接检索。"
+        try:
+            if catalog_path.exists():
+                catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+                themes = catalog.get("themes", [])
+                theme_lines = []
+                for theme in themes[:8]:
+                    theme_name = theme.get("theme_name_zh") or theme.get("theme_dir") or "未命名主题"
+                    subthemes = theme.get("subthemes", [])
+                    subtheme_names = [st.get("name", "") for st in subthemes[:4] if st.get("name")]
+                    aliases = [alias for alias in theme.get("theme_aliases", [])[:3] if alias]
+                    line = f"- {theme_name}"
+                    if aliases:
+                        line += f"（别名：{'、'.join(aliases)}）"
+                    if subtheme_names:
+                        line += f"；子主题：{'、'.join(subtheme_names)}"
+                    theme_lines.append(line)
+                if theme_lines:
+                    sections.append("【知识主题目录】\n" + "\n".join(theme_lines))
+        except Exception as e:
+            print(f"读取知识库目录元数据失败: {e}")
 
-    async def plan(self, user_input: str, risk: str, mem_ctx: Dict[str, Any]) -> Dict[str, Any]:
-        prompt = f"""
-你是一位自杀危机干预对话规划专家。请根据当前信息生成下一步计划，只输出 JSON。
+        if sections:
+            return "\n\n".join(sections)
+        return fallback_text
+
+    def _build_planner_prompt(self, user_input: str, risk: str, mem_ctx: Dict[str, Any]) -> str:
+        return f"""
+你是一位自杀危机干预对话规划专家。当前目标是通过支持性、苏格拉底式对话帮助用户，同时在需要时调用本地知识库补充可靠信息。
 
 【背景信息】
 - 用户输入：{user_input}
@@ -45,7 +73,7 @@ class DialoguePlanner:
 【知识库概览】
 {self._get_knowledge_overview()}
 
-输出格式：
+请只输出 JSON，格式如下：
 {{
   "retrieval_queries": [
     {{"type": "knowledge|emotional_support|safety_plan", "query": "检索词", "priority": 1}}
@@ -53,18 +81,73 @@ class DialoguePlanner:
   "dialogue_strategy": {{
     "phase": "EXPLORING_EMOTION|OFFERING_EVIDENCE|GUIDING_ACTION|CLOSING",
     "tone": "empathic|supportive|firm",
-    "socratic_focus": "一句话说明引导方向",
+    "socratic_focus": "一句话说明本轮引导方向",
     "pending_nodes": ["节点1", "节点2"],
     "interruption": false
   }}
 }}
 
 规则：
-1. 普通知识问答可以设置 interruption=true。
-2. 高风险和极高风险时，至少包含一个 safety_plan 查询。
-3. 查询词尽量短，不要写成长段句子。
-4. 只输出 JSON。
+1. 如果当前输入明显是普通问答、闲聊、系统测试、问功能、非心理危机主线元对话，可设置 interruption=true。
+2. interruption=true 时，phase 尽量保持当前阶段，pending_nodes 尽量保留当前待追问节点，socratic_focus 写“直接回应用户问题，随后自然引导回未完成任务”。
+3. 如果风险为“高”或“极高”，retrieval_queries 至少包含一个 type=safety_plan。
+4. query 必须简短、可检索，优先使用知识库中可能直接出现的术语，不要写成长句。
+5. 若无需检索，retrieval_queries 返回空数组。
+6. 只输出 JSON，不要附带解释。
 """
+
+    def _normalize_plan(self, plan: Dict[str, Any], user_input: str) -> Dict[str, Any]:
+        normalized = plan if isinstance(plan, dict) else {}
+        retrieval_queries = normalized.get("retrieval_queries")
+        if not isinstance(retrieval_queries, list):
+            retrieval_queries = []
+
+        clean_queries: List[Dict[str, Any]] = []
+        for item in retrieval_queries:
+            if not isinstance(item, dict):
+                continue
+            query = str(item.get("query", "")).strip()
+            if not query:
+                continue
+            clean_queries.append(
+                {
+                    "type": str(item.get("type", "knowledge")).strip() or "knowledge",
+                    "query": query,
+                    "priority": int(item.get("priority", 1) or 1),
+                }
+            )
+
+        strategy = normalized.get("dialogue_strategy")
+        if not isinstance(strategy, dict):
+            strategy = {}
+
+        top_level_interruption = normalized.get("interruption")
+        if "interruption" not in strategy and isinstance(top_level_interruption, bool):
+            strategy["interruption"] = top_level_interruption
+
+        pending_nodes = strategy.get("pending_nodes")
+        if not isinstance(pending_nodes, list):
+            pending_nodes = []
+        pending_nodes = [str(node).strip() for node in pending_nodes if str(node).strip()][:3]
+
+        strategy.setdefault("phase", "EXPLORING_EMOTION")
+        strategy.setdefault("tone", "supportive")
+        strategy.setdefault("socratic_focus", "理解用户当前需求")
+        strategy["pending_nodes"] = pending_nodes
+        strategy["interruption"] = bool(strategy.get("interruption", False))
+
+        if strategy["interruption"] and not clean_queries:
+            # 普通问答场景至少保留一次直接知识检索的机会，避免完全空转。
+            if any(token in user_input for token in ["什么", "怎么", "为何", "原因", "症状", "药", "治疗", "帮助"]):
+                clean_queries = [{"type": "knowledge", "query": user_input, "priority": 1}]
+
+        return {
+            "retrieval_queries": clean_queries,
+            "dialogue_strategy": strategy,
+        }
+
+    async def plan(self, user_input: str, risk: str, mem_ctx: Dict[str, Any]) -> Dict[str, Any]:
+        prompt = self._build_planner_prompt(user_input, risk, mem_ctx)
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(self.executor, self.callLLM, prompt)
         try:
@@ -74,17 +157,10 @@ class DialoguePlanner:
             if text.endswith("```"):
                 text = text[:-3]
             plan = json.loads(text)
-            plan.setdefault("retrieval_queries", [])
-            plan.setdefault("dialogue_strategy", {})
-            plan["dialogue_strategy"].setdefault("phase", "EXPLORING_EMOTION")
-            plan["dialogue_strategy"].setdefault("tone", "supportive")
-            plan["dialogue_strategy"].setdefault("socratic_focus", "理解用户当前需求")
-            plan["dialogue_strategy"].setdefault("pending_nodes", [])
-            plan["dialogue_strategy"].setdefault("interruption", False)
-            return plan
+            return self._normalize_plan(plan, user_input)
         except Exception as e:
             print(f"planner 输出解析失败: {e}")
-            return {
+            return self._normalize_plan({
                 "retrieval_queries": [{"type": "knowledge", "query": user_input, "priority": 1}],
                 "dialogue_strategy": {
                     "phase": "OFFERING_EVIDENCE",
@@ -93,7 +169,7 @@ class DialoguePlanner:
                     "pending_nodes": [],
                     "interruption": True,
                 },
-            }
+            }, user_input)
 
 
 class ResponseGenerator:
@@ -150,7 +226,7 @@ class ResponseGenerator:
             finally:
                 loop.call_soon_threadsafe(queue.put_nowait, None)
 
-        worker_task = asyncio.create_task(asyncio.to_thread(_worker))
+        worker_future = loop.run_in_executor(self.executor, _worker)
         try:
             while True:
                 item = await queue.get()
@@ -158,7 +234,7 @@ class ResponseGenerator:
                     break
                 yield item
         finally:
-            await worker_task
+            await worker_future
 
     def _build_generation_prompt(
         self,
@@ -169,23 +245,27 @@ class ResponseGenerator:
         history: str,
     ) -> str:
         triple_text = "\n".join(
-            f"- {t.get('subject', '')} {t.get('predicate', '')} {t.get('object', '')}"
+            f"- {t.get('subject', '')} {t.get('predicate', '')} {t.get('object', '')}；证据：{t.get('evidence', '')[:80]}"
             for t in triples[:5]
         ) if triples else "暂无文献证据"
 
         if strategy.get("interruption", False):
+            pending_nodes = strategy.get("pending_nodes", [])
+            pending_text = "、".join([str(item).strip() for item in pending_nodes if str(item).strip()]) or "之前还没说完的安全相关情况"
             return f"""
 【用户输入】{user_input}
 【近期对话摘要】{history}
 【参考证据】{triple_text}
 
-当前是普通问答。请直接、自然、简洁地回答用户问题。
-如果有证据就结合证据，没有证据也可以给出保守回答。
-不要生硬转回危机流程。
+当前是普通问答或与危机主线无直接关系的插入问题。请按以下要求生成回复：
+1. 先用 1-2 句话直接、自然、简洁地回答用户当前问题。
+2. 如果参考证据有帮助，可以自然融入；如果证据不足，也可以保守回答，不要编造。
+3. 回答后用温和语气自然衔接一句，把话题带回未完成的支持或安全任务，例如围绕“{pending_text}”继续追问。
+4. 不要生硬，不要像系统提示。
 """
 
         return f"""
-你是一位专业的自杀危机干预人员，正在与用户进行支持性对话。
+你是一位专业的自杀危机干预人员，正在与用户进行支持性、苏格拉底式对话。
 
 【用户输入】{user_input}
 【当前风险等级】{risk}
@@ -200,12 +280,16 @@ class ResponseGenerator:
 【近期对话摘要】
 {history}
 
-请生成一个回答：
-1. 先表达理解或确认关切。
-2. 再给出基于证据的回应或建议。
-3. 最后给一个温和的下一步引导。
-4. 风险越高，越优先安全和现实支持。
-只输出最终回答。
+请生成一个自然回复，内部结构遵循以下顺序，但不要写数字序号：
+1. 先共情或确认用户的感受与处境。
+2. 再给出基于证据的回应、解释或建议；若证据不足，可以诚实说明并给出保守建议。
+3. 最后提出一个开放但聚焦的问题，把对话推进到下一步。
+
+额外要求：
+- 风险越高，越优先安全、现实支持和立即可执行的行动。
+- 不要使用生硬模板句。
+- 不要下诊断结论。
+- 只输出最终回答。
 """
 
 
@@ -356,16 +440,47 @@ class SuicideAgent:
             ]
             strategy["interruption"] = True
             strategy["phase"] = "GUIDING_ACTION"
-        elif self.preset_intent == "casual_chat":
-            plan["retrieval_queries"] = []
-            strategy["interruption"] = True
-            strategy["phase"] = "CLOSING"
         elif self.preset_intent == "emotional_support":
             if risk == "高" and not any(q.get("type") == "safety_plan" for q in plan.get("retrieval_queries", [])):
                 plan.setdefault("retrieval_queries", []).insert(
                     0, {"type": "safety_plan", "query": "suicide crisis help", "priority": 1}
                 )
         return plan
+
+    def _retrieve_evidence_sync(self, query: str) -> Dict[str, Any]:
+        """在线程池中执行轻量证据检索，供并行 RAG 调度使用。"""
+        try:
+            return asyncio.run(self.rag_tool.retrieve_evidence(query))
+        except Exception as exc:
+            print(f"并行RAG检索失败 [{query}]: {exc}")
+            return {"sourceFiles": [], "fragments": []}
+
+    async def _retrieve_evidence_batch(self, retrieval_queries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        if not retrieval_queries:
+            return []
+
+        loop = asyncio.get_running_loop()
+        started_at = time.perf_counter()
+
+        async def _run_single(rq: Dict[str, Any]) -> Dict[str, Any]:
+            query = rq.get("query", "").strip()
+            if not query:
+                return {"sourceFiles": [], "fragments": []}
+            return await loop.run_in_executor(executor, self._retrieve_evidence_sync, query)
+
+        results = await asyncio.gather(*[_run_single(rq) for rq in retrieval_queries], return_exceptions=True)
+
+        normalized_results: List[Dict[str, Any]] = []
+        for rq, result in zip(retrieval_queries, results):
+            if isinstance(result, Exception):
+                print(f"并行RAG任务异常 [{rq.get('query', '')}]: {result}")
+                normalized_results.append({"sourceFiles": [], "fragments": []})
+            else:
+                normalized_results.append(result or {"sourceFiles": [], "fragments": []})
+
+        elapsed = time.perf_counter() - started_at
+        print(f"并行RAG完成，共 {len(retrieval_queries)} 个查询，用时 {elapsed:.2f}s")
+        return normalized_results
 
     async def _prepare_response_context(self, user_input: str) -> Dict[str, Any]:
         loop = asyncio.get_running_loop()
@@ -389,19 +504,25 @@ class SuicideAgent:
         evidence_items = []
         target_files_info = []
 
-        for rq in retrieval_queries:
-            result = await self.rag_tool.retrieve_evidence(rq["query"])
+        retrieval_results = await self._retrieve_evidence_batch(retrieval_queries)
+
+        for rq, result in zip(retrieval_queries, retrieval_results):
             if not result:
                 continue
-            file_info = result.get("target_file", [])
+            file_info = result.get("sourceFiles", [])
             current_file = file_info[0] if file_info else None
-            snippets = result.get("rela_text", [])
+            snippets = result.get("fragments", [])
+            if not snippets:
+                print(f"查询未命中文本片段: {rq.get('query', '')}")
             for snippet in snippets:
                 evidence_items.append({"snippet": snippet, "file": current_file})
             if current_file and not any(f["path"] == current_file["path"] for f in target_files_info):
                 target_files_info.append(current_file)
 
-        doc_map = {file_info["path"]: file_info["name"] for file_info in target_files_info}
+        doc_map = {
+            file_info["path"]: f"doc_{index + 1:03d}"
+            for index, file_info in enumerate(target_files_info)
+        }
 
         evidence_objects = []
         for i, item in enumerate(evidence_items):
@@ -410,9 +531,9 @@ class SuicideAgent:
                 file_name = file["name"]
                 title = file_name.rsplit(".", 1)[0] if "." in file_name else file_name
                 ext = file_name.rsplit(".", 1)[-1] if "." in file_name else ""
-                doc_id = doc_map.get(file["path"], file_name)
+                doc_id = doc_map.get(file["path"], "doc_000")
             else:
-                title, ext, doc_id = "未知来源", "", "未知来源"
+                title, ext, doc_id = "未知来源", "", "doc_000"
             evidence_objects.append(
                 {
                     "id": f"evidence_{i + 1:03d}",
@@ -441,7 +562,6 @@ class SuicideAgent:
             "mem_ctx": mem_ctx,
             "plan": plan,
             "retrieval_queries": retrieval_queries,
-            "target_file": target_files_info,
             "references": references,
             "triples": all_triples,
             "mind_map": mind_map,
@@ -469,24 +589,24 @@ class SuicideAgent:
             self.memory.add_turn("assistant", response, triples=context["triples"])
 
             return {
-                "LLM_ans": response,
                 "content": response,
-                "target_file": context["target_file"],
                 "references": context["references"],
-                "ragContext.mindMap": context["mind_map"],
-                "ragContext.evidence": context["evidence_objects"],
-                "ragContext.contextSources": context["context_sources"],
+                "ragContext": {
+                    "mindMap": context["mind_map"],
+                    "evidence": context["evidence_objects"],
+                    "contextSources": context["context_sources"],
+                },
             }
         except Exception as e:
             print("process_message:", str(e))
             return {
-                "LLM_ans": "LLM错误",
                 "content": "LLM错误",
-                "target_file": [],
                 "references": [],
-                "ragContext.mindMap": {"nodes": [], "edges": [], "summary": "", "focusNodeId": None},
-                "ragContext.evidence": [],
-                "ragContext.contextSources": [],
+                "ragContext": {
+                    "mindMap": {"nodes": [], "edges": [], "summary": "", "focusNodeId": None},
+                    "evidence": [],
+                    "contextSources": [],
+                },
             }
 
     async def stream_process_message(

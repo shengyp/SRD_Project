@@ -1,4 +1,0 @@
-# 忽略所有 .json 日志文件（保留目录结构和 .gitkeep/.gitignore）
-*.json
-!.gitignore
-!.gitkeep

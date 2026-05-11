@@ -1,0 +1,9 @@
+{
+  "session_id": "session_00001",
+  "turn": 0,
+  "timestamp": "2026-04-13_15-45-05_609",
+  "error_context": "process_message",
+  "error_message": "RAGSkillTool.update_mind_map() missing 1 required positional argument: 'rela_text'",
+  "traceback": "Traceback (most recent call last):\n  File \"E:\\HW\\实验室\\SIGIR\\Agent\\SuiAgent-main\\agent.py\", line 719, in process_message\n    updated_mind_map=self.update_mind_map(cur_mind_map, rela_text)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: RAGSkillTool.update_mind_map() missing 1 required positional argument: 'rela_text'\n",
+  "agent_name": "suicide_intervention_agent"
+}

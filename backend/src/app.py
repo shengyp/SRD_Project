@@ -51,6 +51,7 @@ async def lifespan(app: FastAPI):
     """管理数据库连接池与自定义表初始化。"""
     from src.core import init_pools, close_pools
     from src.core.database import get_mysql_pool, get_pg_pool
+    warmup_task = None
     
     try:
         await init_pools()
@@ -127,13 +128,40 @@ async def lifespan(app: FastAPI):
         # 预热 Agent 池（后台异步执行，不阻塞启动）
         import asyncio
         from src.routes.chat import _warmup_agent_pool_async
-        asyncio.create_task(_warmup_agent_pool_async(count=1))
+        warmup_task = asyncio.create_task(_warmup_agent_pool_async(count=1))
 
         yield
     except Exception as e:
         print(f"[启动错误] {str(e)}")
         print(traceback.format_exc())
     finally:
+        if warmup_task and not warmup_task.done():
+            warmup_task.cancel()
+            try:
+                await warmup_task
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                print(f"⚠️ Agent 预热任务取消时出错: {str(e)}")
+
+        # 先释放 app.state 上对连接池和服务的引用，避免对象析构拖到事件循环关闭之后
+        for state_key in [
+            "dataset_service",
+            "dataset_csv_service",
+            "user_service",
+            "map_service",
+            "model_service",
+            "knowledge_service",
+            "chat_service",
+            "scale_service",
+            "home_service",
+            "auth_service",
+            "mysql_db",
+            "pg_db",
+        ]:
+            if hasattr(app.state, state_key):
+                setattr(app.state, state_key, None)
+
         from src.core import close_pools
         await close_pools()
         print("🔄 数据库连接池已关闭")

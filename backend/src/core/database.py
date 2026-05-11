@@ -1,6 +1,8 @@
 # 数据库连接池：MySQL（业务） + PostgreSQL（地理），生命周期由 app lifespan 管理
 import asyncpg
 import aiomysql
+import asyncio
+import gc
 import time
 import traceback
 from .config import settings
@@ -82,8 +84,21 @@ async def close_pools():
     
     if _mysql_pool:
         try:
-            _mysql_pool.close()
+            pool = _mysql_pool
+            used_count = len(getattr(pool, "_used", []))
+            free_count = len(getattr(pool, "_free", []))
+            print(f"🔍 MySQL 连接池关闭前状态: used={used_count}, free={free_count}, size={pool.size}")
+
+            pool.close()
+            try:
+                await asyncio.wait_for(pool.wait_closed(), timeout=3)
+            except asyncio.TimeoutError:
+                print("⚠️ MySQL 连接池等待关闭超时，改为强制终止仍在占用的连接")
+                pool.terminate()
+                await pool.wait_closed()
+
             _mysql_pool = None
+            gc.collect()
             print("✅ MySQL 连接池已关闭")
         except Exception as e:
             print(f"⚠️ MySQL 连接池关闭时出错: {str(e)}")
@@ -166,7 +181,13 @@ async def reconnect_mysql() -> bool:
     try:
         if _mysql_pool:
             _mysql_pool.close()
-        
+            try:
+                await asyncio.wait_for(_mysql_pool.wait_closed(), timeout=3)
+            except asyncio.TimeoutError:
+                _mysql_pool.terminate()
+                await _mysql_pool.wait_closed()
+            gc.collect()
+
         _mysql_pool = await aiomysql.create_pool(
             host=settings.DB_HOST,
             port=settings.DB_PORT,

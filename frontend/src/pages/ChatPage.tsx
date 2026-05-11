@@ -356,13 +356,24 @@ function parseJsonSafely(value: unknown): any {
   }
 }
 
+function normalizeKnowledgeDocTargetId(rawId: unknown, fallbackTitle?: unknown): string {
+  const idText = String(rawId || '').trim();
+  const titleText = String(fallbackTitle || '').trim();
+
+  if (/^doc_\d+$/i.test(idText)) {
+    return titleText || '';
+  }
+
+  return idText || titleText || '';
+}
+
 function normalizeReferences(raw: any): ReferenceItem[] {
   if (!Array.isArray(raw)) return [];
   return uniqueBy(
     raw
       .filter((item) => item && typeof item === 'object')
       .map((item) => ({
-        id: String(item.id || item.title || item.docId || ''),
+        id: normalizeKnowledgeDocTargetId(item.id || item.docId, item.title),
         title: String(item.title || item.name || '未命名来源'),
         type: item.type ? String(item.type) : undefined,
       })),
@@ -465,7 +476,10 @@ function parseEvidencePayload(raw: any, fallback: EvidenceItem[]): EvidenceItem[
     sourceType: String(item.sourceType || item.type || 'doc'),
     snippet: String(item.snippet || item.content || item.quote || '暂无证据片段'),
     claim: String(item.claim || item.relation || '支持当前回答的关键结论。'),
-    docId: item.docId && String(item.sourceType || item.type || 'doc') !== 'answer' ? String(item.docId) : undefined,
+    docId:
+      String(item.sourceType || item.type || 'doc') !== 'answer'
+        ? normalizeKnowledgeDocTargetId(item.docId, item.title || item.source)
+        : undefined,
   }));
 }
 

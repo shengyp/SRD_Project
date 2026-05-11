@@ -355,13 +355,23 @@ def _build_backend_knowledge_panel(
     }
 
 
-async def _run_suicide_agent_reply(
+async def _run_suicide_agent_payload(
     session_id_str: str, user_content: str, preset_intent: str,
-) -> str:
-    """使用 Agent 池复用实例，提升响应速度。"""
+) -> Dict[str, Any]:
+    """返回 Agent 标准结果，供非流式接口补齐 rag_context / references。"""
     agent = _get_agent(session_id_str, preset_intent)
     res = await agent.process_message(user_content)
-    return res["LLM_ans"]
+    if isinstance(res, dict):
+        return res
+    return {
+        "content": str(res),
+        "references": [],
+        "ragContext": {
+            "mindMap": None,
+            "evidence": [],
+            "contextSources": [],
+        },
+    }
 
 
 async def _stream_suicide_agent_reply(
@@ -682,11 +692,29 @@ async def send_chat_message(message: ChatMessageSend = Body(...), request: Reque
     user_msg_id = await chat_svc.create_message(user_msg_data)
 
     try:
-        assistant_content = await _run_suicide_agent_reply(
+        agent_result = await _run_suicide_agent_payload(
             str(session_id_int), user_content, preset_intent
         )
+        assistant_content = _safe_str(agent_result.get("content"))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"消息处理失败：{str(e)}")
+
+    references_json = _build_references_from_sources(agent_result.get("references"))
+    rag_context_data = agent_result.get("ragContext") if isinstance(agent_result.get("ragContext"), dict) else {}
+    rag_context_payload = {
+        "evidence": rag_context_data.get("evidence", []),
+        "mindMap": rag_context_data.get("mindMap"),
+        "contextSources": rag_context_data.get("contextSources", []),
+    }
+    knowledge_panel = _build_backend_knowledge_panel(
+        question=user_content,
+        answer=assistant_content,
+        references=references_json or [],
+        evidence=rag_context_payload.get("evidence", []),
+        mind_map=rag_context_payload.get("mindMap"),
+        context_sources=rag_context_payload.get("contextSources", []),
+    )
+    rag_context_payload["knowledgePanel"] = knowledge_panel
 
     # 保存助手消息
     assistant_msg_data = {
@@ -696,6 +724,9 @@ async def send_chat_message(message: ChatMessageSend = Body(...), request: Reque
         "content_type": "text",
         "ai_model": _persisted_llm_model_name(),
         "ai_mode": ai_mode,
+        "references_json": references_json,
+        "retrieval_sources": agent_result.get("references"),
+        "rag_context": rag_context_payload,
     }
     assistant_msg_id = await chat_svc.create_message(assistant_msg_data)
 
@@ -704,8 +735,9 @@ async def send_chat_message(message: ChatMessageSend = Body(...), request: Reque
     # 获取保存的消息
     user_msg_row = await chat_svc.get_messages(session_id_int, page=1, page_size=100)
     all_msgs = user_msg_row.get("messages", [])
-    user_msg = next((m for m in all_msgs if str(m.get("id")) == str(user_msg_id)), None)
-    assistant_msg = next((m for m in all_msgs if str(m.get("id")) == str(assistant_msg_id)), None)
+    normalized_messages = _normalize_messages_for_response(all_msgs)
+    user_msg = next((m for m in normalized_messages if str(m.get("id")) == str(user_msg_id)), None)
+    assistant_msg = next((m for m in normalized_messages if str(m.get("id")) == str(assistant_msg_id)), None)
 
     return {
         "success": True,
@@ -816,7 +848,6 @@ async def post_session_message_stream(
         rag_evidence_data = []
         mind_map_data = None
         context_sources_data = []
-        pre_knowledge_terms: List[str] = []
         references_json = None
         chunk_count = 0
         print(f"[event_generator] 开始处理会话 {session_int}")
@@ -858,10 +889,6 @@ async def post_session_message_stream(
                     rag_evidence_data = evidence
                     print(f"[event_generator] 收到 rag_evidence 事件，证据数: {len(evidence)}")
                     yield f"data: {json.dumps({'type': 'rag_evidence', 'evidence': evidence}, ensure_ascii=False)}\n\n".encode("utf-8")
-                elif event_type == "pre_knowledge":
-                    print(f"[event_generator] 收到 pre_knowledge 事件")
-                    pre_knowledge_terms = parsed.get("terms", []) or []
-                    yield f"data: {json.dumps({'type': 'pre_knowledge', 'terms': pre_knowledge_terms}, ensure_ascii=False)}\n\n".encode("utf-8")
                 elif event_type == "context_sources":
                     sources = parsed.get("sources", [])
                     context_sources_data = sources
@@ -892,7 +919,7 @@ async def post_session_message_stream(
                     references=references_json or [],
                     evidence=rag_evidence_data,
                     mind_map=mind_map_data,
-                    context_sources=context_sources_data or pre_knowledge_terms,
+                    context_sources=context_sources_data,
                 )
                 assistant_msg_data = {
                     "session_id": session_int,
@@ -930,7 +957,7 @@ async def post_session_message_stream(
             references=references_json or [],
             evidence=rag_evidence_data,
             mind_map=mind_map_data,
-            context_sources=context_sources_data or pre_knowledge_terms,
+            context_sources=context_sources_data,
         )
 
         yield f"data: {json.dumps({'type': 'knowledge_panel', 'knowledgePanel': knowledge_panel}, ensure_ascii=False)}\n\n".encode("utf-8")
@@ -1002,20 +1029,23 @@ async def post_session_message(
     user_msg_id = await chat_svc.create_message(user_msg_data)
 
     try:
-        assistant_content = await _run_suicide_agent_reply(
+        agent_result = await _run_suicide_agent_payload(
             str(session_int), content, preset_intent
         )
+        assistant_content = _safe_str(agent_result.get("content"))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"消息处理失败：{str(e)}")
 
     # 保存助手消息
+    references_json = _build_references_from_sources(agent_result.get("references"))
+    rag_context_data = agent_result.get("ragContext") if isinstance(agent_result.get("ragContext"), dict) else {}
     knowledge_panel = _build_backend_knowledge_panel(
         question=content,
         answer=assistant_content,
-        references=[],
-        evidence=[],
-        mind_map=None,
-        context_sources=[],
+        references=references_json or [],
+        evidence=rag_context_data.get("evidence", []),
+        mind_map=rag_context_data.get("mindMap"),
+        context_sources=rag_context_data.get("contextSources", []),
     )
     assistant_msg_data = {
         "session_id": session_int,
@@ -1024,6 +1054,8 @@ async def post_session_message(
         "content_type": "text",
         "ai_model": _persisted_llm_model_name(),
         "ai_mode": ai_mode,
+        "references_json": references_json,
+        "retrieval_sources": agent_result.get("references"),
         "rag_context": {
             "evidence": knowledge_panel.get("evidence", []),
             "mindMap": knowledge_panel.get("mindMap"),

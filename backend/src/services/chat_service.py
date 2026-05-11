@@ -5,10 +5,6 @@ import json
 import uuid
 from datetime import datetime
 
-import os
-
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 DEFAULT_RECOMMENDED_QUESTIONS = {
     "deep_think": [
         {"question": "如何缓解焦虑情绪？请先帮我判断我现在更像压力反应、焦虑还是抑郁倾向。", "category": "情绪梳理"},
@@ -494,87 +490,3 @@ class ChatService:
             result = prioritized_result
 
         return result
-
-    async def chat_with_agent(self, session_id: int, user_input: str, user_hash: Optional[str] = None,
-                              ai_mode: str = "deep_think") -> Dict[str, Any]:
-
-        if not session_id or session_id <= 0:
-            new_session_id = await self.create_session({
-                "user_hash": user_hash,
-                "ai_mode": ai_mode,
-                "context_type": "general"
-            })
-            session_id = new_session_id
-
-        user_msg_id = await self.create_message({
-            "session_id": session_id,
-            "role": "user",
-            "content": user_input,
-            "content_type": "text",
-            "ai_mode": ai_mode
-        })
-
-        agent_response = ""
-        is_error = False
-        error_message = ""
-        try:
-            agent = SuicideAgent(
-                session_id=str(session_id),
-                knowledge_base_path=os.path.join(project_root, "SuiAgent-main", "rag-skill", "knowledge"),
-                preset_intent="",
-            )
-            res = await agent.process_message(user_input)
-            agent_response = res.get("LLM_ans", "") if isinstance(res, dict) else str(res)
-        except Exception as e:
-            is_error = True
-            error_message = str(e)
-            agent_response = error_message
-
-        agent_msg_id = await self.create_message({
-            "session_id": session_id,
-            "role": "ai",
-            "content": agent_response,
-            "content_type": "text",
-            "ai_mode": ai_mode,
-            "is_error": is_error,
-            "error_message": error_message
-        })
-
-        await self.update_session(
-            session_id,
-            {"ai_mode": ai_mode, "status": "active"},
-            message_count_delta=2,
-        )
-
-        return {
-            "session_id": str(session_id),
-            "user_message": {
-                "id": str(user_msg_id),
-                "content": user_input,
-                "role": "user"
-            },
-            "agent_message": {
-                "id": str(agent_msg_id),
-                "content": agent_response,
-                "role": "assistant",
-                "is_error": is_error,
-                "error_message": error_message
-            }
-        }
-
-
-if __name__ == "__main__":
-    import asyncio
-
-
-    async def main():
-        chat_service = ChatService(mysql_pool=None)
-        response = await chat_service.chat_with_agent(
-            session_id=0,
-            user_input="你好"
-        )
-
-        print(f"Agent：{response['agent_message']['content']}\n")
-
-
-    asyncio.run(main())

@@ -1,8 +1,6 @@
-from langchain_core.tools import tool
 from pathlib import Path
 import subprocess
 import asyncio
-import time
 import re
 import jieba
 import json
@@ -444,57 +442,6 @@ class RAGSkillTool:
             matched_lines.append(fragment)
         return matched_lines
 
-    def _call_llm_for_answer(self, query: str, context_list: List[str]) -> str:
-        context_str = "\n\n".join(context_list)
-        prompt = f"""
-                基于以下检索到的上下文信息，回答用户查询。要求答案准确、简洁，仅基于上下文内容，不编造信息，回答前缀为：”根据检索到的信息“。注意：当检索上下文为空时，使用你已有的知识直接进行回答，并且不需要回答前缀。
-                用户查询：{query}
-                检索上下文：
-                {context_str}
-                """
-        return callLLM(prompt)
-
-    async def retrieve(self, query: str) -> Dict[str, Union[str, List[Dict[str, str]], List[str]]]:
-        if not query.strip():
-            return {"LLM_ans": "查询内容不能为空", "target_file": [], "rela_text": []}
-
-        target_files = await self._locate_target_file(query)
-        if not target_files:
-            print("未找到目标文件")
-            return {"LLM_ans": "未找到匹配的目标文件", "target_file": [], "rela_text": []}
-
-        print(f"已找到 {len(target_files)} 个目标文件: {[f.name for f in target_files]}")
-
-        initial_keywords = self._extract_query_keywords(query)
-        print(f"初始关键词: {initial_keywords}")
-
-        all_context_fragments = []
-        file_infos = [{"name": fp.name, "path": str(fp)} for fp in target_files]
-
-        for file_path in target_files:
-            file_fragments = self._collect_fragments_for_file(
-                file_path=file_path,
-                query=query,
-                initial_keywords=initial_keywords,
-                lightweight=False,
-            )
-            all_context_fragments.extend(file_fragments)
-
-        if not all_context_fragments:
-            return {
-                "LLM_ans": "未在所有目标文件中找到相关信息",
-                "target_file": file_infos,
-                "rela_text": []
-            }
-
-        final_answer = self._call_llm_for_answer(query, all_context_fragments)
-
-        return {
-            "LLM_ans": final_answer,
-            "target_file": file_infos,
-            "rela_text": all_context_fragments
-        }
-
     async def retrieve_evidence(
         self,
         query: str,
@@ -506,12 +453,12 @@ class RAGSkillTool:
         避免每个 retrieval query 都重复调用 LLM 做总结。
         """
         if not query.strip():
-            return {"target_file": [], "rela_text": []}
+            return {"sourceFiles": [], "fragments": []}
 
         target_files = await self._locate_target_file(query)
         if not target_files:
             print("未找到目标文件")
-            return {"target_file": [], "rela_text": []}
+            return {"sourceFiles": [], "fragments": []}
 
         target_files = target_files[:max_files]
         print(f"已找到 {len(target_files)} 个目标文件: {[f.name for f in target_files]}")
@@ -532,8 +479,8 @@ class RAGSkillTool:
             all_context_fragments.extend(file_fragments[: self.top_k])
 
         return {
-            "target_file": file_infos,
-            "rela_text": all_context_fragments,
+            "sourceFiles": file_infos,
+            "fragments": all_context_fragments,
         }
 
     def _extract_triples(self, context_fragments: List[str],query:str) -> List[Dict]:
@@ -587,37 +534,3 @@ class RAGSkillTool:
         except Exception as e:
             print(f"三元组抽取失败: {e}")
         return []
-
-
-@tool("rag_skill_local_knowledge", return_direct=False)
-async def rag_skill_tool_func(query: str, knowledge_base_path: str = "./knowledge") -> Dict[
-    str, Union[str, List[Dict[str, str]], List[str]]]:
-    """从本地知识库中检索与查询相关的信息，返回答案、来源文件和相关文本片段。"""
-    rag_skill = RAGSkillTool(knowledge_base_path)
-    return await rag_skill.retrieve(query)
-
-
-def create_rag_skill_tool(knowledge_base_path: str = "./knowledge"):
-    async def bound_rag_skill(query: str) -> Dict[str, Union[str, List[Dict[str, str]], List[str]]]:
-        return await rag_skill_tool_func.ainvoke({
-            "query": query,
-            "knowledge_base_path": knowledge_base_path
-        })
-
-    return bound_rag_skill
-
-
-async def test_rag_skill():
-    rag_tool = RAGSkillTool()
-    print("查询：2026年AI Agent技术有哪些关键发展趋势？")
-    result = await rag_tool.retrieve("2026年AI Agent技术有哪些关键发展趋势？")
-    print("答案:", result["LLM_ans"])
-    print("来源文件:", result["target_file"])
-    print("相关文本片段:", result["rela_text"])
-
-
-if __name__ == "__main__":
-    start_time = time.time()
-    asyncio.run(test_rag_skill())
-    end_time = time.time()
-    print(f"总用时:{end_time - start_time}s")
