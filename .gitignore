@@ -101,13 +101,17 @@ VIS4SRD前端页面架构图.pdf
 
 # ---- External data (large files) ----
 数据/
-map_data/
-datasets/
-Emocc/
+
+# ---- Runtime resources intentionally kept in repo ----
+!datasets/
+!map_data/
+!Emocc/
 
 # ---- ML model files ----
 *.pkl
 *.pickle
+Fealeaner/data/
+Emocc/*/data/*.pkl
 
 # ---- Misc ----
 *.bak

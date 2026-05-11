@@ -1,0 +1,2 @@
+﻿User	Post	Label	EmojiSequence
+user-001	['first reddit post', 'second reddit post']	2	calm,worried
