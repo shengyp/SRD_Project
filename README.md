@@ -2,7 +2,7 @@
 
 VIS4SRD 是一个面向心理健康服务与自杀风险识别场景的前后端分离系统，围绕“心理档案管理 -> 风险检测 -> 量表评估 -> 知识支持 -> AI 对话 -> 援助地图”构建完整业务链路。
 
-本仓库适合作为课程项目、毕设 Demo、系统联调与功能演示基础版本使用。当前提交以“可运行、可复现、可继续开发”为目标整理，保留系统运行必需代码、配置示例、前端页面、后端接口、数据资源与轻量模型文件；超大嵌入文件不纳入 Git，由使用者按 README 指引自行补充。
+本仓库适合作为课程项目、毕设 Demo、系统联调与功能演示基础版本使用。当前提交以“可运行、可复现、可继续开发”为目标整理，保留系统运行必需代码、配置示例、前端页面、后端接口、数据资源；体积较大的嵌入文件和模型权重不纳入 Git，由使用者按 README 指引自行补充。
 
 ---
 
@@ -26,8 +26,8 @@ vis4srd/
 ├─ datasets/                     # 内置数据集与导入模板
 ├─ map_data/                     # 心理机构与热线地图数据
 ├─ scales/                       # 心理量表定义
-├─ Emocc/                        # Emocc 代码、checkpoint、配套 CSV / bin（不含超大 pkl）
-├─ Fealeaner/                    # FeaLearner 代码、特征 CSV、checkpoint（不含 data/*.pkl）
+├─ Emocc/                        # Emocc 代码与配套 CSV（大权重/大嵌入文件需自行补充）
+├─ Fealeaner/                    # FeaLearner 代码与特征 CSV（大权重/大嵌入文件需自行补充）
 ├─ docs/                         # 设计与部署说明
 └─ deploy/                       # 部署脚本
 ```
@@ -95,7 +95,7 @@ vis4srd/
 
 - 保留系统运行与功能联调所必需的源码、配置示例、前端页面、后端接口、内置数据与轻量模型文件
 - 不上传本地开发辅助文件，例如 `AGENTS.md`、`.dev-logs/`、`.venv/`、`node_modules/`、构建产物、缓存和临时输出
-- 不上传超大嵌入文件（尤其是 `.pkl`），避免仓库体积失控
+- 不上传超大嵌入文件和较大的模型权重，避免仓库体积失控
 
 ### 已明确排除但需要自行补充的文件
 
@@ -105,14 +105,27 @@ vis4srd/
 2. `Emocc/bigdata/data/bigdata_bert.pkl`
 3. `Emocc/sigir/data/sigir_bert.pkl`
 4. `Emocc/weibo/data/user_post_embeddings_filtered.pkl`
-5. `Fealeaner/data/bert_embeddings.pkl`
-6. `Fealeaner/data/user_post_embeddings_bert_wwm.pkl`
+5. `Emocc/reddit/Emocc_model/checkpoints/emocc_model.pth`
+6. `Emocc/bigdata/Emocc_model/checkpoints/emocc_model.pth`
+7. `Emocc/sigir/Emocc_model/checkpoints/emocc_model.pth`
+8. `Emocc/weibo/Emocc_model/checkpoints/emocc_model.pth`
+9. `Emocc/reddit/pre-trained/emoji2vec.bin`
+10. `Emocc/bigdata/pre-trained/emoji2vec.bin`
+11. `Emocc/sigir/pre-trained/emoji2vec.bin`
+12. `Emocc/weibo/pre-trained/emoji2vec.bin`
+13. `Fealeaner/data/bert_embeddings.pkl`
+14. `Fealeaner/data/user_post_embeddings_bert_wwm.pkl`
+15. `Fealeaner/bestmodel/my_reddit_model.pth`
+16. `Fealeaner/bestmodel/my_bigdata_model.pth`
+17. `Fealeaner/bestmodel/my_sigir_model.pth`
+18. `Fealeaner/bestmodel/my_weibo_model.pth`
 
 说明：
 
-- 这些文件体积很大，属于预编码嵌入资源，不适合直接纳入 GitHub 仓库
-- 代码、checkpoint、CSV、emoji 批文件、量表、地图数据、知识目录结构均已保留
-- 若上述文件缺失，系统中依赖 Emocc / FeaLearner 预编码嵌入的风险检测能力将无法完整运行
+- 其中 `.pkl` 属于预编码嵌入资源，`.pth` 属于模型权重，`.bin` 属于 Emocc 预训练 emoji 向量
+- 这些文件原本就放在上面列出的路径中，补文件时请保持目录不变
+- 代码、CSV、量表、地图数据、知识目录结构均已保留
+- 若上述文件缺失，系统中依赖 Emocc / FeaLearner 的风险检测能力将无法完整运行
 
 ---
 
@@ -266,21 +279,38 @@ Invoke-WebRequest -UseBasicParsing http://127.0.0.1:5173/api/health
 当前仓库已保留：
 
 - Emocc 模型代码
-- checkpoint：`Emocc/*/Emocc_model/checkpoints/emocc_model.pth`
-- emoji 向量：`Emocc/*/pre-trained/emoji2vec.bin`
 - 配套 emoji CSV
 
-但未保留超大 `pkl` 嵌入文件，需自行补充。
+当前仓库未保留、需自行补充：
+
+- `Emocc/reddit/data/reddit_500_bert_embeddings.pkl`
+- `Emocc/bigdata/data/bigdata_bert.pkl`
+- `Emocc/sigir/data/sigir_bert.pkl`
+- `Emocc/weibo/data/user_post_embeddings_filtered.pkl`
+- `Emocc/reddit/Emocc_model/checkpoints/emocc_model.pth`
+- `Emocc/bigdata/Emocc_model/checkpoints/emocc_model.pth`
+- `Emocc/sigir/Emocc_model/checkpoints/emocc_model.pth`
+- `Emocc/weibo/Emocc_model/checkpoints/emocc_model.pth`
+- `Emocc/reddit/pre-trained/emoji2vec.bin`
+- `Emocc/bigdata/pre-trained/emoji2vec.bin`
+- `Emocc/sigir/pre-trained/emoji2vec.bin`
+- `Emocc/weibo/pre-trained/emoji2vec.bin`
 
 ### `Fealeaner/`
 
 当前仓库已保留：
 
 - FeaLearner 推理脚本
-- `bestmodel/` 下模型权重
 - `feature_data/` 下特征 CSV
 
-但 `data/` 下嵌入 `pkl` 未保留，需自行补充。
+当前仓库未保留、需自行补充：
+
+- `Fealeaner/data/bert_embeddings.pkl`
+- `Fealeaner/data/user_post_embeddings_bert_wwm.pkl`
+- `Fealeaner/bestmodel/my_reddit_model.pth`
+- `Fealeaner/bestmodel/my_bigdata_model.pth`
+- `Fealeaner/bestmodel/my_sigir_model.pth`
+- `Fealeaner/bestmodel/my_weibo_model.pth`
 
 ---
 
@@ -323,7 +353,7 @@ cd backend
 - 项目包含心理健康、自杀风险、危机干预等敏感场景，本仓库更适合教学、课程、毕设、实验与演示用途
 - 模型输出不能直接作为临床诊断结论
 - 若地图接口异常，优先检查 PostgreSQL 是否可用
-- 若风险检测接口异常，优先检查上文列出的 `pkl` 文件是否已补齐
+- 若风险检测接口异常，优先检查上文列出的 `pkl`、`.pth`、`.bin` 文件是否已补齐
 
 ---
 

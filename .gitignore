@@ -110,8 +110,12 @@ VIS4SRD前端页面架构图.pdf
 # ---- ML model files ----
 *.pkl
 *.pickle
+*.pth
 Fealeaner/data/
+Fealeaner/bestmodel/
 Emocc/*/data/*.pkl
+Emocc/*/Emocc_model/checkpoints/*.pth
+Emocc/*/pre-trained/*.bin
 
 # ---- Misc ----
 *.bak
