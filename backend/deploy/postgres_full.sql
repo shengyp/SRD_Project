@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gg3D0TA4q4wsFleGxmF55f5mlaXeAjFDT4OuarcPsztf7nGYCmWV0EHBzI0Vcga
+\restrict FW12m9Evw311SztpQPownib87N184BLkfutSDLuteEPizFfe2d9RLIKM9GqLohe
 
 -- Dumped from database version 15.17
 -- Dumped by pg_dump version 15.17
@@ -44,7 +44,7 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: hotlines; Type: TABLE; Schema: public; Owner: postgres
+-- Name: hotlines; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.hotlines (
@@ -65,10 +65,8 @@ CREATE TABLE public.hotlines (
 );
 
 
-ALTER TABLE public.hotlines OWNER TO postgres;
-
 --
--- Name: hotlines_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+-- Name: hotlines_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.hotlines_id_seq
@@ -80,17 +78,15 @@ CREATE SEQUENCE public.hotlines_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.hotlines_id_seq OWNER TO postgres;
-
 --
--- Name: hotlines_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+-- Name: hotlines_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.hotlines_id_seq OWNED BY public.hotlines.id;
 
 
 --
--- Name: institutions; Type: TABLE; Schema: public; Owner: postgres
+-- Name: institutions; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.institutions (
@@ -113,10 +109,8 @@ CREATE TABLE public.institutions (
 );
 
 
-ALTER TABLE public.institutions OWNER TO postgres;
-
 --
--- Name: institutions_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+-- Name: institutions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.institutions_id_seq
@@ -128,31 +122,29 @@ CREATE SEQUENCE public.institutions_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.institutions_id_seq OWNER TO postgres;
-
 --
--- Name: institutions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+-- Name: institutions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.institutions_id_seq OWNED BY public.institutions.id;
 
 
 --
--- Name: hotlines id; Type: DEFAULT; Schema: public; Owner: postgres
+-- Name: hotlines id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.hotlines ALTER COLUMN id SET DEFAULT nextval('public.hotlines_id_seq'::regclass);
 
 
 --
--- Name: institutions id; Type: DEFAULT; Schema: public; Owner: postgres
+-- Name: institutions id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.institutions ALTER COLUMN id SET DEFAULT nextval('public.institutions_id_seq'::regclass);
 
 
 --
--- Data for Name: hotlines; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: hotlines; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.hotlines (id, hotline, name, region, province, city, description, source, hotline_type, is_emergency, is_verified, usage_count, created_at, updated_at) FROM stdin;
@@ -192,7 +184,7 @@ COPY public.hotlines (id, hotline, name, region, province, city, description, so
 
 
 --
--- Data for Name: institutions; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: institutions; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.institutions (id, name, type, province, city, district, address, phone, hours, longitude, latitude, rating, poi_id, data_source, created_at, updated_at) FROM stdin;
@@ -3710,21 +3702,21 @@ COPY public.institutions (id, name, type, province, city, district, address, pho
 
 
 --
--- Name: hotlines_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+-- Name: hotlines_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.hotlines_id_seq', 44, true);
 
 
 --
--- Name: institutions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+-- Name: institutions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.institutions_id_seq', 10530, true);
 
 
 --
--- Name: hotlines hotlines_hotline_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: hotlines hotlines_hotline_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.hotlines
@@ -3732,7 +3724,7 @@ ALTER TABLE ONLY public.hotlines
 
 
 --
--- Name: hotlines hotlines_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: hotlines hotlines_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.hotlines
@@ -3740,7 +3732,7 @@ ALTER TABLE ONLY public.hotlines
 
 
 --
--- Name: institutions institutions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: institutions institutions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.institutions
@@ -3748,7 +3740,7 @@ ALTER TABLE ONLY public.institutions
 
 
 --
--- Name: institutions institutions_poi_id_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: institutions institutions_poi_id_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.institutions
@@ -3756,77 +3748,77 @@ ALTER TABLE ONLY public.institutions
 
 
 --
--- Name: idx_hotlines_city; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_hotlines_city; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_hotlines_city ON public.hotlines USING btree (city);
 
 
 --
--- Name: idx_hotlines_emergency; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_hotlines_emergency; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_hotlines_emergency ON public.hotlines USING btree (is_emergency);
 
 
 --
--- Name: idx_hotlines_hotline; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_hotlines_hotline; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_hotlines_hotline ON public.hotlines USING btree (hotline);
 
 
 --
--- Name: idx_hotlines_province; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_hotlines_province; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_hotlines_province ON public.hotlines USING btree (province);
 
 
 --
--- Name: idx_hotlines_region; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_hotlines_region; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_hotlines_region ON public.hotlines USING btree (region);
 
 
 --
--- Name: idx_hotlines_type; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_hotlines_type; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_hotlines_type ON public.hotlines USING btree (hotline_type);
 
 
 --
--- Name: idx_institutions_city; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_institutions_city; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_institutions_city ON public.institutions USING btree (city);
 
 
 --
--- Name: idx_institutions_district; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_institutions_district; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_institutions_district ON public.institutions USING btree (district);
 
 
 --
--- Name: idx_institutions_province; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_institutions_province; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_institutions_province ON public.institutions USING btree (province);
 
 
 --
--- Name: idx_institutions_rating; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_institutions_rating; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_institutions_rating ON public.institutions USING btree (rating);
 
 
 --
--- Name: idx_institutions_type; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_institutions_type; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_institutions_type ON public.institutions USING btree (type);
@@ -3836,5 +3828,5 @@ CREATE INDEX idx_institutions_type ON public.institutions USING btree (type);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gg3D0TA4q4wsFleGxmF55f5mlaXeAjFDT4OuarcPsztf7nGYCmWV0EHBzI0Vcga
+\unrestrict FW12m9Evw311SztpQPownib87N184BLkfutSDLuteEPizFfe2d9RLIKM9GqLohe
 
