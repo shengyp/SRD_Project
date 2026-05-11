@@ -1002,6 +1002,8 @@ function ModelDetailModal({
             <span className="text-[#64748B] font-medium w-20">类型</span>
             {m.modelType === 'emoji'
               ? <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">Emocc 情绪检测</span>
+              : m.modelType === 'fealearner'
+              ? <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">FeaLearner 深度检测</span>
               : m.modelCategory === 'api'
               ? <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">API 模型</span>
               : <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-xs font-medium">本地 LLM</span>}
@@ -1017,10 +1019,10 @@ function ModelDetailModal({
           {m.ollamaModelName && (
             <div className="flex items-center gap-3"><span className="text-[#64748B] font-medium w-20">Ollama名称</span><span className="text-[#415168] font-mono text-xs">{m.ollamaModelName}</span></div>
           )}
-          {m.modelFilePath && (
+          {m.modelFilePath && m.modelType !== 'fealearner' && m.modelType !== 'emoji' && (
             <div className="flex items-center gap-3"><span className="text-[#64748B] font-medium w-20">模型路径</span><span className="text-[#415168] font-mono text-xs break-all">{m.modelFilePath}</span></div>
           )}
-          {m.embeddingFilePath && (
+          {m.embeddingFilePath && m.modelType !== 'fealearner' && m.modelType !== 'emoji' && (
             <div className="flex items-center gap-3"><span className="text-[#64748B] font-medium w-20">嵌入文件</span><span className="text-[#415168] font-mono text-xs break-all">{m.embeddingFilePath}</span></div>
           )}
           {m.description && (
@@ -1102,7 +1104,21 @@ export default function ModelCenterPage() {
       if (models && models.length > 0) {
         setApiModels((models as UnifiedModel[]).filter((m) => m.modelCategory === 'api'));
         setLocalModels((models as UnifiedModel[]).filter((m) => m.modelCategory === 'local_llm'));
-        setDetectionModels((models as UnifiedModel[]).filter((m) => m.modelCategory === 'detection'));
+        const dsOrder = ['reddit', 'weibo', 'bigdata', 'sigir'];
+        const det = (models as UnifiedModel[]).filter((m) => m.modelCategory === 'detection');
+        det.sort((a, b) => {
+          const typeRank = (t: string | undefined) => (t === 'emoji' ? 0 : t === 'fealearner' ? 1 : 2);
+          const tr = typeRank(a.modelType) - typeRank(b.modelType);
+          if (tr !== 0) return tr;
+          const da = a.supportedDatasets?.[0] || '';
+          const db = b.supportedDatasets?.[0] || '';
+          const ir = dsOrder.indexOf(da);
+          const jr = dsOrder.indexOf(db);
+          const dsCmp = (ir === -1 ? 99 : ir) - (jr === -1 ? 99 : jr);
+          if (dsCmp !== 0) return dsCmp;
+          return (a.modelName || '').localeCompare(b.modelName || '', 'zh-CN');
+        });
+        setDetectionModels(det);
       }
     }).catch(console.error).finally(() => setModelsLoading(false));
 
@@ -1184,10 +1200,12 @@ export default function ModelCenterPage() {
             )}
           </div>
           <p className="text-xs text-gray-400 truncate">
-            {m.provider ? `${m.provider} · ` : ''}
-            {m.ollamaModelName ? `Ollama: ${m.ollamaModelName}` :
-             m.modelCode ? `模型ID: ${m.modelCode}` :
-             m.modelFilePath || m.modelPath || m.modelType}
+            {m.modelCategory === 'detection' && (m.modelType === 'fealearner' || m.modelType === 'emoji')
+              ? [
+                  m.supportedDatasets?.length ? `适用：${m.supportedDatasets.join(' / ')}` : null,
+                  m.modelCode ? `调用 ID：${m.modelCode}` : null,
+                ].filter(Boolean).join(' · ') || '本地检测模型'
+              : `${m.provider ? `${m.provider} · ` : ''}${m.ollamaModelName ? `Ollama: ${m.ollamaModelName}` : m.modelCode ? `模型ID: ${m.modelCode}` : m.modelType || '—'}`}
           </p>
         </div>
 

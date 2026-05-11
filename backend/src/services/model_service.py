@@ -535,11 +535,63 @@ class ModelService:
                 'model_file_path': 'Emocc/weibo/Emocc_model/checkpoints/emocc_model.pth',
                 'embedding_file_path': 'Emocc/weibo/data/user_post_embeddings_filtered.pkl',
                 'emoji_csv_path': 'Emocc/weibo/data/weibo_1000_emoji_batch.csv',
-                'description': 'Weibo 二分类 Emocc 模型。适配中文微博文本与 Emoji 风险检测。',
+                'description': 'Weibo 二分类 Emocc 模型。与 datasets/weibo/weibo_1000.csv（及本目录 pkl、emoji 批）行序一致；适配中文微博与 Emoji 风险检测。',
                 'version': 'v1.0', 'is_available': True, 'is_default': False, 'is_builtin': True,
                 'status': 'active',
                 'performance_metrics': '{}',
                 'supported_datasets': '["weibo"]', 'provider': 'VIS4SRD',
+            },
+        ]
+
+        # FeaLearner 预置模型 — 与 Emocc 相同按数据集拆分（各一条，supported_datasets 单源）
+        fealearner_models = [
+            {
+                'model_name': 'FeaLearner-Reddit', 'model_code': 'fealearner-reddit',
+                'model_category': 'detection', 'model_type': 'fealearner',
+                'detection_type': 'fealearner',
+                'model_file_path': 'Fealeaner/bestmodel/my_reddit_model.pth',
+                'embedding_file_path': 'Emocc/reddit/data/bert_embeddings.pkl',
+                'description': 'FeaLearner Reddit 五分类。嵌入优先使用 Emocc/reddit/data/bert_embeddings.pkl；特征与权重见 Fealeaner/feature_data、bestmodel。',
+                'version': 'v1.0', 'is_available': True, 'is_default': True, 'is_builtin': True,
+                'status': 'active',
+                'performance_metrics': '{"accuracy":0.85,"precision":0.83,"recall":0.82,"f1":0.825}',
+                'supported_datasets': '["reddit"]', 'provider': 'VIS4SRD',
+            },
+            {
+                'model_name': 'FeaLearner-Weibo', 'model_code': 'fealearner-weibo',
+                'model_category': 'detection', 'model_type': 'fealearner',
+                'detection_type': 'fealearner',
+                'model_file_path': 'Fealeaner/bestmodel/my_weibo_model.pth',
+                'embedding_file_path': 'Fealeaner/data/user_post_embeddings_bert_wwm.pkl',
+                'description': 'FeaLearner Weibo 二分类。嵌入与 datasets/weibo/weibo_data.csv 行序对齐（Fealeaner/data 下 pkl）；Emocc Weibo 使用 weibo_1000 子集，二者勿混。',
+                'version': 'v1.0', 'is_available': True, 'is_default': False, 'is_builtin': True,
+                'status': 'active',
+                'performance_metrics': '{}',
+                'supported_datasets': '["weibo"]', 'provider': 'VIS4SRD',
+            },
+            {
+                'model_name': 'FeaLearner-BigData', 'model_code': 'fealearner-bigdata',
+                'model_category': 'detection', 'model_type': 'fealearner',
+                'detection_type': 'fealearner',
+                'model_file_path': 'Fealeaner/bestmodel/my_bigdata_model.pth',
+                'embedding_file_path': 'Emocc/bigdata/data/bigdata_bert_embeddings.pkl',
+                'description': 'FeaLearner BigData 四分类。嵌入优先使用 Emocc/bigdata/data/bigdata_bert_embeddings.pkl。',
+                'version': 'v1.0', 'is_available': True, 'is_default': False, 'is_builtin': True,
+                'status': 'active',
+                'performance_metrics': '{}',
+                'supported_datasets': '["bigdata"]', 'provider': 'VIS4SRD',
+            },
+            {
+                'model_name': 'FeaLearner-SIGIR', 'model_code': 'fealearner-sigir',
+                'model_category': 'detection', 'model_type': 'fealearner',
+                'detection_type': 'fealearner',
+                'model_file_path': 'Fealeaner/bestmodel/my_sigir_model.pth',
+                'embedding_file_path': 'Emocc/sigir/data/sigir_bert_embeddings.pkl',
+                'description': 'FeaLearner SIGIR 二分类。嵌入优先使用 Emocc/sigir/data/sigir_bert_embeddings.pkl。',
+                'version': 'v1.0', 'is_available': True, 'is_default': False, 'is_builtin': True,
+                'status': 'active',
+                'performance_metrics': '{}',
+                'supported_datasets': '["sigir"]', 'provider': 'VIS4SRD',
             },
         ]
 
@@ -747,7 +799,7 @@ class ModelService:
             },
         ]
 
-        all_models = emoji_models + api_models + ollama_models
+        all_models = emoji_models + fealearner_models + api_models + ollama_models
 
         templates = [
             {
@@ -1028,6 +1080,7 @@ Emocc 情绪检测：
                 await conn.commit()
 
         print(f"[init_builtin] Emocc ×{len(emoji_models)}, "
+              f"FeaLearner ×{len(fealearner_models)}, "
               f"API模板 ×{len(api_models)}, "
               f"Ollama本地 ×{len(ollama_models)}, "
               f"指令模板 ×{len(templates)}")

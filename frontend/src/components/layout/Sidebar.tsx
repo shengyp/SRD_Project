@@ -22,6 +22,8 @@ interface SidebarProps {
   isCollapsed: boolean;
   setIsCollapsed: (collapsed: boolean) => void;
   isMapPage?: boolean;
+  /** 智能问答页：侧栏宽度贴近设计稿「约 5% 视口」，随屏幕缩放 */
+  isChatPage?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -35,12 +37,20 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'map', icon: MapPin, label: '心理援助地图' },
 ];
 
-export default function Sidebar({ activeTab, onNavClick, isCollapsed, setIsCollapsed, isMapPage }: SidebarProps) {
+export default function Sidebar({ activeTab, onNavClick, isCollapsed, setIsCollapsed, isMapPage, isChatPage }: SidebarProps) {
+  const chatFluidNav =
+    isChatPage &&
+    `shrink-0 ${
+      isCollapsed
+        ? 'w-[clamp(4rem,5.25vw,6rem)]'
+        : 'w-[clamp(11.25rem,min(18vw,13rem),17.5rem)]'
+    }`;
+
   return (
     <div 
       className={`relative flex flex-col transition-all duration-300 ease-in-out overflow-visible z-20 ${
         isMapPage ? 'rounded-br-none' : 'rounded-br-3xl rounded-tr-3xl'
-      } ${isCollapsed ? 'w-20' : 'w-64'}`}
+      } ${chatFluidNav || (isCollapsed ? 'w-20' : 'w-64')}`}
       style={{
         background: 'linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,250,253,0.98) 100%)',
         boxShadow: '0 18px 44px rgba(15,23,42,.06)',

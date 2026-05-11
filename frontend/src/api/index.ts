@@ -74,9 +74,9 @@ async function request<T>(
   
   // 尝试解析 JSON，如果失败则返回原始文本
   try {
-    const result: ApiResponse<T> = JSON.parse(responseText);
+    const result: ApiResponse<T> & { error?: string } = JSON.parse(responseText);
     if (!result.success) {
-      throw new Error(result.message || '请求失败');
+      throw new Error(result.message || result.error || '请求失败');
     }
     // 如果 result.data 存在则返回它，否则返回整个 result（某些 API 直接返回数据）
     return result.data !== undefined ? result.data : (result as unknown as T);
@@ -2140,6 +2140,37 @@ export interface EmoccTaskResult {
   processingTimeMs: number;
 }
 
+/** 从任务对象上解析数字主键（兼容 snake_case / 网关字段名） */
+function pickEmoccNumericId(obj: Record<string, unknown> | null | undefined): number | undefined {
+  if (!obj || typeof obj !== 'object') return undefined;
+  const raw =
+    (obj as any).id ??
+    (obj as any).task_id ??
+    (obj as any).taskId ??
+    (obj as any).ID;
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  const n = typeof raw === 'number' ? raw : parseInt(String(raw), 10);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+/** 剥掉多层 { success, data } 封装，直到拿到含 id 的任务对象（兼容网关/代理二次包装） */
+function normalizeEmoccTaskPayload(raw: unknown): EmoccTaskResult {
+  let cur: any = raw;
+  for (let i = 0; i < 8; i++) {
+    if (!cur || typeof cur !== 'object') break;
+    const nid = pickEmoccNumericId(cur as Record<string, unknown>);
+    if (nid !== undefined) {
+      return { ...(cur as object), id: nid } as EmoccTaskResult;
+    }
+    if ((cur as any).data !== undefined && typeof (cur as any).data === 'object') {
+      cur = (cur as any).data;
+      continue;
+    }
+    break;
+  }
+  return cur as EmoccTaskResult;
+}
+
 /**
  * 创建Emocc本地模型检测任务
  */
@@ -2179,7 +2210,7 @@ export async function createEmoccDetectionTask(params: {
     method: 'POST',
     body: JSON.stringify(body),
   });
-  return data;
+  return normalizeEmoccTaskPayload(data);
 }
 
 /**

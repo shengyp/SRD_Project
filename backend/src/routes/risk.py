@@ -12,6 +12,15 @@ import uuid
 import aiomysql
 
 from src.services.emocc_config import get_emocc_dataset_spec, list_emocc_dataset_specs
+from src.services.dataset_csv_service import DatasetCSVService
+from src.services.fealearner_service import (
+    FEAL_SUPPORTED_DATASETS,
+    FEAL_MODEL_CATALOG_DISPLAY,
+    FEAL_MODEL_CENTER_DESCRIPTION,
+    fealearner_dataset_label,
+    fealearner_model_display_name,
+    get_fealearner_service,
+)
 
 router = APIRouter(prefix="", tags=["risk"])
 
@@ -104,12 +113,7 @@ async def _call_llm_for_fusion_analysis(
     model_name = _get_llm_model_name()
     
     if not api_key:
-        return {
-            "fused_risk_level": emocc_result.get("risk_level", "medium"),
-            "fused_risk_score": emocc_result.get("risk_score", 0.5),
-            "confidence": emocc_result.get("confidence", 0.8),
-            "fusion_method": "direct"
-        }
+        raise ValueError("LLM API Key 未配置，无法执行融合分析")
     
     system_prompt = """你是一位专业的心理健康评估专家，专注于自杀风险检测。
 你的任务是分析 Emocc 情绪表情模型的检测结果，
@@ -190,11 +194,7 @@ async def _call_llm_for_fusion_analysis(
             else:
                 result_data = json.loads(reply)
         except json.JSONDecodeError:
-            return {
-                "fused_risk_level": emocc_result.get("risk_level", "medium"),
-                "fused_risk_score": emocc_result.get("risk_score", 0.5),
-                "confidence": emocc_result.get("confidence", 0.8)
-            }
+            raise ValueError("融合分析返回内容不是有效 JSON")
         
         return {
             "fusion_method": "llm_analysis",
@@ -211,53 +211,7 @@ async def _call_llm_for_fusion_analysis(
         
     except Exception as e:
         print(f"[WARNING] DashScope LLM融合分析失败: {e}")
-        return {
-            "fused_risk_level": emocc_result.get("risk_level", "medium"),
-            "fused_risk_score": emocc_result.get("risk_score", 0.5),
-            "confidence": emocc_result.get("confidence", 0.8),
-            "fusion_method": "direct"
-        }
-
-
-# ========================
-# 模拟模型推理
-# ========================
-def _mock_emoji_predict(posts: List[str]) -> dict:
-    """模拟 Emoji 情绪模型推理"""
-    emoji_sentiments = {
-        "😢": -0.6, "😭": -0.8, "😔": -0.5, "😞": -0.6,
-        "😀": 0.6, "😊": 0.5, "😄": 0.7, "🙂": 0.3,
-        "😠": -0.4, "😡": -0.7, "🤬": -0.9,
-        "🤔": 0.0, "😐": 0.0, "😶": 0.0
-    }
-
-    avg_sentiment = 0.0
-    if posts:
-        import random
-        sentiments = [random.choice(list(emoji_sentiments.values())) for _ in posts]
-        avg_sentiment = sum(sentiments) / len(sentiments)
-
-    risk_score = max(0.1, min(0.95, 0.5 - avg_sentiment * 0.8))
-
-    if risk_score >= 0.7:
-        risk_level = "high"
-    elif risk_score >= 0.4:
-        risk_level = "medium"
-    else:
-        risk_level = "low"
-
-    return {
-        "model_type": "emoji",
-        "risk_level": risk_level,
-        "risk_score": round(risk_score, 4),
-        "confidence": round(0.78 + abs(avg_sentiment) * 0.1, 4),
-        "features": {
-            "analyzed_posts": len(posts),
-            "avg_sentiment": round(avg_sentiment, 4),
-            "dominant_emotion": "negative" if avg_sentiment < -0.3 else "positive" if avg_sentiment > 0.3 else "neutral",
-            "emotion_intensity": round(abs(avg_sentiment), 4)
-        }
-    }
+        raise ValueError(f"DashScope LLM融合分析失败: {e}")
 
 
 # ========================
@@ -353,7 +307,7 @@ async def _call_llm_api(
         
         result_data = _extract_json_object(reply)
         if result_data is None:
-            result_data = _parse_risk_response(reply)
+            raise ValueError("LLM 返回内容不是有效 JSON，无法产出结构化风险结果")
         
         return {
             "success": True,
@@ -384,33 +338,6 @@ async def _call_llm_api(
             "risk_score": 0.0,
             "confidence": 0.0
         }
-
-
-def _parse_risk_response(text: str) -> dict:
-    """从文本中解析风险评估结果"""
-    result = {
-        "risk_level": "medium",
-        "risk_score": 0.5,
-        "confidence": 0.7,
-        "key_risk_factors": [],
-        "protective_factors": [],
-        "professional_advice": "请结合临床信息综合判断"
-    }
-    
-    text_lower = text.lower()
-    
-    # 解析风险等级
-    if "high" in text_lower or "高风险" in text:
-        result["risk_level"] = "high"
-        result["risk_score"] = 0.75
-    elif "low" in text_lower or "低风险" in text:
-        result["risk_level"] = "low"
-        result["risk_score"] = 0.25
-    else:
-        result["risk_level"] = "medium"
-        result["risk_score"] = 0.5
-    
-    return result
 
 
 # ========================
@@ -596,7 +523,11 @@ def _generate_user_hash(dataset_key: str, user_id: str) -> str:
 
 
 async def _get_user_posts_from_db(pool, user_hash: str, data_source: str, page_size: int = 50) -> tuple[list[dict], int]:
-    """从 MySQL 获取用户帖子。"""
+    """
+    获取用户帖子：优先 MySQL；若无档案（常见于未做入库同步、仅 CSV 选人列表），
+    回退到与 UserService 一致的内置 datasets/ CSV，避免「列表有人、创建失败」。
+    """
+    ds_key = (data_source or "reddit").strip().lower()
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cursor:
             await cursor.execute("SET NAMES utf8mb4")
@@ -607,7 +538,7 @@ async def _get_user_posts_from_db(pool, user_hash: str, data_source: str, page_s
                 INNER JOIN psychological_archives pa ON up.archive_id = pa.id
                 WHERE pa.user_id = %s AND pa.dataset_source = %s
                 """,
-                (user_hash, data_source),
+                (user_hash, ds_key),
             )
             count_row = await cursor.fetchone()
             total = count_row["cnt"] if count_row else 0
@@ -621,10 +552,40 @@ async def _get_user_posts_from_db(pool, user_hash: str, data_source: str, page_s
                 ORDER BY up.post_index ASC
                 LIMIT %s
                 """,
-                (user_hash, data_source, page_size),
+                (user_hash, ds_key, page_size),
             )
             rows = await cursor.fetchall()
-    return rows, total
+
+    if total > 0 or (rows and len(rows) > 0):
+        return list(rows), int(total) if total else len(rows)
+
+    try:
+        svc = DatasetCSVService()
+        if ds_key not in svc.DATASET_CONFIG:
+            return [], 0
+        post_infos, csv_total = svc.get_user_posts(user_hash, ds_key, page=1, page_size=page_size)
+        if not post_infos:
+            return [], 0
+        dict_rows: list[dict] = []
+        for p in post_infos:
+            dict_rows.append(
+                {
+                    "post_index": p.post_index,
+                    "content": p.content or "",
+                    "emoji_sequence": p.emoji_sequence or "",
+                    "post_timestamp": p.timestamp,
+                    "fine_risk_value": p.risk_value,
+                    "risk_level": p.risk_level,
+                }
+            )
+        n = int(csv_total) if csv_total else len(dict_rows)
+        return dict_rows, n if n > 0 else len(dict_rows)
+    except Exception as e:
+        print(f"[Risk] MySQL 无帖时从内建 CSV 回退失败 user={user_hash!r} ds={ds_key!r}: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return [], 0
 
 
 async def _get_model_config(pool, model_id: int) -> Optional[Dict[str, Any]]:
@@ -988,7 +949,11 @@ def _infer_report_model_name(task: Dict[str, Any], result_summary: Dict[str, Any
         except KeyError:
             return "Emocc + qwen-flash"
     if result_summary.get("fealearnerModelResult") or model_type == "fealearner_local":
-        return "FeaLearner-Reddit + qwen-flash"
+        ds = (task.get("data_source") or "reddit").strip().lower()
+        if ds not in FEAL_SUPPORTED_DATASETS:
+            ds = "reddit"
+        llm = (result_summary.get("llmModel") or result_summary.get("llm_model") or "qwen-flash").strip() or "qwen-flash"
+        return f"{fealearner_model_display_name(ds)} + {llm}"
     if base_name:
         return base_name
     return "qwen-flash"
@@ -1004,6 +969,31 @@ def _get_emocc_detection_config(dataset_key: str, model_name: Optional[str] = No
         "class_labels": spec.class_labels,
         "coarse_risk_mapping": spec.coarse_risk_mapping,
     }
+
+
+async def _mysql_resolve_risk_task_insert_id(cur, task_code: Optional[str] = None) -> int:
+    """
+    解析刚插入的 risk_detection_tasks 主键。
+    commit() 之后 cur.lastrowid 在 aiomysql 中常变为 0，应优先用 LAST_INSERT_ID()，再用 task_code 查询兜底。
+    """
+    tid = int(getattr(cur, "lastrowid", 0) or 0)
+    await cur.execute("SELECT LAST_INSERT_ID() AS ins_id")
+    row = await cur.fetchone()
+    if row:
+        v = row[0] if isinstance(row, (list, tuple)) else row.get("ins_id")
+        if v is not None:
+            tid = int(v) or tid
+    if tid <= 0 and task_code:
+        await cur.execute(
+            "SELECT id FROM risk_detection_tasks WHERE task_code = %s ORDER BY id DESC LIMIT 1",
+            (task_code,),
+        )
+        row2 = await cur.fetchone()
+        if row2:
+            v2 = row2[0] if isinstance(row2, (list, tuple)) else row2.get("id")
+            if v2 is not None:
+                tid = int(v2)
+    return max(tid, 0)
 
 
 # ========================
@@ -1054,7 +1044,8 @@ async def _save_risk_task_to_db(pool, task_data: dict) -> int:
                 task_data.get("processing_time_ms")
             ))
             await conn.commit()
-            return cur.lastrowid
+            tid = await _mysql_resolve_risk_task_insert_id(cur, task_data.get("task_code"))
+            return tid
 
 
 async def _get_risk_tasks_from_db(pool, page: int = 1, limit: int = 20, status: str = None, data_source: str = None) -> tuple:
@@ -1612,22 +1603,7 @@ async def _execute_emocc_task(pool, task: dict) -> dict:
             "riskClass": result.risk_class
         }
     except Exception as e:
-        # 如果 Emocc 模型不可用，使用模拟结果
-        import random
-        random.seed(hash(user_hash) % (2**32))
-
-        risk_levels = ["low", "low", "medium", "medium", "high"]
-        risk_scores = [0.1, 0.3, 0.5, 0.7, 0.9]
-        idx = random.randint(0, 4)
-
-        return {
-            "riskLevel": risk_levels[idx],
-            "riskScore": risk_scores[idx],
-            "confidence": round(random.uniform(0.7, 0.95), 4),
-            "summary": f"Emocc模型检测完成（模拟），风险等级: {risk_levels[idx]}",
-            "modelType": "emocc_mock",
-            "postCount": len(posts)
-        }
+        raise ValueError(f"Emocc模型推理失败: {str(e)}")
 
 
 async def _execute_api_task(pool, task: dict, app_state: Any = None) -> dict:
@@ -1883,18 +1859,7 @@ async def _execute_ollama_task(pool, task: dict) -> dict:
                     pass  # parsed 保持 None
 
         if not parsed:
-                # 最终回退：基于内容关键词判断风险等级
-                content_lower = content.lower()
-                if "高风险" in content or "high" in content_lower or "严重" in content:
-                    risk_level = "high"
-                    risk_score = 0.75
-                elif "低风险" in content or "low" in content_lower or "正常" in content:
-                    risk_level = "low"
-                    risk_score = 0.25
-                else:
-                    risk_level = "medium"
-                    risk_score = 0.5
-                parsed = {"risk_level": risk_level, "risk_score": risk_score, "summary": content[:200]}
+            raise ValueError("Ollama 返回内容不是有效 JSON，无法产出结构化风险结果")
 
         structured = _normalize_report_fields(
             parsed,
@@ -1925,40 +1890,11 @@ async def _get_user_data_for_api(user_hash: str, data_source: str, pool) -> Opti
 
 @router.get("/api/risk/predict/{user_hash}")
 async def predict_user_risk(request: Request, user_hash: str):
-    """快速预测单个用户风险（使用用户档案中的帖子）"""
-    user_svc = request.app.state.user_service
-
-    try:
-        # 获取用户详情
-        user_detail = await user_svc.get_user_detail(user_hash)
-        posts = [p.get("text", "") for p in user_detail.get("posts", [])]
-
-        if not posts:
-            return {
-                "success": True,
-                "data": {
-                    "user_hash": user_hash,
-                    "risk_level": "low",
-                    "risk_score": 0.1,
-                    "message": "无可用帖子数据"
-                }
-            }
-
-        # 使用 Emocc 模型推理
-        emoji_result = _mock_emoji_predict(posts)
-
-        return {
-            "success": True,
-            "data": {
-                "user_hash": user_hash,
-                "post_count": len(posts),
-                "emoji": emoji_result
-            }
-        }
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    """快速预测接口已禁用 mock，请使用任务接口执行真实模型检测。"""
+    raise HTTPException(
+        status_code=400,
+        detail="快速预测接口不再提供 mock 结果，请改用 Emocc / FeaLearner 检测任务接口执行真实模型推理。",
+    )
 
 
 # ========================
@@ -2052,7 +1988,8 @@ async def _save_emocc_task_to_db(pool, task_data: dict) -> int:
                 fusion_model_id  # 新增：融合模型 ID
             ))
             await conn.commit()
-            return cur.lastrowid
+            tid = await _mysql_resolve_risk_task_insert_id(cur, task_data.get("task_code"))
+            return tid
 
 
 async def _get_emocc_task_by_id_from_db(pool, task_id: int) -> Optional[Dict]:
@@ -2108,13 +2045,7 @@ async def _call_llm_for_emocc_fusion(
         print(f"[Emocc Fusion] 使用环境变量中的固定整理模型: {model_name}")
     
     if not api_key:
-        return {
-            "fused_risk_level": emocc_result.get("risk_level", "medium"),
-            "fused_risk_score": emocc_result.get("risk_score", 0.5),
-            "confidence": emocc_result.get("confidence", 0.8),
-            "fusion_method": "direct",
-            "summary": "直接使用Emocc模型结果，未进行LLM整合"
-        }
+        raise ValueError("LLM API Key 未配置，无法执行 Emocc 检测后的融合分析")
     
     system_prompt = """你是一位资深的心理健康评估专家，专注于社交媒体用户的自杀风险评估与临床诊断支持。
 你的任务是基于Emocc情绪模型的检测结果，结合用户贴文内容，给出专业、严谨、富有同理心的综合临床评估报告。
@@ -2237,12 +2168,7 @@ async def _call_llm_for_emocc_fusion(
             else:
                 result_data = json.loads(reply)
         except json.JSONDecodeError:
-            result_data = {
-                "risk_level": emocc_result.get("risk_level", "medium"),
-                "risk_score": emocc_result.get("risk_score", 0.5),
-                "confidence": emocc_result.get("confidence", 0.8),
-                "summary": "LLM整合解析失败，使用原始结果"
-            }
+            raise ValueError("Emocc 融合阶段返回内容不是有效 JSON")
 
         return {
             "fusion_method": "llm_analysis",
@@ -2265,14 +2191,7 @@ async def _call_llm_for_emocc_fusion(
 
     except Exception as e:
         print(f"[WARNING] DashScope LLM整合失败: {e}")
-        return {
-            "fusion_method": "direct",
-            "risk_level": emocc_result.get("risk_level", "medium"),
-            "risk_score": emocc_result.get("risk_score", 0.5),
-            "confidence": emocc_result.get("confidence", 0.8),
-            "summary": "LLM整合不可用，使用Emocc模型直接结果",
-            "error": str(e)
-        }
+        raise ValueError(f"Emocc 融合阶段失败: {e}")
 
 
 @router.post("/api/risk/emocc-tasks")
@@ -2338,11 +2257,14 @@ async def create_emocc_detection_task(
     }
     
     task_id = await _save_emocc_task_to_db(pool, task_record)
-    
+    if not task_id or int(task_id) <= 0:
+        print(f"[Emocc Create] 插入后无法解析任务主键，task_code={task_code}")
+        return {"success": False, "error": "任务已写入但无法获得有效编号，请检查数据库连接或稍后重试"}
+
     return {
         "success": True,
         "data": {
-            "id": task_id,
+            "id": int(task_id),
             "taskCode": f"EMOCC-{task_code}",
             "taskName": task_record["task_name"],
             "taskDescription": task_record["task_description"],
@@ -2435,7 +2357,7 @@ async def execute_emocc_detection_task(
         if not service.is_dataset_loaded(data_source):
             loaded = load_emocc_model(dataset_key=data_source)
             if not loaded:
-                print(f"[Emocc Execute] {emocc_spec.model_name} 模型加载失败，使用回退结果")
+                raise RuntimeError(f"{emocc_spec.model_name} 模型加载失败")
 
         if service.is_dataset_loaded(data_source):
             result = service.predict_single_user(
@@ -2466,84 +2388,39 @@ async def execute_emocc_detection_task(
         print(f"[Emocc Execute] 模型推理失败: {e}")
         import traceback
         traceback.print_exc()
-    
-    # 如果Emocc模型不可用，使用模拟结果
     if emocc_result is None:
-        print("[Emocc Execute] 使用模拟结果")
-        import random
-        random.seed(hash(user_hash) % (2**32))
-        
-        risk_keywords = [
-            "death", "suicide", "kill", "die", "hopeless", "depressed", "alone", "empty", "tired", "hurt",
-            "自杀", "结束自己", "想死", "活不下去", "绝望", "没有意义"
-        ]
-        keyword_count = sum(1 for post in posts for kw in risk_keywords if kw.lower() in post.lower())
-        
-        base_score = min(0.9, 0.2 + keyword_count * 0.05)
-        thresholds = list(emocc_spec.risk_score_mapping.values())
-        risk_class = 0
-        for idx, score_threshold in enumerate(thresholds):
-            if base_score >= score_threshold:
-                risk_class = idx
-        
-        post_attention_scores = []
-        for i, post in enumerate(posts):
-            # 所有帖子都有注意力分数，包含风险关键词的帖子分数更高
-            has_risk = any(kw.lower() in post.lower() for kw in risk_keywords)
-            if has_risk:
-                score = random.uniform(0.4, 0.9)
-            else:
-                score = random.uniform(0.1, 0.4)
-            post_attention_scores.append({
-                "post_index": i,
-                "attention_score": round(score, 4),
-                "text_preview": post[:80] + "..." if len(post) > 80 else post,
-                "emoji_count": len(emoji_sequences[i]) if i < len(emoji_sequences) else 0
-            })
-        post_attention_scores.sort(key=lambda x: x["attention_score"], reverse=True)
-        
-        class_probs = [round(random.uniform(0.05, 0.4), 4) for _ in range(emocc_spec.class_num)]
-        total = sum(class_probs)
-        class_probs = [round(p / total, 4) for p in class_probs]
-        
-        emocc_result = {
-            "risk_level": emocc_spec.coarse_risk_mapping.get(risk_class, "medium"),
-            "risk_score": emocc_spec.risk_score_mapping.get(risk_class, round(base_score, 4)),
-            "risk_class": risk_class,
-            "confidence": round(random.uniform(0.7, 0.95), 4),
-            "post_attention_scores": post_attention_scores,
-            "class_probs": class_probs,
-            "post_count": len(posts),
-            "model_type": "emocc_mock",
-            "model_name": emocc_spec.model_name,
-            "dataset_key": data_source,
-            "class_num": emocc_spec.class_num,
-            "class_labels": emocc_spec.class_labels,
-            "coarse_risk_mapping": emocc_spec.coarse_risk_mapping,
-            "performance_metrics": emocc_spec.performance_metrics,
-            "mapping_info": {
-                "datasetKey": data_source,
-                "userHash": user_hash,
-                "mappingMode": "mock",
-                "dbPostCount": len(posts),
-                "samplePostCount": len(posts),
-                "embeddingPostCount": len(posts),
-                "matchedPostCount": len(posts),
-                "isExactAligned": True,
-                "alignmentStatus": "mock",
-                "attentionPreviewSource": "database",
-            },
-        }
+        error_message = f"{emocc_spec.model_name} 真实模型推理失败，任务未产出检测结果"
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute("""
+                    UPDATE risk_detection_tasks
+                    SET status = 'failed', error_message = %s, completed_at = NOW()
+                    WHERE id = %s
+                """, (error_message, task_id))
+                await conn.commit()
+        return {"success": False, "error": error_message}
     
     # 3. 调用LLM融合
-    fusion_result = await _call_llm_for_emocc_fusion(
-        emocc_result=emocc_result,
-        posts=posts,
-        dataset_key=data_source,
-        temperature=0.7,
-        max_tokens=2048,
-        fusion_model_config=fusion_model_config
-    )
+    try:
+        fusion_result = await _call_llm_for_emocc_fusion(
+            emocc_result=emocc_result,
+            posts=posts,
+            dataset_key=data_source,
+            temperature=0.7,
+            max_tokens=2048,
+            fusion_model_config=fusion_model_config
+        )
+    except Exception as e:
+        error_message = f"{emocc_spec.model_name} 已完成检测，但 LLM 融合失败: {e}"
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute("""
+                    UPDATE risk_detection_tasks
+                    SET status = 'failed', error_message = %s, completed_at = NOW()
+                    WHERE id = %s
+                """, (error_message, task_id))
+                await conn.commit()
+        return {"success": False, "error": error_message}
     
     processing_time_ms = int((time.time() - start_time) * 1000)
     
@@ -2578,7 +2455,7 @@ async def execute_emocc_detection_task(
             "performanceMetrics": emocc_result.get("performance_metrics", emocc_spec.performance_metrics),
             "mappingInfo": emocc_result.get("mapping_info", {}),
         },
-        "fusionMethod": fr.get("fusion_method", "direct") if fr else "direct",
+        "fusionMethod": fr.get("fusion_method", "llm_analysis") if fr else "llm_analysis",
         "symptomDescription": structured["symptomDescription"],
         "emotionalAnalysis": structured["emotionalAnalysis"],
         "riskInterpretation": structured["riskInterpretation"],
@@ -3159,33 +3036,43 @@ async def create_fealearner_detection_task(
     pool = request.app.state.mysql_db
     
     user_hash = task_data.get("userHash") or task_data.get("user_hash") or ""
-    data_source = task_data.get("dataSource") or task_data.get("data_source") or "reddit"
+    data_source = (task_data.get("dataSource") or task_data.get("data_source") or "reddit").strip().lower()
     fusion_model_id = task_data.get("fusionModelId") or task_data.get("fusion_model_id")
     task_name = task_data.get("taskName") or task_data.get("task_name") or ""
+
+    if data_source not in FEAL_SUPPORTED_DATASETS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的 dataSource「{data_source}」，可选: {', '.join(sorted(FEAL_SUPPORTED_DATASETS))}",
+        )
     
     if not user_hash:
         raise HTTPException(status_code=400, detail="缺少 userHash 参数")
     
     post_count = 0
     try:
-        db_posts, _ = await _get_user_posts_from_db(pool, user_hash=user_hash, data_source=data_source, page_size=100)
-        post_count = len([p for p in db_posts if p.get("content")])
+        db_posts, total = await _get_user_posts_from_db(
+            pool, user_hash=user_hash, data_source=data_source, page_size=100
+        )
+        # 与 Emocc 创建逻辑一致：以档案下帖子总数为准，避免「库里有帖子但样本页无正文」时误拒创建
+        post_count = total if total > 0 else len(db_posts) if db_posts else 0
     except Exception as e:
         print(f"[FeaLearner Create] 从数据库获取帖子失败: {e}")
 
     if post_count <= 0:
-        raise HTTPException(status_code=400, detail="用户没有可用于 FeaLearner 检测的帖子数据")
+        raise HTTPException(status_code=400, detail="用户没有可用的帖子数据")
     
     now = datetime.now()
     task_code = _generate_task_code("fea")
     
     if not task_name:
         task_name = f"FeaLearner检测_{user_hash[:8]}"
-    
+
+    fea_display = fealearner_model_display_name(data_source)
     task_record = {
         "task_code": f"FEA-{task_code}",
         "task_name": task_name,
-        "task_description": "FeaLearner-Reddit 本地模型检测任务",
+        "task_description": f"{fea_display} 本地模型检测任务",
         "task_mode": "single",  # 使用 single 而非 fealearner（enum 限制）
         "task_type_id": 1,
         "user_hash": user_hash,
@@ -3193,7 +3080,12 @@ async def create_fealearner_detection_task(
         "post_count": post_count,
         "status": "pending",
         "progress": 0,
-        "detection_model_configs": {"model_type": "fealearner_local", "source": "fealearner"},
+        "detection_model_configs": {
+            "model_type": "fealearner_local",
+            "source": "fealearner",
+            "dataset": data_source,
+            "model_name": fea_display,
+        },
         "result_summary": None,
         "fusion_model_id": fusion_model_id,
         "started_at": None,
@@ -3202,11 +3094,17 @@ async def create_fealearner_detection_task(
     }
     
     task_id = await _save_fealearner_task_to_db(pool, task_record)
-    
+    if not task_id or int(task_id) <= 0:
+        print(f"[FeaLearner Create] 插入后无法解析任务主键，task_code={task_record.get('task_code')}")
+        raise HTTPException(
+            status_code=500,
+            detail="任务已写入但无法获得有效编号，请检查数据库或稍后重试",
+        )
+
     return {
         "success": True,
         "data": {
-            "id": task_id,
+            "id": int(task_id),
             "taskCode": f"FEA-{task_code}",
             "taskName": task_record["task_name"],
             "taskDescription": task_record["task_description"],
@@ -3214,7 +3112,7 @@ async def create_fealearner_detection_task(
             "userHash": user_hash,
             "dataSource": data_source,
             "postCount": post_count,
-            "modelName": "FeaLearner-Reddit",
+            "modelName": fea_display,
             "progress": 0,
             "status": "pending",
             "resultSummary": None,
@@ -3261,7 +3159,8 @@ async def _save_fealearner_task_to_db(pool, task_data: Dict) -> int:
                 fusion_model_id
             ))
             await conn.commit()
-            return cur.lastrowid
+            tid = await _mysql_resolve_risk_task_insert_id(cur, task_data.get("task_code"))
+            return tid
 
 
 async def _get_fealearner_task_by_id_from_db(pool, task_id: int) -> Optional[Dict]:
@@ -3321,7 +3220,11 @@ async def list_fealearner_tasks(
                 result_summary = None
 
         result_summary = result_summary or {}
-        report_model_name = _infer_report_model_name(row, result_summary) if result_summary else "FeaLearner-Reddit"
+        report_model_name = (
+            _infer_report_model_name(row, result_summary)
+            if result_summary
+            else fealearner_model_display_name(row.get("data_source") or "reddit")
+        )
         
         tasks.append({
             "id": row["id"],
@@ -3385,7 +3288,7 @@ async def get_fealearner_task_detail(
             "userHash": task["user_hash"],
             "dataSource": task["data_source"],
             "postCount": task["post_count"],
-            "modelName": "FeaLearner-Reddit",
+            "modelName": fealearner_model_display_name(task.get("data_source") or "reddit"),
             "progress": task.get("progress", 0),
             "status": task["status"],
             "resultSummary": result_summary,
@@ -3445,7 +3348,10 @@ async def execute_fealearner_detection_task(
         return {"success": False, "error": "任务已完成，无需重复执行"}
     
     user_hash = task.get("user_hash", "")
-    data_source = task.get("data_source", "reddit")
+    data_source = (task.get("data_source") or "reddit").strip().lower()
+    if data_source not in FEAL_SUPPORTED_DATASETS:
+        print(f"[FeaLearner Execute] 未知 data_source={data_source!r}，回退 reddit")
+        data_source = "reddit"
     fusion_model_id = task.get("fusion_model_id")
     
     fusion_model_config = None
@@ -3478,7 +3384,6 @@ async def execute_fealearner_detection_task(
     
     fealearner_result = None
     try:
-        from src.services.fealearner_service import get_fealearner_service
         service = get_fealearner_service()
         result = service.predict_single_user(user_hash=user_hash, dataset=data_source)
         
@@ -3497,37 +3402,35 @@ async def execute_fealearner_detection_task(
         traceback.print_exc()
     
     if fealearner_result is None:
-        print("[FeaLearner Execute] 使用模拟结果")
-        import random
-        random.seed(hash(user_hash) % (2**32))
-        
-        risk_keywords = ["death", "suicide", "kill", "die", "hopeless", "depressed", "alone", "empty", "tired", "hurt"]
-        keyword_count = sum(1 for post in posts for kw in risk_keywords if kw.lower() in post.lower())
-        
-        base_score = min(0.9, 0.2 + keyword_count * 0.05)
-        pred_label = 0 if base_score < 0.3 else 1 if base_score < 0.5 else 2 if base_score < 0.7 else 3 if base_score < 0.85 else 4
-        
-        risk_levels = ["low", "low", "medium", "medium", "high"]
-        risk_scores = [0.1, 0.3, 0.5, 0.7, 0.9]
-        
-        fealearner_result = {
-            "risk_level": risk_levels[pred_label],
-            "risk_score": risk_scores[pred_label],
-            "pred_label": pred_label,
-            "confidence": round(random.uniform(0.7, 0.95), 4),
-            "probabilities": {str(i): round(random.uniform(0.05, 0.4), 4) for i in range(5)},
-            "person_id": user_hash,
-            "model_type": "fealearner_mock"
-        }
-        
-        total = sum(fealearner_result["probabilities"].values())
-        fealearner_result["probabilities"] = {k: round(v / total, 4) for k, v in fealearner_result["probabilities"].items()}
+        error_message = f"{fealearner_model_display_name(data_source)} 真实模型推理失败，任务未产出检测结果"
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute("""
+                    UPDATE risk_detection_tasks
+                    SET status = 'failed', error_message = %s, completed_at = NOW()
+                    WHERE id = %s
+                """, (error_message, task_id))
+                await conn.commit()
+        return {"success": False, "error": error_message}
     
-    fusion_result = await _call_llm_for_fealearner_fusion(
-        fealearner_result=fealearner_result,
-        posts=posts,
-        fusion_model_config=fusion_model_config
-    )
+    try:
+        fusion_result = await _call_llm_for_fealearner_fusion(
+            fealearner_result=fealearner_result,
+            posts=posts,
+            fusion_model_config=fusion_model_config,
+            data_source=data_source,
+        )
+    except Exception as e:
+        error_message = f"{fealearner_model_display_name(data_source)} 已完成检测，但 LLM 融合失败: {e}"
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute("""
+                    UPDATE risk_detection_tasks
+                    SET status = 'failed', error_message = %s, completed_at = NOW()
+                    WHERE id = %s
+                """, (error_message, task_id))
+                await conn.commit()
+        return {"success": False, "error": error_message}
     
     processing_time_ms = int((time.time() - start_time) * 1000)
     
@@ -3575,6 +3478,7 @@ async def execute_fealearner_detection_task(
             """, (processing_time_ms, json.dumps(result_summary, ensure_ascii=False), task_id))
             await conn.commit()
     
+    llm_part = result_summary.get("llmModel") or "qwen-flash"
     return {
         "success": True,
         "id": task_id,
@@ -3583,7 +3487,7 @@ async def execute_fealearner_detection_task(
         "userHash": user_hash,
         "dataSource": data_source,
         "postCount": len(posts),
-        "modelName": "FeaLearner-Reddit + qwen-flash",
+        "modelName": f"{fealearner_model_display_name(data_source)} + {llm_part}",
         "progress": 100,
         "status": "completed",
         "resultSummary": result_summary,
@@ -3596,7 +3500,8 @@ async def execute_fealearner_detection_task(
 async def _call_llm_for_fealearner_fusion(
     fealearner_result: dict,
     posts: List[str],
-    fusion_model_config: Optional[Dict[str, Any]] = None
+    fusion_model_config: Optional[Dict[str, Any]] = None,
+    data_source: str = "reddit",
 ) -> dict:
     """
     调用 DashScope LLM 整合 FeaLearner 模型检测结果
@@ -3610,16 +3515,39 @@ async def _call_llm_for_fealearner_fusion(
         print(f"[FeaLearner Fusion] 使用环境变量中的固定整理模型: {model_name}")
     
     if not api_key:
-        return {
-            "risk_level": fealearner_result.get("risk_level", "medium"),
-            "risk_score": fealearner_result.get("risk_score", 0.5),
-            "confidence": fealearner_result.get("confidence", 0.8),
-            "fusion_method": "direct",
-            "summary": "直接使用 FeaLearner 模型结果，未进行 LLM 整合"
-        }
-    
-    system_prompt = """你是一位资深的心理健康评估专家，专注于社交媒体用户的自杀风险评估与临床诊断支持。
+        raise ValueError("LLM API Key 未配置，无法执行 FeaLearner 检测后的融合分析")
+
+    ds = (data_source or "reddit").strip().lower()
+    if ds not in FEAL_SUPPORTED_DATASETS:
+        ds = "reddit"
+    fea_ctx = f"{FEAL_MODEL_CATALOG_DISPLAY}（{fealearner_dataset_label(ds)}）"
+
+    if ds in ("weibo", "sigir"):
+        mapping_text = """【风险等级映射（二分类）】
+- FeaLearner 标签 0: 模型判为无风险/低风险
+- FeaLearner 标签 1: 模型判为高风险
+请结合两类概率分布与贴文证据解释主判定与边界不确定性。"""
+        analysis_hint = "先解释 FeaLearner 的二分类预测与两类概率，再结合帖子证据判断"
+    elif ds == "bigdata":
+        mapping_text = """【风险等级映射（四分类 0-3）】
+- 0: 无风险 → 3: 风险渐强（与模型训练标签语义一致）
+请在报告中说明预测档与相邻风险档的差异依据。"""
+        analysis_hint = "先解释 FeaLearner 的四分类预测与各类别概率，再结合帖子证据判断"
+    else:
+        mapping_text = """【风险等级映射（五分类 Reddit）】
+- FeaLearner 五分类 (0-4):
+  - 0 (无风险): risk_level=low, risk_score≈0.1
+  - 1 (极低风险): risk_level=low, risk_score≈0.3
+  - 2 (低风险): risk_level=medium, risk_score≈0.5
+  - 3 (中风险): risk_level=medium, risk_score≈0.7
+  - 4 (高风险): risk_level=high, risk_score≈0.9"""
+        analysis_hint = "先解释 FeaLearner 的五分类预测标签和概率分布，再结合帖子证据判断"
+
+    system_prompt = f"""你是一位资深的心理健康评估专家，专注于社交媒体用户的自杀风险评估与临床诊断支持。
 你的任务是基于 FeaLearner 深度学习模型的检测结果，结合用户贴文内容，给出专业、严谨、富有同理心的综合临床评估报告。
+
+【当前模型与数据】
+- 数据集: {fea_ctx}（内部 key: {ds}）
 
 【重要原则】
 1. 以专业、关怀、严谨的态度进行分析，绝不泄露用户隐私
@@ -3627,13 +3555,7 @@ async def _call_llm_for_fealearner_fusion(
 3. 所有评估结果仅供参考，最终诊断应由持证专业医生做出
 4. 报告应具备临床参考价值，语言准确、条理清晰
 
-【风险等级映射】
-- FeaLearner 五分类 (0-4):
-  - 0 (无风险): risk_level=low, risk_score≈0.1
-  - 1 (极低风险): risk_level=low, risk_score≈0.3
-  - 2 (低风险): risk_level=medium, risk_score≈0.5
-  - 3 (中风险): risk_level=medium, risk_score≈0.7
-  - 4 (高风险): risk_level=high, risk_score≈0.9
+{mapping_text}
 
 请以 JSON 格式输出评估报告，包含以下字段：
 - risk_level: 风险等级（low/medium/high）
@@ -3676,8 +3598,8 @@ async def _call_llm_for_fealearner_fusion(
 {posts_text}
 
 【分析要求】
-1. 先解释 FeaLearner 的五分类预测标签和概率分布，再结合帖子证据判断
-2. 必须明确说明：模型主判定是什么、最接近的次高风险类别是什么、两者差距意味着什么
+1. {analysis_hint}
+2. 必须明确说明：模型主判定是什么；若为多分类，说明最接近的次高风险类别及差距含义（二分类则说明与另一类的概率对比）
 3. 从模型结果、文本证据、模型不确定性三个角度做互补与增强解释
 4. 如果当前模型没有提供注意力分数，不要编造；改为解释概率分布和边界不确定性
 5. 不要泛泛写“存在抑郁倾向”，要结合帖子中的具体线索
@@ -3736,53 +3658,48 @@ async def _call_llm_for_fealearner_fusion(
                     parsed["llmModel"] = model_name
                     parsed["model"] = model_name
                     return parsed
+                raise ValueError("FeaLearner 融合阶段返回内容不是有效 JSON")
+            raise ValueError(f"FeaLearner 融合阶段 HTTP 调用失败: status={response.status_code}, body={response.text[:300]}")
     except Exception as e:
         print(f"[FeaLearner Fusion] LLM 调用失败: {e}")
-    
-    return {
-        "risk_level": fealearner_result.get("risk_level", "medium"),
-        "risk_score": fealearner_result.get("risk_score", 0.5),
-        "confidence": fealearner_result.get("confidence", 0.8),
-        "fusion_method": "direct",
-        "summary": f"FeaLearner 检测完成，风险等级: {fealearner_result.get('risk_level', 'medium')}"
-    }
+        raise ValueError(f"FeaLearner 融合阶段失败: {e}")
 
 
 @router.get("/api/risk/fealearner-models")
 async def get_fealearner_model_info():
     """获取 FeaLearner 模型信息"""
+    supported = sorted(FEAL_SUPPORTED_DATASETS)
     return {
         "success": True,
         "data": {
-            "model_name": "FeaLearner-Reddit",
+            "model_name": FEAL_MODEL_CATALOG_DISPLAY,
             "model_type": "fealearner_local",
-            "description": "FeaLearner 深度学习自杀风险检测模型（Reddit 数据集）",
+            "description": FEAL_MODEL_CENTER_DESCRIPTION,
             "architecture": {
                 "text_encoder": "BERT embeddings",
                 "classifier": "MLP classifier",
-                "output": "5-class classification (0-4)"
+                "output": "按数据集：2 / 4 / 5 类分类",
             },
             "features": [
                 "基于文本特征与嵌入进行自杀风险预测",
-                "五分类风险评估",
-                "支持 Reddit 数据集"
+                "与内置数据集 reddit / weibo / bigdata / sigir 的 user_hash 对齐",
             ],
             "performance": {
                 "accuracy": 0.85,
                 "precision": 0.83,
                 "recall": 0.82,
-                "f1": 0.825
+                "f1": 0.825,
             },
-            "supported_datasets": ["reddit"],
+            "supported_datasets": supported,
             "input_format": {
                 "user_hash": "string",
-                "dataset": "reddit"
+                "dataset": "|".join(supported),
             },
             "output_format": {
                 "risk_level": "high|medium|low",
                 "risk_score": "0.0-1.0",
-                "pred_label": "0-4",
-                "confidence": "0.0-1.0"
-            }
-        }
+                "pred_label": "依数据集而定",
+                "confidence": "0.0-1.0",
+            },
+        },
     }

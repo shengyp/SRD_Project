@@ -153,7 +153,11 @@ EMOCC_DATASET_SPECS: Dict[str, EmoccDatasetSpec] = {
         max_posts=100,
         emoji_csv_file="data/weibo_1000_emoji_batch.csv",
         embedding_pickle_file="data/user_post_embeddings_filtered.pkl",
-        description="BERT + Emoji 双模态层次融合模型，面向微博二分类高风险检测。",
+        description=(
+            "BERT + Emoji 双模态层次融合模型，面向微博二分类高风险检测。"
+            " 与仓库 datasets/weibo/weibo_1000.csv（及 emoji 批）行序对齐，对应本目录 data 下 pkl；"
+            " 与 FeaLearner 使用的 weibo_data.csv 子集不同。"
+        ),
         features=[
             "输出二分类类别概率",
             "适配中文微博文本",

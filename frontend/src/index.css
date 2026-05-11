@@ -59,6 +59,12 @@ body {
   text-wrap: pretty;
 }
 
+/* 智能问答中间对话栏：基础字号随视口宽度平滑缩放（整体略小于原固定 16px） */
+.chat-fluid-center {
+  font-size: clamp(11.5px, 0.22vw + 10.65px, 12.875px);
+  line-height: 1.55;
+}
+
 /* 美化滚动条 */
 ::-webkit-scrollbar {
   width: 8px;

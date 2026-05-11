@@ -16,6 +16,13 @@
 - feature_data/  放各数据集的特征 CSV（列数与训练时一致；脚本会将标签列拼到特征后构造 Dataset）
 - bestmodel/     放各数据集训练得到的最佳权重 .pth
 
+后端 FeaLearner 服务（fealearner_service）会优先从仓库根 **Emocc/<数据集>/data/** 加载
+reddit / sigir / bigdata 的嵌入 pkl（与 Emocc 部署一致）；weibo 仍用 **Fealeaner/data/user_post_embeddings_bert_wwm.pkl**。
+
+仓库 **datasets/weibo/** 与上述 pkl 的对应关系（行序须一致，勿与 Emocc 子集混用）：
+  - weibo_1000.csv          → 对齐 Emocc-Weibo（Emocc/weibo/data 下 pkl）
+  - weibo_data.csv          → 对齐 FeaLearner-Weibo（本目录 data/user_post_embeddings_bert_wwm.pkl）
+
 默认文件名对照：
   weibo   data/user_post_embeddings_bert_wwm.pkl    feature_data/feature_weibo_2.csv    bestmodel/weibo_best_model.pth
   reddit  data/reddit_bert_embeddings.pkl            feature_data/feature_reddit_500.csv   bestmodel/my_reddit_model.pth
@@ -110,7 +117,48 @@ def _load_train_module(dataset: str):
 
 def _read_embeddings_pkl(path: Path) -> List[Dict[str, Any]]:
     with open(path, "rb") as f:
-        return pickle.load(f)
+        raw = pickle.load(f)
+
+    if isinstance(raw, list):
+        return raw
+
+    if isinstance(raw, dict) and "dataframe" in raw and "bert_embeddings" in raw:
+        df = raw["dataframe"]
+        bert_embeddings = raw["bert_embeddings"]
+        if len(df) != len(bert_embeddings):
+            raise ValueError(
+                f"pkl 中 dataframe 行数 {len(df)} 与 bert_embeddings 数量 {len(bert_embeddings)} 不一致: {path}"
+            )
+
+        label_col = None
+        for candidate in ("label", "Label", "suicide_risk"):
+            if candidate in df.columns:
+                label_col = candidate
+                break
+        if label_col is None:
+            raise KeyError(f"无法在 pkl dataframe 中找到标签列(label/Label/suicide_risk): {path}")
+
+        id_col = None
+        for candidate in ("user_id", "user", "author_id", "author", "id"):
+            if candidate in df.columns:
+                id_col = candidate
+                break
+
+        normalized: List[Dict[str, Any]] = []
+        for idx, emb in enumerate(bert_embeddings):
+            row = df.iloc[idx]
+            record: Dict[str, Any] = {
+                "label": int(row[label_col]),
+                "embeddings": emb,
+            }
+            if id_col is not None:
+                record[id_col] = str(row[id_col]).strip()
+            else:
+                record["id"] = f"row_{idx + 1}"
+            normalized.append(record)
+        return normalized
+
+    raise TypeError(f"不支持的 embeddings pkl 结构: {type(raw).__name__} @ {path}")
 
 
 def _default_paths(dataset: str) -> Tuple[Path, Path, Path]:

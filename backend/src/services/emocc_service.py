@@ -278,6 +278,7 @@ class EmoccInferenceService:
 
     @staticmethod
     def _dataset_csv_relative_path(dataset_key: str) -> str:
+        # datasets/ 下主贴与 Emocc 各数据目录 pkl 行序对齐；Weibo 用 weibo_1000（非 weibo_data，后者对齐 FeaLearner）
         mapping = {
             "reddit": "reddit/reddit_500.csv",
             "bigdata": "bigdata/bigdata.csv",

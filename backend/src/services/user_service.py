@@ -1,6 +1,9 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import aiomysql
 from src.core.constants import RISK_LEVEL_LOW, RISK_LEVEL_MEDIUM, RISK_LEVEL_HIGH
+
+# 与 DatasetCSVService.DATASET_CONFIG / FeaLearner 内置源一致
+_BUILTIN_ARCHIVE_SOURCES = frozenset({"reddit", "weibo", "bigdata", "sigir"})
 
 
 class UserService:
@@ -9,6 +12,78 @@ class UserService:
     def __init__(self, mysql_pool, get_dataset_config_fn):
         self.mysql_pool = mysql_pool
         self.get_dataset_config = get_dataset_config_fn
+
+    @staticmethod
+    def _pack_archive_rows(rows: List[Any]) -> List[dict]:
+        out = []
+        for a in rows:
+            ts = a.get("import_timestamp")
+            if ts is None:
+                import_time = ""
+            elif hasattr(ts, "isoformat"):
+                import_time = ts.isoformat()
+            else:
+                import_time = str(ts)
+            out.append({
+                "id": a["user_id"],
+                "userId": a["user_id"],
+                "datasetSource": a["dataset_source"],
+                "postCount": a["post_count"],
+                "riskValue": a["risk_value"],
+                "riskLevel": a["risk_level"],
+                "riskScore": 0.9 if a["risk_level"] == RISK_LEVEL_HIGH else 0.6 if a["risk_level"] == RISK_LEVEL_MEDIUM else 0.1,
+                "importTime": import_time,
+                "status": a.get("status") or "ready",
+                "hasTimestamp": bool(a["has_timestamp"]),
+                "hasEmojis": bool(a["has_emojis"]),
+            })
+        return out
+
+    def _fallback_users_from_builtin_csv(
+        self,
+        dataset: str,
+        risk_level: Optional[str],
+        keyword: Optional[str],
+        status: Optional[str],
+        page: int,
+        page_size: int,
+    ) -> Optional[dict]:
+        """MySQL 无该数据源档案时，从内建 CSV 读取（未跑 sync 也能选人）。"""
+        if status and status != "ready":
+            return None
+        from src.services.dataset_csv_service import DatasetCSVService
+
+        csv_svc = DatasetCSVService()
+        infos, csv_total = csv_svc.get_builtin_csv_archives_page(
+            dataset_key=dataset,
+            risk_level=risk_level,
+            keyword=keyword,
+            page=page,
+            page_size=page_size,
+        )
+        if not csv_total:
+            return None
+        rows = []
+        for info in infos:
+            rows.append({
+                "user_id": info.user_id,
+                "dataset_source": info.dataset_key,
+                "post_count": info.post_count,
+                "risk_value": info.risk_value,
+                "risk_level": info.risk_level,
+                "import_timestamp": info.import_timestamp,
+                "status": "ready",
+                "has_timestamp": info.has_timestamp,
+                "has_emojis": info.has_emojis,
+            })
+        archives = self._pack_archive_rows(rows)
+        return {
+            "archives": archives,
+            "total": csv_total,
+            "page": page,
+            "pageSize": page_size,
+            "totalPages": (csv_total + page_size - 1) // page_size,
+        }
 
     async def get_users(
         self,
@@ -19,7 +94,8 @@ class UserService:
         page: int = 1,
         page_size: int = 20,
     ) -> dict:
-        """分页获取用户列表，仅从 MySQL 读取。"""
+        """分页获取用户列表：优先 MySQL；该数据源无同步记录时回退到内建 CSV。"""
+        ds_key = dataset.strip().lower() if dataset else None
         async with self.mysql_pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cursor:
                 await cursor.execute("SET NAMES utf8mb4")
@@ -55,21 +131,7 @@ class UserService:
                     query += " ORDER BY import_timestamp DESC, id DESC LIMIT %s OFFSET %s"
                     await cursor.execute(query, params + [page_size, (page - 1) * page_size])
                     rows = await cursor.fetchall()
-                    archives = []
-                    for a in rows:
-                        archives.append({
-                            "id": a["user_id"],
-                            "userId": a["user_id"],
-                            "datasetSource": a["dataset_source"],
-                            "postCount": a["post_count"],
-                            "riskValue": a["risk_value"],
-                            "riskLevel": a["risk_level"],
-                            "riskScore": 0.9 if a["risk_level"] == RISK_LEVEL_HIGH else 0.6 if a["risk_level"] == RISK_LEVEL_MEDIUM else 0.1,
-                            "importTime": a["import_timestamp"].isoformat() if a["import_timestamp"] else "",
-                            "status": a["status"],
-                            "hasTimestamp": bool(a["has_timestamp"]),
-                            "hasEmojis": bool(a["has_emojis"]),
-                        })
+                    archives = self._pack_archive_rows(rows)
                     return {
                         "archives": archives,
                         "total": total,
@@ -77,6 +139,13 @@ class UserService:
                         "pageSize": page_size,
                         "totalPages": (total + page_size - 1) // page_size,
                     }
+
+        if ds_key and ds_key in _BUILTIN_ARCHIVE_SOURCES:
+            fb = self._fallback_users_from_builtin_csv(
+                ds_key, risk_level, keyword, status, page, page_size
+            )
+            if fb:
+                return fb
 
         return {"archives": [], "total": 0, "page": page, "pageSize": page_size, "totalPages": 0}
 

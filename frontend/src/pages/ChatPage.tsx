@@ -1,19 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight,
   Bot,
   BrainCircuit,
-  ChevronLeft,
-  ChevronRight,
   Copy,
   FileText,
   GitBranch,
+  GripVertical,
   Archive,
   Mic,
   MoreHorizontal,
   Network,
   Pin,
   PenSquare,
+  PanelLeftClose,
+  PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
   PencilLine,
@@ -129,6 +130,85 @@ interface SessionListItem {
   status: ChatSession['status'];
 }
 
+const CHAT_LAYOUT_LEFT_LS = 'vis4srd_chat_layout_left_px';
+const CHAT_LAYOUT_RIGHT_LS = 'vis4srd_chat_layout_right_px';
+const CHAT_LAYOUT_LEFT_PCT_LS = 'vis4srd_chat_layout_left_pct';
+const CHAT_LAYOUT_RIGHT_PCT_LS = 'vis4srd_chat_layout_right_pct';
+/** 设计稿比例：会话列表 18%、对话区 52%、知识清单 25%（相对三栏之和 95%，另 ~5% 为全局导航） */
+const CHAT_LAYOUT_LEFT_RATIO = 18 / 95;
+const CHAT_LAYOUT_RIGHT_RATIO = 25 / 95;
+const CHAT_LAYOUT_LEFT_MIN = 200;
+const CHAT_LAYOUT_RIGHT_MIN = 200;
+const CHAT_LAYOUT_MAX_COL = 560;
+const CHAT_LAYOUT_MIN_CENTER = 320;
+const CHAT_LAYOUT_CHROME = 88;
+
+function readLayoutRatios(): { left: number; right: number } {
+  try {
+    const ls = localStorage.getItem(CHAT_LAYOUT_LEFT_PCT_LS);
+    const rs = localStorage.getItem(CHAT_LAYOUT_RIGHT_PCT_LS);
+    if (ls !== null && rs !== null) {
+      const l = parseFloat(ls);
+      const r = parseFloat(rs);
+      if (Number.isFinite(l) && Number.isFinite(r) && l >= 0.12 && r >= 0.12 && l + r <= 0.72) {
+        return { left: l, right: r };
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const oldL = parseInt(localStorage.getItem(CHAT_LAYOUT_LEFT_LS) || '', 10);
+    const oldR = parseInt(localStorage.getItem(CHAT_LAYOUT_RIGHT_LS) || '', 10);
+    if (Number.isFinite(oldL) && Number.isFinite(oldR) && typeof window !== 'undefined') {
+      const est = Math.max(720, window.innerWidth - 260);
+      return {
+        left: Math.min(0.34, Math.max(0.14, oldL / est)),
+        right: Math.min(0.38, Math.max(0.15, oldR / est)),
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { left: CHAT_LAYOUT_LEFT_RATIO, right: CHAT_LAYOUT_RIGHT_RATIO };
+}
+
+function resolveChatColumnWidths(totalWidth: number, leftRatio: number, rightRatio: number): { leftW: number; rightW: number } {
+  if (totalWidth <= CHAT_LAYOUT_MIN_CENTER + CHAT_LAYOUT_CHROME + CHAT_LAYOUT_LEFT_MIN + CHAT_LAYOUT_RIGHT_MIN) {
+    return { leftW: CHAT_LAYOUT_LEFT_MIN, rightW: CHAT_LAYOUT_RIGHT_MIN };
+  }
+  let leftW = Math.round(totalWidth * leftRatio);
+  let rightW = Math.round(totalWidth * rightRatio);
+  leftW = Math.min(CHAT_LAYOUT_MAX_COL, Math.max(CHAT_LAYOUT_LEFT_MIN, leftW));
+  rightW = Math.min(CHAT_LAYOUT_MAX_COL, Math.max(CHAT_LAYOUT_RIGHT_MIN, rightW));
+  let center = totalWidth - leftW - rightW - CHAT_LAYOUT_CHROME;
+  let guard = 0;
+  while (center < CHAT_LAYOUT_MIN_CENTER && guard < 640 && (leftW > CHAT_LAYOUT_LEFT_MIN || rightW > CHAT_LAYOUT_RIGHT_MIN)) {
+    if (leftW >= rightW && leftW > CHAT_LAYOUT_LEFT_MIN) leftW -= 1;
+    else if (rightW > CHAT_LAYOUT_RIGHT_MIN) rightW -= 1;
+    else if (leftW > CHAT_LAYOUT_LEFT_MIN) leftW -= 1;
+    center = totalWidth - leftW - rightW - CHAT_LAYOUT_CHROME;
+    guard += 1;
+  }
+  return { leftW, rightW };
+}
+
+/** 底部输入区整体高度（白卡片），避免占满屏幕挡住历史消息 */
+const CHAT_INPUT_DOCK_HEIGHT_LS = 'vis4srd_chat_input_dock_height_px';
+const CHAT_INPUT_DOCK_DEFAULT = 220;
+const CHAT_INPUT_DOCK_MIN = 152;
+const CHAT_INPUT_DOCK_MAX = 520;
+
+function readStoredInputDockHeight(): number {
+  try {
+    const n = parseInt(localStorage.getItem(CHAT_INPUT_DOCK_HEIGHT_LS) || '', 10);
+    if (!Number.isFinite(n)) return CHAT_INPUT_DOCK_DEFAULT;
+    return Math.min(CHAT_INPUT_DOCK_MAX, Math.max(CHAT_INPUT_DOCK_MIN, n));
+  } catch {
+    return CHAT_INPUT_DOCK_DEFAULT;
+  }
+}
+
 const CHAT_MODE_LABELS: Record<ChatSession['aiMode'], string> = {
   deep_think: '深度思考',
   risk_assessment: '风险识别',
@@ -202,7 +282,7 @@ function renderChatMessageHtml(content: string): string {
     const header = line.match(/^(#{1,6})\s+(.+)$/);
     if (header) {
       const level = header[1].length;
-      const size = level === 1 ? 'text-[28px]' : level === 2 ? 'text-[24px]' : 'text-[20px]';
+      const size = level === 1 ? 'text-[1.55em]' : level === 2 ? 'text-[1.35em]' : 'text-[1.2em]';
       blocks.push(`<h${level} class="${size} font-bold text-[#1F1F1F] mt-5 mb-3">${formatChatInline(header[2])}</h${level}>`);
       i += 1;
       continue;
@@ -219,10 +299,10 @@ function renderChatMessageHtml(content: string): string {
       while (i < lines.length) {
         const match = /^\s*[*-]\s+(.+)$/.exec(lines[i]);
         if (!match) break;
-        items.push(`<li class="leading-8">${formatChatInline(match[1])}</li>`);
+        items.push(`<li class="leading-[1.75]">${formatChatInline(match[1])}</li>`);
         i += 1;
       }
-      blocks.push(`<ul class="list-disc pl-6 my-3 text-[16px] text-[#202020]">${items.join('')}</ul>`);
+      blocks.push(`<ul class="list-disc pl-6 my-3 text-[1em] text-[#202020]">${items.join('')}</ul>`);
       continue;
     }
     if (ol) {
@@ -230,10 +310,10 @@ function renderChatMessageHtml(content: string): string {
       while (i < lines.length) {
         const match = /^\s*\d+\.\s+(.+)$/.exec(lines[i]);
         if (!match) break;
-        items.push(`<li class="leading-8">${formatChatInline(match[1])}</li>`);
+        items.push(`<li class="leading-[1.75]">${formatChatInline(match[1])}</li>`);
         i += 1;
       }
-      blocks.push(`<ol class="list-decimal pl-6 my-3 text-[16px] text-[#202020]">${items.join('')}</ol>`);
+      blocks.push(`<ol class="list-decimal pl-6 my-3 text-[1em] text-[#202020]">${items.join('')}</ol>`);
       continue;
     }
     if (line.trim() === '') {
@@ -252,7 +332,7 @@ function renderChatMessageHtml(content: string): string {
       paragraph.push(lines[i]);
       i += 1;
     }
-    blocks.push(`<p class="my-2 text-[16px] leading-8 text-[#232323]">${paragraph.map((item) => formatChatInline(item)).join('<br/>')}</p>`);
+    blocks.push(`<p class="my-2 text-[1em] leading-[1.75] text-[#232323]">${paragraph.map((item) => formatChatInline(item)).join('<br/>')}</p>`);
   }
   return blocks.join('');
 }
@@ -1021,6 +1101,64 @@ export default function ChatPage() {
   const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
   const [editingSessionTitle, setEditingSessionTitle] = useState('');
 
+  const chatLayoutRef = useRef<HTMLDivElement>(null);
+  const layoutDragRef = useRef<{
+    pointerId: number;
+    edge: 'left' | 'right';
+    startX: number;
+    startLeft: number;
+    startRight: number;
+  } | null>(null);
+  const layoutRatiosRef = useRef(readLayoutRatios());
+  const leftAsidePxRef = useRef(CHAT_LAYOUT_LEFT_MIN);
+  const rightAsidePxRef = useRef(CHAT_LAYOUT_RIGHT_MIN);
+  const [leftAsidePx, setLeftAsidePx] = useState(CHAT_LAYOUT_LEFT_MIN);
+  const [rightAsidePx, setRightAsidePx] = useState(CHAT_LAYOUT_RIGHT_MIN);
+  const [isLayoutDragging, setIsLayoutDragging] = useState(false);
+
+  const inputDockDragRef = useRef<{ pointerId: number; startY: number; startH: number } | null>(null);
+  const [inputDockHeightPx, setInputDockHeightPx] = useState(readStoredInputDockHeight);
+  const inputDockHeightRef = useRef(readStoredInputDockHeight());
+  const [isInputDockDragging, setIsInputDockDragging] = useState(false);
+
+  useEffect(() => {
+    leftAsidePxRef.current = leftAsidePx;
+  }, [leftAsidePx]);
+  useEffect(() => {
+    rightAsidePxRef.current = rightAsidePx;
+  }, [rightAsidePx]);
+  useEffect(() => {
+    inputDockHeightRef.current = inputDockHeightPx;
+  }, [inputDockHeightPx]);
+
+  const applyChatLayoutFromRatios = useCallback(() => {
+    const root = chatLayoutRef.current;
+    if (!root || isLayoutDragging) return;
+    const total = root.getBoundingClientRect().width;
+    if (total < 480) return;
+    if (sessionPanelCollapsed || !rightPanelVisible) return;
+    const { left: lr, right: rr } = layoutRatiosRef.current;
+    const { leftW, rightW } = resolveChatColumnWidths(total, lr, rr);
+    leftAsidePxRef.current = leftW;
+    rightAsidePxRef.current = rightW;
+    setLeftAsidePx(leftW);
+    setRightAsidePx(rightW);
+  }, [isLayoutDragging, sessionPanelCollapsed, rightPanelVisible]);
+
+  useLayoutEffect(() => {
+    applyChatLayoutFromRatios();
+  }, [applyChatLayoutFromRatios]);
+
+  useEffect(() => {
+    const root = chatLayoutRef.current;
+    if (!root || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      applyChatLayoutFromRatios();
+    });
+    ro.observe(root);
+    return () => ro.disconnect();
+  }, [applyChatLayoutFromRatios]);
+
   const activeAnswer = useMemo(
     () => messages.find((item) => item.id === activeAnswerId && item.role === 'ai') || [...messages].reverse().find((item) => item.role === 'ai') || null,
     [activeAnswerId, messages],
@@ -1061,6 +1199,26 @@ export default function ChatPage() {
     () => RECOMMENDED_QUESTIONS_BY_MODE[currentChatMode] || RECOMMENDED_QUESTIONS_BY_MODE.deep_think,
     [currentChatMode],
   );
+
+  /** 左侧会话列表（非全局导航）：窄宽度时同步缩小根字号，子元素用 em 比例缩放以保留可读性 */
+  const leftSessionPanelFontPx = useMemo(() => {
+    if (sessionPanelCollapsed) return 13;
+    const minW = CHAT_LAYOUT_LEFT_MIN;
+    const refW = 292;
+    const w = leftAsidePx;
+    const t = Math.min(1, Math.max(0, (w - minW) / Math.max(1, refW - minW)));
+    return Math.round((10.25 + t * 3.35) * 10) / 10;
+  }, [leftAsidePx, sessionPanelCollapsed]);
+
+  /** 右侧知识清单：窄宽度时同步缩小根字号，子元素用 em 比例缩放 */
+  const rightKnowledgePanelFontPx = useMemo(() => {
+    if (!rightPanelVisible) return 13;
+    const minW = CHAT_LAYOUT_RIGHT_MIN;
+    const refW = 300;
+    const w = rightAsidePx;
+    const t = Math.min(1, Math.max(0, (w - minW) / Math.max(1, refW - minW)));
+    return Math.round((10.25 + t * 3.35) * 10) / 10;
+  }, [rightAsidePx, rightPanelVisible]);
 
   const resetConversationView = () => {
     streamingUiRef.current.forEach((state) => {
@@ -1614,52 +1772,213 @@ export default function ChatPage() {
     handleSendMessage(prompt);
   };
 
+  const resetChatLayoutWidths = () => {
+    layoutRatiosRef.current = { left: CHAT_LAYOUT_LEFT_RATIO, right: CHAT_LAYOUT_RIGHT_RATIO };
+    try {
+      localStorage.removeItem(CHAT_LAYOUT_LEFT_PCT_LS);
+      localStorage.removeItem(CHAT_LAYOUT_RIGHT_PCT_LS);
+      localStorage.removeItem(CHAT_LAYOUT_LEFT_LS);
+      localStorage.removeItem(CHAT_LAYOUT_RIGHT_LS);
+    } catch {
+      /* ignore */
+    }
+    queueMicrotask(() => {
+      applyChatLayoutFromRatios();
+    });
+  };
+
+  const resetInputDockHeight = () => {
+    setInputDockHeightPx(CHAT_INPUT_DOCK_DEFAULT);
+    inputDockHeightRef.current = CHAT_INPUT_DOCK_DEFAULT;
+    try {
+      localStorage.removeItem(CHAT_INPUT_DOCK_HEIGHT_LS);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const attachInputDockResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const el = e.currentTarget;
+    el.setPointerCapture(e.pointerId);
+    inputDockDragRef.current = {
+      pointerId: e.pointerId,
+      startY: e.clientY,
+      startH: inputDockHeightRef.current,
+    };
+    setIsInputDockDragging(true);
+    const onMove = (ev: PointerEvent) => {
+      const d = inputDockDragRef.current;
+      if (!d || ev.pointerId !== d.pointerId) return;
+      const next = d.startH - (ev.clientY - d.startY);
+      const v = Math.round(Math.min(CHAT_INPUT_DOCK_MAX, Math.max(CHAT_INPUT_DOCK_MIN, next)));
+      inputDockHeightRef.current = v;
+      setInputDockHeightPx(v);
+    };
+    const onUp = (ev: PointerEvent) => {
+      const d = inputDockDragRef.current;
+      if (!d || ev.pointerId !== d.pointerId) return;
+      inputDockDragRef.current = null;
+      setIsInputDockDragging(false);
+      try {
+        el.releasePointerCapture(ev.pointerId);
+      } catch {
+        /* ignore */
+      }
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      try {
+        localStorage.setItem(CHAT_INPUT_DOCK_HEIGHT_LS, String(inputDockHeightRef.current));
+      } catch {
+        /* ignore */
+      }
+      document.body.style.removeProperty('cursor');
+      document.body.style.removeProperty('user-select');
+    };
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+
+  const attachChatLayoutResize = (edge: 'left' | 'right', event: React.PointerEvent<HTMLDivElement>) => {
+    if (edge === 'left' && sessionPanelCollapsed) return;
+    if (edge === 'right' && !rightPanelVisible) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const handleEl = event.currentTarget;
+    handleEl.setPointerCapture(event.pointerId);
+    layoutDragRef.current = {
+      pointerId: event.pointerId,
+      edge,
+      startX: event.clientX,
+      startLeft: leftAsidePxRef.current,
+      startRight: rightAsidePxRef.current,
+    };
+    setIsLayoutDragging(true);
+
+    const onMove = (ev: PointerEvent) => {
+      const d = layoutDragRef.current;
+      const root = chatLayoutRef.current;
+      if (!d || !root || ev.pointerId !== d.pointerId) return;
+      const total = root.getBoundingClientRect().width;
+      if (d.edge === 'left') {
+        const next = d.startLeft + (ev.clientX - d.startX);
+        const maxL = total - d.startRight - CHAT_LAYOUT_MIN_CENTER - CHAT_LAYOUT_CHROME;
+        const v = Math.round(Math.min(CHAT_LAYOUT_MAX_COL, Math.max(CHAT_LAYOUT_LEFT_MIN, Math.min(next, maxL))));
+        leftAsidePxRef.current = v;
+        setLeftAsidePx(v);
+      } else {
+        const next = d.startRight + (d.startX - ev.clientX);
+        const maxR = total - d.startLeft - CHAT_LAYOUT_MIN_CENTER - CHAT_LAYOUT_CHROME;
+        const v = Math.round(Math.min(CHAT_LAYOUT_MAX_COL, Math.max(CHAT_LAYOUT_RIGHT_MIN, Math.min(next, maxR))));
+        rightAsidePxRef.current = v;
+        setRightAsidePx(v);
+      }
+    };
+
+    const onUp = (ev: PointerEvent) => {
+      const d = layoutDragRef.current;
+      if (!d || ev.pointerId !== d.pointerId) return;
+      layoutDragRef.current = null;
+      setIsLayoutDragging(false);
+      try {
+        handleEl.releasePointerCapture(ev.pointerId);
+      } catch {
+        /* ignore */
+      }
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      try {
+        const root = chatLayoutRef.current;
+        const total = root?.getBoundingClientRect().width ?? 0;
+        if (total > 100) {
+          const lp = leftAsidePxRef.current / total;
+          const rp = rightAsidePxRef.current / total;
+          layoutRatiosRef.current = { left: lp, right: rp };
+          localStorage.setItem(CHAT_LAYOUT_LEFT_PCT_LS, String(lp));
+          localStorage.setItem(CHAT_LAYOUT_RIGHT_PCT_LS, String(rp));
+        }
+        localStorage.removeItem(CHAT_LAYOUT_LEFT_LS);
+        localStorage.removeItem(CHAT_LAYOUT_RIGHT_LS);
+      } catch {
+        /* ignore */
+      }
+      document.body.style.removeProperty('cursor');
+      document.body.style.removeProperty('user-select');
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+
   const centerTimestamp = useMemo(() => formatTimestamp(activeAnswer?.createdAt), [activeAnswer?.createdAt]);
 
   return (
-    <div className="relative flex min-h-0 flex-1 gap-6 overflow-hidden">
+    <div
+      ref={chatLayoutRef}
+      className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden lg:flex-row lg:items-stretch lg:gap-3 xl:gap-4 2xl:gap-5"
+    >
       <aside
-        className={`hidden h-full shrink-0 overflow-hidden rounded-[30px] border border-[#E5ECF5] bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(247,250,254,0.98)_100%)] shadow-[0_18px_42px_rgba(78,101,132,0.08)] transition-[width] duration-300 lg:flex lg:flex-col ${
-          sessionPanelCollapsed ? 'lg:w-[88px]' : 'lg:w-[318px]'
-        }`}
+        style={{
+          width: sessionPanelCollapsed ? undefined : leftAsidePx,
+        }}
+        className={`hidden h-full min-h-0 shrink-0 overflow-hidden rounded-[30px] border border-[#E5ECF5] bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(247,250,254,0.98)_100%)] shadow-[0_18px_42px_rgba(78,101,132,0.08)] lg:flex lg:flex-col ${
+          sessionPanelCollapsed ? 'lg:w-[88px]' : ''
+        } ${!isLayoutDragging && !sessionPanelCollapsed ? 'lg:transition-[width] lg:duration-200' : ''}`}
       >
-        <div className="border-b border-[#EBF0F6] px-4 py-4">
-          <div className={`flex items-center ${sessionPanelCollapsed ? 'justify-center' : 'justify-between'} gap-3`}>
+        <div
+          className="flex h-full min-h-0 flex-col overflow-hidden"
+          style={{ fontSize: `${leftSessionPanelFontPx}px` }}
+        >
+        <div className="border-b border-[#EBF0F6] px-[1.05em] py-[1.05em]">
+          <div className={`flex items-center ${sessionPanelCollapsed ? 'justify-center' : 'justify-between'} gap-[0.75em]`}>
             {!sessionPanelCollapsed && (
-              <div>
-                <div className="text-[21px] font-semibold text-[#2B5FD9]">VIS4SRD Chat</div>
-                <div className="mt-1 text-[13px] text-[#8A97AA]">风险研判与知识推理会话</div>
+              <div className="min-w-0 flex-1">
+                <div className="break-words text-[1.62em] font-semibold leading-tight text-[#2B5FD9]">VIS4SRD Chat</div>
+                <div className="mt-[0.35em] break-words text-[1em] leading-snug text-[#8A97AA]">风险研判与知识推理会话</div>
               </div>
             )}
             <button
+              type="button"
               onClick={() => setSessionPanelCollapsed((prev) => !prev)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-[14px] border border-[#DEE7F1] bg-white text-[#60738B] shadow-sm transition hover:border-[#C8D7EA] hover:text-[#3557D4]"
+              className="inline-flex min-h-[36px] min-w-[36px] shrink-0 items-center justify-center rounded-full p-[0.35em] text-[#60738B] transition hover:bg-white hover:text-[#3557D4]"
               title={sessionPanelCollapsed ? '展开会话侧栏' : '收起会话侧栏'}
             >
-              {sessionPanelCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+              {sessionPanelCollapsed ? (
+                <PanelLeftOpen className="h-[1.05em] w-[1.05em]" />
+              ) : (
+                <PanelLeftClose className="h-[1.05em] w-[1.05em]" />
+              )}
             </button>
           </div>
 
           <button
             onClick={handleCreateNewSession}
-            className={`mt-4 flex items-center rounded-[18px] border border-[#DCE7F4] bg-white text-[#1F2E43] shadow-[0_12px_28px_rgba(86,111,146,0.08)] transition hover:-translate-y-[1px] hover:border-[#C7D9EE] hover:shadow-[0_14px_32px_rgba(86,111,146,0.12)] ${
-              sessionPanelCollapsed ? 'h-12 w-12 justify-center mx-auto' : 'w-full gap-3 px-4 py-3.5'
+            className={`mt-[1em] flex items-center rounded-[1.15em] border border-[#DCE7F4] bg-white text-[#1F2E43] shadow-[0_12px_28px_rgba(86,111,146,0.08)] transition hover:-translate-y-[1px] hover:border-[#C7D9EE] hover:shadow-[0_14px_32px_rgba(86,111,146,0.12)] ${
+              sessionPanelCollapsed ? 'mx-auto h-[2.85em] min-h-[44px] w-[2.85em] min-w-[44px] justify-center' : 'w-full gap-[0.75em] px-[1em] py-[0.85em]'
             }`}
             title="开启新对话"
           >
-            <Plus className="h-4 w-4 shrink-0" />
-            {!sessionPanelCollapsed && <span className="text-[16px] font-medium">开启新对话</span>}
+            <Plus className="h-[1.05em] w-[1.05em] shrink-0" />
+            {!sessionPanelCollapsed && <span className="break-words text-left text-[1.15em] font-medium">开启新对话</span>}
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-4">
+        <div className="flex-1 overflow-y-auto px-[0.75em] py-[1em]">
           {sessionPanelCollapsed ? (
-            <div className="space-y-3">
+            <div className="space-y-[0.75em]">
               {sessionItems.map((session) => (
                 <button
                   key={session.id}
                   onClick={() => handleSwitchSession(session.id)}
-                  className={`flex h-12 w-12 items-center justify-center rounded-[16px] border text-[13px] font-semibold transition ${
+                  className={`flex h-[2.85em] min-h-[40px] w-[2.85em] min-w-[40px] items-center justify-center rounded-[1.15em] border text-[1em] font-semibold transition ${
                     currentSessionId === session.id
                       ? 'border-[#C9DAF5] bg-[#EEF4FF] text-[#2457C5] shadow-[0_10px_24px_rgba(36,87,197,0.12)]'
                       : 'border-transparent bg-white text-[#76879B] hover:border-[#E3EAF3] hover:text-[#3557D4]'
@@ -1671,17 +1990,17 @@ export default function ChatPage() {
               ))}
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-[1.35em]">
               {sessionGroups.map((group) => (
                 <section key={group.label}>
-                  <div className="mb-3 px-2 text-[13px] font-medium text-[#8C99AA]">{group.label}</div>
-                  <div className="space-y-1.5">
+                  <div className="mb-[0.65em] px-[0.35em] text-[1em] font-medium text-[#8C99AA]">{group.label}</div>
+                  <div className="space-y-[0.4em]">
                     {group.items.map((session) => {
                       const active = currentSessionId === session.id;
                       return (
                         <div
                           key={session.id}
-                          className={`group flex w-full items-start gap-3 rounded-[18px] px-3 py-3 text-left transition ${
+                          className={`group flex w-full items-start gap-[0.65em] rounded-[1.1em] px-[0.65em] py-[0.65em] text-left transition ${
                             active
                               ? 'bg-[#EEF4FF] text-[#1E3E75] shadow-[0_12px_24px_rgba(58,103,189,0.10)]'
                               : 'text-[#46576B] hover:bg-white'
@@ -1696,46 +2015,46 @@ export default function ChatPage() {
                                 handleSwitchSession(session.id);
                               }
                             }}
-                            className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                            className="flex min-w-0 flex-1 items-start gap-[0.65em] text-left"
                           >
-                            <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] ${
+                            <div className={`mt-[0.15em] flex h-[2.35em] min-h-[32px] w-[2.35em] min-w-[32px] shrink-0 items-center justify-center rounded-[0.85em] ${
                               active ? 'bg-white text-[#2559D4]' : 'bg-[#F4F7FB] text-[#7A8CA3] group-hover:bg-[#EDF3FB]'
                             }`}>
-                              <PenSquare className="h-4 w-4" />
+                              <PenSquare className="h-[1.05em] w-[1.05em]" />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="truncate text-[15px] font-medium">{session.title}</div>
-                              <div className="mt-1 line-clamp-2 text-[13px] leading-5 text-[#8A97AA]">{session.preview}</div>
-                              <div className="mt-2 flex items-center gap-2 text-[12px] text-[#9AA7B8]">
+                              <div className="break-words text-[1.08em] font-medium leading-snug">{session.title}</div>
+                              <div className="mt-[0.35em] break-words text-[0.95em] leading-snug text-[#8A97AA]">{session.preview}</div>
+                              <div className="mt-[0.5em] flex flex-wrap items-center gap-x-[0.5em] gap-y-[0.25em] text-[0.88em] text-[#9AA7B8]">
                                 <span>{CHAT_MODE_LABELS[session.aiMode]}</span>
-                                <span className="h-1 w-1 rounded-full bg-[#CBD5E1]" />
+                                <span className="h-[0.35em] w-[0.35em] shrink-0 rounded-full bg-[#CBD5E1]" />
                                 <span>{session.messageCount}条消息</span>
                                 {session.isPinned && (
                                   <>
-                                    <span className="h-1 w-1 rounded-full bg-[#CBD5E1]" />
+                                    <span className="h-[0.35em] w-[0.35em] shrink-0 rounded-full bg-[#CBD5E1]" />
                                     <span>已置顶</span>
                                   </>
                                 )}
                               </div>
                             </div>
                           </button>
-                          <div className="relative mt-1 shrink-0">
+                          <div className="relative mt-[0.15em] shrink-0">
                             <button
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
                                 setOpenSessionMenuId((prev) => (prev === session.id ? null : session.id));
                               }}
-                              className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition ${
+                              className={`inline-flex h-[2em] min-h-[32px] w-[2em] min-w-[32px] items-center justify-center rounded-full transition ${
                                 active ? 'text-[#6B7E98] hover:bg-white' : 'text-[#9AA7B8] hover:bg-[#F4F7FB] hover:text-[#60738B]'
                               }`}
                               title="更多操作"
                             >
-                              <MoreHorizontal className="h-4 w-4" />
+                              <MoreHorizontal className="h-[1.05em] w-[1.05em]" />
                             </button>
                             {openSessionMenuId === session.id && (
                               <div
-                                className="absolute right-0 top-10 z-20 w-[168px] overflow-hidden rounded-[16px] border border-[#E4EAF2] bg-white p-1.5 shadow-[0_18px_36px_rgba(85,104,129,0.14)]"
+                                className="absolute right-0 top-[2.25em] z-20 w-[12.5em] overflow-hidden rounded-[1.1em] border border-[#E4EAF2] bg-white p-[0.35em] shadow-[0_18px_36px_rgba(85,104,129,0.14)]"
                                 onClick={(event) => event.stopPropagation()}
                               >
                                 <button
@@ -1746,9 +2065,9 @@ export default function ChatPage() {
                                     setEditingSessionTitle(session.rawTitle || session.title);
                                     setOpenSessionMenuId(null);
                                   }}
-                                  className="flex w-full items-center gap-2 rounded-[12px] px-3 py-2.5 text-left text-[14px] text-[#314255] transition hover:bg-[#F5F8FC]"
+                                  className="flex w-full items-center gap-[0.5em] rounded-[0.85em] px-[0.65em] py-[0.65em] text-left text-[1.05em] text-[#314255] transition hover:bg-[#F5F8FC]"
                                 >
-                                  <PencilLine className="h-4 w-4" />
+                                  <PencilLine className="h-[1em] w-[1em] shrink-0" />
                                   重命名
                                 </button>
                                 <button
@@ -1757,9 +2076,9 @@ export default function ChatPage() {
                                     event.stopPropagation();
                                     handleTogglePinSession(session);
                                   }}
-                                  className="flex w-full items-center gap-2 rounded-[12px] px-3 py-2.5 text-left text-[14px] text-[#314255] transition hover:bg-[#F5F8FC]"
+                                  className="flex w-full items-center gap-[0.5em] rounded-[0.85em] px-[0.65em] py-[0.65em] text-left text-[1.05em] text-[#314255] transition hover:bg-[#F5F8FC]"
                                 >
-                                  <Pin className="h-4 w-4" />
+                                  <Pin className="h-[1em] w-[1em] shrink-0" />
                                   {session.isPinned ? '取消置顶' : '置顶会话'}
                                 </button>
                                 <button
@@ -1768,9 +2087,9 @@ export default function ChatPage() {
                                     event.stopPropagation();
                                     handleDeleteSession(session.id);
                                   }}
-                                  className="flex w-full items-center gap-2 rounded-[12px] px-3 py-2.5 text-left text-[14px] text-[#9A4D4D] transition hover:bg-[#FFF5F5]"
+                                  className="flex w-full items-center gap-[0.5em] rounded-[0.85em] px-[0.65em] py-[0.65em] text-left text-[1.05em] text-[#9A4D4D] transition hover:bg-[#FFF5F5]"
                                 >
-                                  <X className="h-4 w-4" />
+                                  <X className="h-[1em] w-[1em] shrink-0" />
                                   删除会话
                                 </button>
                               </div>
@@ -1785,9 +2104,29 @@ export default function ChatPage() {
             </div>
           )}
         </div>
+        </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      {!sessionPanelCollapsed && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="拖拽调节会话列表宽度，双击恢复默认"
+          title="拖拽调节宽度；双击恢复默认"
+          onPointerDown={(e) => attachChatLayoutResize('left', e)}
+          onDoubleClick={(e) => {
+            e.preventDefault();
+            resetChatLayoutWidths();
+          }}
+          className="relative hidden shrink-0 touch-none select-none lg:flex lg:w-2 lg:items-stretch lg:justify-center"
+        >
+          <div className="my-6 flex w-full cursor-col-resize items-center justify-center rounded-full border border-transparent py-10 text-[#9AA7B8] transition hover:border-[#D0D9E8] hover:bg-[#EEF2F8] hover:text-[#5A6B80]">
+            <GripVertical className="h-5 w-5 shrink-0" aria-hidden />
+          </div>
+        </div>
+      )}
+
+      <div className="chat-fluid-center flex min-h-0 min-w-0 flex-1 flex-col">
         <div
           ref={messageListRef}
           onScroll={() => {
@@ -1796,18 +2135,18 @@ export default function ChatPage() {
             const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
             shouldAutoScrollRef.current = distanceToBottom <= 120;
           }}
-          className="mx-auto w-full max-w-[980px] flex-1 overflow-y-auto px-4 pb-8 pt-3 xl:max-w-[1040px]"
+          className="w-full max-w-full flex-1 min-h-0 min-w-0 overflow-y-auto px-3 pb-6 pt-3 sm:px-4 md:px-5 lg:px-5 xl:px-6"
         >
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-[#E7EDF5] bg-[rgba(255,255,255,0.8)] px-5 py-4 shadow-[0_10px_30px_rgba(90,109,135,0.05)] backdrop-blur-sm">
             <div>
-              <div className="text-[20px] font-semibold text-[#1C2A3A]">
+              <div className="text-[1.28em] font-semibold text-[#1C2A3A]">
                 {sessionItems.find((item) => item.id === currentSessionId)?.title || '新对话'}
               </div>
-              <div className="mt-1 text-[13px] text-[#8C99AA]">
+              <div className="mt-1 text-[0.94em] text-[#8C99AA]">
                 {sessionItems.find((item) => item.id === currentSessionId)?.preview || '围绕自杀风险识别、干预建议、量表解读展开连续问答。'}
               </div>
             </div>
-            <div className="flex items-center gap-2 text-[13px] text-[#708399]">
+            <div className="flex items-center gap-2 text-[0.94em] text-[#708399]">
               <span className="rounded-full bg-[#EEF4FF] px-3 py-1 text-[#2457C5]">
                 {currentSessionId ? `会话 #${currentSessionId}` : '未选择会话'}
               </span>
@@ -1815,20 +2154,20 @@ export default function ChatPage() {
             </div>
           </div>
 
-          <div className="mb-6 flex justify-center text-[14px] text-[#8C8C8C]">{centerTimestamp}</div>
+          <div className="mb-6 flex justify-center text-[1em] text-[#8C8C8C]">{centerTimestamp}</div>
 
           {messages.length === 0 && !isLoading && (
             <div className="mt-12 rounded-[28px] border border-[#EEEEEE] bg-white px-8 py-10 shadow-[0_12px_36px_rgba(0,0,0,0.04)]">
-              <div className="text-center text-[18px] text-[#666]">请输入你的问题跟我聊聊～</div>
-              <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <div className="text-center text-[1.12em] text-[#666]">请输入你的问题跟我聊聊～</div>
+              <div className="mt-6 flex w-full flex-nowrap gap-2 overflow-x-auto overflow-y-hidden pb-1 [-webkit-overflow-scrolling:touch]">
                 {recommendedQuestions.map((question) => (
                   <button
                     key={question}
                     type="button"
                     onClick={() => handleSendMessage(question, currentChatMode)}
-                    className="max-w-[420px] rounded-full border border-[#D9E5F4] bg-[#F8FBFF] px-4 py-2 text-left text-[14px] text-[#37506A] transition hover:border-[#BFD4F4] hover:bg-white"
+                    className="inline-flex w-fit max-w-[min(38rem,93vw)] shrink-0 rounded-2xl border border-[#D9E5F4] bg-[#F8FBFF] px-3.5 py-2 text-left text-[1em] leading-snug text-[#37506A] transition hover:border-[#BFD4F4] hover:bg-white"
                   >
-                    {question}
+                    <span className="line-clamp-2 block max-w-full">{question}</span>
                   </button>
                 ))}
               </div>
@@ -1840,7 +2179,7 @@ export default function ChatPage() {
               if (message.role === 'user') {
                 return (
                   <div key={message.id} className="flex justify-end">
-                    <div className="rounded-[16px] bg-[#F2F3F5] px-5 py-3 text-[18px] text-[#4A4A4A]">
+                    <div className="rounded-[16px] bg-[#F2F3F5] px-5 py-3 text-[1.08em] text-[#4A4A4A]">
                       {message.content}
                     </div>
                   </div>
@@ -1858,7 +2197,7 @@ export default function ChatPage() {
                     setSelectedEvidenceId(message.evidenceList?.[0]?.id || null);
                   }}
                 >
-                  <div className="mb-4 flex items-center gap-3 text-[16px] text-[#212121]">
+                  <div className="mb-4 flex items-center gap-3 text-[1em] text-[#212121]">
                     <div className="flex items-center gap-2 font-semibold">
                       <Bot className="h-5 w-5 text-[#303030]" />
                       {message.modeLabel || '深度思考'}
@@ -1867,17 +2206,17 @@ export default function ChatPage() {
                   </div>
 
                   {message.isGenerating && !message.content ? (
-                    <div className="py-8 text-[16px] text-[#8C8C8C]">正在组织回答...</div>
+                    <div className="py-8 text-[1em] text-[#8C8C8C]">正在组织回答...</div>
                   ) : (
                     <div
-                      className="chat-md text-[16px] text-[#232323] [&_a]:text-[#2F6CA5] [&_a]:underline"
+                      className="chat-md text-[1em] text-[#232323] [&_a]:text-[#2F6CA5] [&_a]:underline"
                       dangerouslySetInnerHTML={{ __html: renderChatMessageHtml(message.content) }}
                     />
                   )}
 
                   {message.references.length > 0 && (
                     <div className="mt-6">
-                      <div className="inline-flex items-center gap-3 rounded-full border border-[#E9E9E9] bg-white px-4 py-2 text-[15px] text-[#343434] shadow-sm">
+                      <div className="inline-flex items-center gap-3 rounded-full border border-[#E9E9E9] bg-white px-4 py-2 text-[1em] text-[#343434] shadow-sm">
                         <div className="flex items-center gap-2">
                           <div className="rounded-full border border-[#2D2D2D] p-1">
                             <FileText className="h-3.5 w-3.5" />
@@ -1894,7 +2233,7 @@ export default function ChatPage() {
                   {(message.references.length > 0 || active) && (
                     <div className="mt-5 flex flex-wrap items-center gap-4 border-t border-[#EFEFEF] pt-5 text-[#202020]">
                       <button
-                        className="inline-flex items-center gap-2 text-[15px] font-medium"
+                        className="inline-flex items-center gap-2 text-[1em] font-medium"
                         title="打开右侧证据工作台"
                         onClick={(event) => {
                           event.stopPropagation();
@@ -1905,7 +2244,7 @@ export default function ChatPage() {
                         证据工作台
                       </button>
                       <button
-                        className={`inline-flex items-center gap-2 text-[15px] ${speakingMessageId === message.id ? 'text-[#2457C5]' : ''}`}
+                        className={`inline-flex items-center gap-2 text-[1em] ${speakingMessageId === message.id ? 'text-[#2457C5]' : ''}`}
                         title={speakingMessageId === message.id ? '停止朗读' : '朗读当前回答'}
                         onClick={(event) => {
                           event.stopPropagation();
@@ -1915,7 +2254,7 @@ export default function ChatPage() {
                         <Volume2 className="h-4 w-4" />
                       </button>
                       <button
-                        className={`inline-flex items-center gap-2 text-[15px] ${copied && active ? 'text-[#2457C5]' : ''}`}
+                        className={`inline-flex items-center gap-2 text-[1em] ${copied && active ? 'text-[#2457C5]' : ''}`}
                         title={copied && active ? '已复制' : '复制当前回答'}
                         onClick={(event) => {
                           event.stopPropagation();
@@ -1925,7 +2264,7 @@ export default function ChatPage() {
                         <Copy className="h-4 w-4" />
                       </button>
                       <button
-                        className="inline-flex items-center gap-2 text-[15px]"
+                        className="inline-flex items-center gap-2 text-[1em]"
                         title="重新生成这一轮回答"
                         onClick={(event) => {
                           event.stopPropagation();
@@ -1935,7 +2274,7 @@ export default function ChatPage() {
                         <RefreshCcw className="h-4 w-4" />
                       </button>
                       <button
-                        className="inline-flex items-center gap-2 text-[15px]"
+                        className="inline-flex items-center gap-2 text-[1em]"
                         title="把这轮问题放回输入框继续编辑"
                         onClick={(event) => {
                           event.stopPropagation();
@@ -1946,7 +2285,7 @@ export default function ChatPage() {
                       </button>
                       <span className="h-5 w-px bg-[#E5E5E5]" />
                       <button
-                        className={`inline-flex items-center gap-2 text-[15px] ${message.feedback === 'up' ? 'text-[#2E7D4F]' : ''}`}
+                        className={`inline-flex items-center gap-2 text-[1em] ${message.feedback === 'up' ? 'text-[#2E7D4F]' : ''}`}
                         title="这条回答有帮助"
                         onClick={(event) => {
                           event.stopPropagation();
@@ -1956,7 +2295,7 @@ export default function ChatPage() {
                         <ThumbsUp className="h-4 w-4" />
                       </button>
                       <button
-                        className={`inline-flex items-center gap-2 text-[15px] ${message.feedback === 'down' ? 'text-[#9A4D4D]' : ''}`}
+                        className={`inline-flex items-center gap-2 text-[1em] ${message.feedback === 'down' ? 'text-[#9A4D4D]' : ''}`}
                         title="这条回答不够好"
                         onClick={(event) => {
                           event.stopPropagation();
@@ -1970,13 +2309,13 @@ export default function ChatPage() {
 
                   {active && message.contextSources && message.contextSources.length > 0 && (
                     <div className="mt-4 rounded-[18px] border border-[#E8EEF6] bg-[#F8FBFF] p-4">
-                      <div className="mb-3 flex items-center gap-2 text-[14px] font-semibold text-[#24374B]">
+                      <div className="mb-3 flex items-center gap-2 text-[1em] font-semibold text-[#24374B]">
                         <Archive className="h-4 w-4 text-[#67819B]" />
                         本轮检索线索
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {message.contextSources.slice(0, 6).map((item) => (
-                          <span key={item} className="rounded-full border border-[#D9E5F2] bg-white px-3 py-1 text-[13px] text-[#51677D]">
+                          <span key={item} className="rounded-full border border-[#D9E5F2] bg-white px-3 py-1 text-[0.94em] text-[#51677D]">
                             {item}
                           </span>
                         ))}
@@ -1986,7 +2325,7 @@ export default function ChatPage() {
 
                   {active && message.evidenceList && message.evidenceList.length > 0 && (
                     <div className="mt-4 rounded-[20px] border border-[#E6EDF5] bg-[#FBFCFE] p-4">
-                      <div className="mb-3 flex items-center gap-2 text-[15px] font-semibold text-[#203245]">
+                      <div className="mb-3 flex items-center gap-2 text-[1.05em] font-semibold text-[#203245]">
                         <Pin className="h-4 w-4 text-[#6D8197]" />
                         证据片段
                       </div>
@@ -1997,12 +2336,12 @@ export default function ChatPage() {
                             <div key={group.id} className="rounded-[16px] border border-[#E4EBF3] bg-white px-4 py-3">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
-                                  <div className="text-[14px] font-semibold text-[#24364A]">{group.title}</div>
-                                  <div className="mt-1 text-[12px] text-[#7B8DA2]">
+                                  <div className="text-[1em] font-semibold text-[#24364A]">{group.title}</div>
+                                  <div className="mt-1 text-[0.88em] text-[#7B8DA2]">
                                     共 {group.items.length} 条证据片段，已按同一文档归并
                                   </div>
                                 </div>
-                                <span className="shrink-0 rounded-full border border-[#D9E4F0] bg-[#F8FBFF] px-2.5 py-1 text-[12px] text-[#6B7F95]">
+                                <span className="shrink-0 rounded-full border border-[#D9E4F0] bg-[#F8FBFF] px-2.5 py-1 text-[0.88em] text-[#6B7F95]">
                                   {group.sourceType || 'doc'}
                                 </span>
                               </div>
@@ -2019,7 +2358,7 @@ export default function ChatPage() {
                                       canOpenEvidenceDoc(evidence) ? 'hover:border-[#D8E5F2] hover:bg-white' : 'cursor-default'
                                     }`}
                                   >
-                                    <div className="line-clamp-2 text-[13px] leading-6 text-[#53677D]">{evidence.snippet}</div>
+                                    <div className="line-clamp-2 text-[0.94em] leading-6 text-[#53677D]">{evidence.snippet}</div>
                                   </button>
                                 ))}
                               </div>
@@ -2035,7 +2374,7 @@ export default function ChatPage() {
                         <button
                           key={question}
                           onClick={() => handleKnowledgeQuestion(question)}
-                          className="flex w-full items-center justify-between rounded-[14px] bg-[#FAFAFA] px-4 py-3 text-left text-[15px] text-[#333] transition hover:bg-[#F4F4F4]"
+                          className="flex w-full items-center justify-between rounded-[14px] bg-[#FAFAFA] px-4 py-3 text-left text-[1em] text-[#333] transition hover:bg-[#F4F4F4]"
                         >
                           <span>{question}</span>
                           <ArrowRight className="h-4 w-4 text-[#666]" />
@@ -2052,11 +2391,11 @@ export default function ChatPage() {
                           onClick={() => handleOpenDocPreview(ref.id)}
                           className="rounded-[18px] bg-[#FCFCFC] p-4 text-left shadow-[0_10px_24px_rgba(0,0,0,0.02)] transition hover:bg-white"
                         >
-                          <div className="mb-2 flex items-center gap-3 text-[15px] text-[#404040]">
+                          <div className="mb-2 flex items-center gap-3 text-[1em] text-[#404040]">
                             <ReferenceBadge iconText={index === 0 ? '百' : '馆'} />
                             {ref.title}
                           </div>
-                          <div className="text-[18px] text-[#232323]">{ref.title}</div>
+                          <div className="text-[1.08em] text-[#232323]">{ref.title}</div>
                         </button>
                       ))}
                     </div>
@@ -2068,241 +2407,303 @@ export default function ChatPage() {
           </div>
         </div>
 
-        <div className="relative px-4 pb-4 pt-2">
-          <div className="mx-auto w-full max-w-[1120px] rounded-[30px] border border-[#ECECEC] bg-white px-5 pb-4 pt-5 shadow-[0_18px_42px_rgba(0,0,0,0.07)] md:px-7">
-            <div className="mb-4 flex flex-wrap gap-2 border-b border-[#EEF2F7] pb-4">
-              {recommendedQuestions.map((question) => (
-                <button
-                  key={question}
-                  type="button"
-                  onClick={() => handleSendMessage(question, currentChatMode)}
-                  className="rounded-full border border-[#DCE6F2] bg-[#F8FBFE] px-3.5 py-2 text-[13px] text-[#4D647C] transition hover:border-[#BFD4F4] hover:bg-white"
-                >
-                  {question}
-                </button>
-              ))}
-            </div>
-            <textarea
-              ref={inputRef}
-              value={inputText}
-              onChange={(event) => setInputText(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault();
-                  handleSendMessage();
-                }
+        <div className="relative flex shrink-0 flex-col px-3 pb-3 pt-0 sm:px-4 md:px-5 lg:px-5 xl:px-6">
+          <div
+            style={{ height: inputDockHeightPx }}
+            className={`relative mx-auto flex min-h-0 w-full max-w-full flex-col overflow-hidden rounded-[30px] border border-[#ECECEC] bg-white shadow-[0_18px_42px_rgba(0,0,0,0.07)] ${
+              !isInputDockDragging ? 'transition-[height] duration-200' : ''
+            }`}
+          >
+            <div
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="在卡片上边缘拖拽调节输入区高度，双击恢复默认"
+              title="沿卡片上边缘拖拽调节高度；双击恢复默认"
+              onPointerDown={attachInputDockResize}
+              onDoubleClick={(e) => {
+                e.preventDefault();
+                resetInputDockHeight();
               }}
-              placeholder="请输入你的问题跟我聊聊～"
-              className="min-h-[66px] w-full resize-none border-none bg-transparent text-[17px] text-[#222] outline-none placeholder:text-[#C9CDD5]"
-              rows={1}
+              className={`absolute inset-x-0 top-0 z-20 -translate-y-1/2 cursor-row-resize touch-none select-none bg-transparent py-2 ${
+                isInputDockDragging ? 'bg-black/[0.04]' : ''
+              }`}
             />
-            <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="flex gap-3 overflow-x-auto pb-1">
-                {CHAT_MODE_OPTIONS.map((mode) => (
+            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden px-5 pb-3 pt-4 md:px-7">
+              <div className="flex shrink-0 flex-nowrap gap-2 overflow-x-auto overflow-y-hidden border-b border-[#EEF2F7] pb-3 [-webkit-overflow-scrolling:touch]">
+                {recommendedQuestions.map((question) => (
                   <button
-                    key={mode.key}
+                    key={question}
                     type="button"
-                    onClick={() => handleSelectChatMode(mode.key)}
-                    className={`whitespace-nowrap rounded-full border px-4 py-2 text-[15px] transition ${
-                      currentChatMode === mode.key
-                        ? 'border-[#8CB5F2] bg-[#EEF5FF] text-[#2457C5]'
-                        : 'border-[#E2E8F0] bg-white text-[#334155] hover:border-[#C9D8EC] hover:bg-[#FAFCFF]'
-                    }`}
+                    onClick={() => handleSendMessage(question, currentChatMode)}
+                    className="inline-flex w-fit max-w-[min(38rem,93vw)] shrink-0 rounded-2xl border border-[#DCE6F2] bg-[#F8FBFE] px-3 py-2 text-left text-[0.94em] leading-snug text-[#4D647C] transition hover:border-[#BFD4F4] hover:bg-white"
                   >
-                    {mode.label}
+                    <span className="line-clamp-2 block max-w-full">{question}</span>
                   </button>
                 ))}
               </div>
-              <div className="flex items-center justify-end gap-4 text-[#2D2D2D]">
-                <button title="语音入口" className="rounded-full p-1 hover:bg-[#F5F5F5]">
-                  <Mic className="h-5 w-5" />
-                </button>
-                <button
-                  onClick={() => handleSendMessage()}
-                  className="rounded-full bg-[#2457C5] p-3 text-white shadow-[0_8px_18px_rgba(36,87,197,0.22)] transition hover:translate-y-[-1px]"
-                >
-                  <Send className="h-5 w-5" />
-                </button>
+              <textarea
+                ref={inputRef}
+                value={inputText}
+                onChange={(event) => setInputText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                placeholder="请输入你的问题跟我聊聊～"
+                className="min-h-0 flex-1 basis-0 w-full resize-none overflow-y-auto border-none bg-transparent text-[1.05em] text-[#222] outline-none placeholder:text-[#C9CDD5]"
+                rows={2}
+              />
+              <div className="mt-auto shrink-0 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div className="flex gap-3 overflow-x-auto pb-0.5">
+                  {CHAT_MODE_OPTIONS.map((mode) => (
+                    <button
+                      key={mode.key}
+                      type="button"
+                      onClick={() => handleSelectChatMode(mode.key)}
+                      className={`whitespace-nowrap rounded-full border px-4 py-2 text-[1em] transition ${
+                        currentChatMode === mode.key
+                          ? 'border-[#8CB5F2] bg-[#EEF5FF] text-[#2457C5]'
+                          : 'border-[#E2E8F0] bg-white text-[#334155] hover:border-[#C9D8EC] hover:bg-[#FAFCFF]'
+                      }`}
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center justify-end gap-4 text-[#2D2D2D]">
+                  <button title="语音入口" className="rounded-full p-1 hover:bg-[#F5F5F5]">
+                    <Mic className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={() => handleSendMessage()}
+                    className="rounded-full bg-[#2457C5] p-3 text-white shadow-[0_8px_18px_rgba(36,87,197,0.22)] transition hover:translate-y-[-1px]"
+                  >
+                    <Send className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-          <div className="mt-3 text-center text-[14px] text-[#C0C0C0]">内容为AI生成，使用请注意辨别</div>
+          <div className="mt-2 text-center text-[0.95em] text-[#C0C0C0]">内容为AI生成，使用请注意辨别</div>
         </div>
       </div>
 
-      <div className={`hidden lg:flex lg:shrink-0 lg:transition-[width] lg:duration-200 ${rightPanelVisible ? 'lg:w-[308px] xl:w-[368px] 2xl:w-[428px]' : 'lg:w-[56px]'}`}>
+      {rightPanelVisible && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="拖拽调节知识清单宽度，双击恢复默认"
+          title="拖拽调节宽度；双击恢复默认"
+          onPointerDown={(e) => attachChatLayoutResize('right', e)}
+          onDoubleClick={(e) => {
+            e.preventDefault();
+            resetChatLayoutWidths();
+          }}
+          className="relative hidden shrink-0 touch-none select-none lg:flex lg:w-2 lg:items-stretch lg:justify-center"
+        >
+          <div className="my-6 flex w-full cursor-col-resize items-center justify-center rounded-full border border-transparent py-10 text-[#9AA7B8] transition hover:border-[#D0D9E8] hover:bg-[#EEF2F8] hover:text-[#5A6B80]">
+            <GripVertical className="h-5 w-5 shrink-0" aria-hidden />
+          </div>
+        </div>
+      )}
+
+      <div
+        style={{
+          width: rightPanelVisible ? rightAsidePx : undefined,
+        }}
+        className={`hidden min-h-0 min-w-0 lg:flex lg:shrink-0 ${
+          rightPanelVisible ? '' : 'lg:w-[56px]'
+        } ${rightPanelVisible && !isLayoutDragging ? 'lg:transition-[width] lg:duration-200' : ''}`}
+      >
         {rightPanelVisible ? (
-          <aside className="relative flex h-full flex-1 flex-col overflow-hidden rounded-[28px] border border-[#E2E8F0] bg-[#F8FAFD] shadow-[0_18px_40px_rgba(97,118,146,0.08)]">
-            <div className="flex items-center justify-between border-b border-[#E8E8E8] px-5 py-5">
-              <div className="text-[18px] font-semibold text-[#202020]">
-                知识清单
-              </div>
-              <button onClick={() => setRightPanelVisible(false)} className="rounded-full p-1.5 hover:bg-white">
-                <PanelRightClose className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-4 py-4">
-              {activeAnswer?.knowledgePanel ? (
-                <div className="space-y-4">
-                  <div className="overflow-hidden rounded-[24px] border border-[#DDE6F2] bg-white shadow-[0_14px_30px_rgba(90,115,144,0.07)]">
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setGraphModalOpen(true)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          setGraphModalOpen(true);
-                        }
-                      }}
-                      className="group block w-full cursor-pointer p-4 text-left"
-                    >
-                      <div className="rounded-[20px] border border-[#E4ECF5] bg-[#F8FBFF] p-4 transition group-hover:border-[#D4E1F0] group-hover:bg-[#F5F9FE]">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 text-[15px] font-semibold text-[#26384A]">
-                              <Network className="h-4 w-4 text-[#6483A2]" />
-                              图谱概览
-                            </div>
-                            <div className="mt-1 text-[13px] leading-6 text-[#70849A]">
-                              节点关系预览，点击查看完整力导向图。
-                            </div>
-                          </div>
-                          <div className="shrink-0 rounded-full border border-[#DEE8F2] bg-white px-3 py-1 text-[12px] text-[#6B7F95]">
-                            {activeAnswer.knowledgePanel.mindMap.nodes.length} 节点 / {activeAnswer.knowledgePanel.mindMap.edges.length} 关系
-                          </div>
-                        </div>
-                        <div className="mt-4 overflow-hidden rounded-[18px] border border-[#E1EAF4] bg-white">
-                          <MindMapPreview
-                            mindMap={activeAnswer.knowledgePanel.mindMap}
-                            selectedNodeId={selectedNode?.id || null}
-                            onSelectNode={(id) => setSelectedNodeId(id)}
-                            compact
-                          />
-                        </div>
-                        <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#E7EEF6] pt-3">
-                          <div className="min-w-0">
-                            <div className="text-[12px] text-[#7B8DA2]">当前问题</div>
-                            <div className="mt-1 text-[15px] font-medium leading-6 text-[#203245] break-words">
-                              {messages.filter((item) => item.role === 'user').slice(-1)[0]?.content || '当前问题'}
-                            </div>
-                          </div>
-                          <div className="shrink-0 rounded-full border border-[#D8E4F0] bg-white p-2 text-[#6D8197] transition group-hover:border-[#C3D5EA] group-hover:text-[#4B6783]">
-                            <ArrowRight className="h-4 w-4" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="border-t border-[#EEF2F6] px-4 pb-4 pt-4">
-                      <div className="overflow-hidden rounded-[18px] border border-[#E5EAF1] bg-white">
-                        <div className="grid grid-cols-[72px_88px_minmax(0,1fr)] bg-[#F4F6F8] text-[13px] font-medium text-[#4A5662]">
-                          <div className="border-r border-[#E5EAF1] px-3 py-3">主题</div>
-                          <div className="border-r border-[#E5EAF1] px-3 py-3">知识</div>
-                          <div className="px-3 py-3">描述</div>
-                        </div>
-                        {activeAnswer.knowledgePanel.tableRows.map((row, index) => (
-                          <div key={`${row.topic}-${index}`} className="grid grid-cols-[72px_88px_minmax(0,1fr)] border-t border-[#EEF2F6] text-[13px] leading-6 text-[#485565]">
-                            <div className="border-r border-[#EEF2F6] px-3 py-3 text-[#2E3640]">{row.topic}</div>
-                            <div className="border-r border-[#EEF2F6] px-3 py-3 text-[#31465B]">{row.knowledge}</div>
-                            <div className="break-words px-3 py-3">{row.description}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="overflow-hidden rounded-[20px] border border-[#E4EAF1] bg-white shadow-[0_12px_24px_rgba(105,125,151,0.05)]">
-                    <div className="flex items-center gap-2 border-b border-[#EEF2F6] px-4 py-3 text-[16px] font-semibold text-[#263240]">
-                      <BrainCircuit className="h-4 w-4 text-[#5D6F86]" />
-                      证据片段
-                    </div>
-                    <div className="space-y-3 px-4 py-4">
-                      {groupedActiveEvidence.length > 0 ? groupedActiveEvidence.map((group) => {
-                        const groupSelected = group.items.some((item) => item.id === selectedEvidenceId);
-                        return (
-                          <div
-                            key={group.id}
-                            className={`rounded-[16px] border px-4 py-3 transition ${
-                              groupSelected ? 'border-[#C9DCF2] bg-[#F4F8FD]' : 'border-[#EBF0F5] bg-[#F8FBFE]'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="mb-1 text-[15px] font-semibold text-[#213042]">{group.title}</div>
-                                <div className="text-[12px] text-[#7B8DA2]">
-                                  共 {group.items.length} 条片段，已归并到同一文档模块
-                                </div>
-                              </div>
-                              <span className="shrink-0 rounded-full border border-[#DCE6F2] bg-white px-2.5 py-1 text-[12px] text-[#6D8197]">
-                                {group.sourceType}
-                              </span>
-                            </div>
-                            <div className="mt-3 space-y-2.5">
-                              {group.items.map((item, snippetIndex) => (
-                                <button
-                                  key={item.id}
-                                  onClick={() => {
-                                    setSelectedEvidenceId(item.id);
-                                    if (canOpenEvidenceDoc(item)) handleOpenDocPreview(item.docId, item.snippet);
-                                  }}
-                                  className={`block w-full rounded-[14px] border px-3 py-2.5 text-left transition ${
-                                    selectedEvidenceId === item.id
-                                      ? 'border-[#C9DCF2] bg-white'
-                                      : `border-[#E5ECF4] bg-white/80 ${canOpenEvidenceDoc(item) ? 'hover:border-[#D7E4F1] hover:bg-white' : ''}`
-                                  }`}
-                                >
-                                  <div className="flex items-start gap-3">
-                                    <span className="mt-0.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#EAF1FB] px-1.5 text-[11px] font-semibold text-[#4B6783]">
-                                      {snippetIndex + 1}
-                                    </span>
-                                    <div className="min-w-0 flex-1">
-                                      <div className="text-[13px] leading-6 text-[#617386]">{item.snippet}</div>
-                                      <div className="mt-2 text-[12px] leading-5 text-[#7B8DA2]">{item.claim}</div>
-                                    </div>
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      }) : (
-                        <div className="rounded-[16px] border border-dashed border-[#D8E3EF] bg-[#FBFCFE] px-4 py-5 text-[14px] leading-6 text-[#7A8CA1]">
-                          本轮回答暂未返回独立证据片段；若知识库命中成功，这里会展示原文摘录与对应论点。
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="overflow-hidden rounded-[20px] border border-[#E4EAF1] bg-white shadow-[0_12px_24px_rgba(105,125,151,0.05)]">
-                    <div className="flex items-center gap-2 border-b border-[#EEF2F6] px-4 py-3 text-[16px] font-semibold text-[#263240]">
-                      <FileText className="h-4 w-4 text-[#5D6F86]" />
-                      来源文档
-                    </div>
-                    <div className="space-y-3 px-4 py-4">
-                      {activeAnswer.references.length > 0 ? activeAnswer.references.map((item) => (
-                        <button
-                          key={item.id}
-                          onClick={() => handleOpenDocPreview(item.id)}
-                          className="flex w-full items-center justify-between rounded-[16px] border border-[#EBF0F5] bg-[#F8FBFE] px-4 py-3 text-left transition hover:bg-[#F1F6FB]"
-                        >
-                          <div>
-                            <div className="text-[15px] font-semibold text-[#213042]">{item.title}</div>
-                            <div className="mt-1 text-[12px] text-[#7B8DA2]">{item.type || 'doc'}</div>
-                          </div>
-                          <ArrowRight className="h-4 w-4 text-[#70849A]" />
-                        </button>
-                      )) : (
-                        <div className="rounded-[16px] border border-dashed border-[#D8E3EF] bg-[#FBFCFE] px-4 py-5 text-[14px] leading-6 text-[#7A8CA1]">
-                          当前回答未附带独立来源文档。
-                        </div>
-                      )}
-                    </div>
-                  </div>
+          <aside className="relative flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-[28px] border border-[#E2E8F0] bg-[#F8FAFD] shadow-[0_18px_40px_rgba(97,118,146,0.08)]">
+            <div
+              className="flex h-full min-h-0 flex-col overflow-hidden"
+              style={{ fontSize: `${rightKnowledgePanelFontPx}px` }}
+            >
+              <div className="flex items-center justify-between gap-[0.65em] border-b border-[#E8E8E8] px-[1.15em] py-[1.15em]">
+                <div className="min-w-0 flex-1 break-words text-[1.38em] font-semibold leading-tight text-[#202020]">
+                  知识清单
                 </div>
-              ) : (
-                <div className="rounded-[18px] bg-white p-5 text-[15px] text-[#888]">完成一轮问答后，这里会自动生成知识清单。</div>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setRightPanelVisible(false)}
+                  className="inline-flex min-h-[36px] min-w-[36px] shrink-0 items-center justify-center rounded-full p-[0.35em] hover:bg-white"
+                  title="收起知识清单"
+                >
+                  <PanelRightClose className="h-[1.05em] w-[1.05em]" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto px-[1em] py-[1em]">
+                {activeAnswer?.knowledgePanel ? (
+                  <div className="space-y-[1em]">
+                    <div className="overflow-hidden rounded-[1.35em] border border-[#DDE6F2] bg-white shadow-[0_14px_30px_rgba(90,115,144,0.07)]">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setGraphModalOpen(true)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            setGraphModalOpen(true);
+                          }
+                        }}
+                        className="group block w-full cursor-pointer p-[1em] text-left"
+                      >
+                        <div className="rounded-[1.1em] border border-[#E4ECF5] bg-[#F8FBFF] p-[1em] transition group-hover:border-[#D4E1F0] group-hover:bg-[#F5F9FE]">
+                          <div className="flex flex-wrap items-start justify-between gap-[0.65em]">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-[0.5em] text-[1.15em] font-semibold text-[#26384A]">
+                                <Network className="h-[1.05em] w-[1.05em] shrink-0 text-[#6483A2]" />
+                                <span className="break-words">图谱概览</span>
+                              </div>
+                              <div className="mt-[0.35em] break-words text-[1em] leading-snug text-[#70849A]">
+                                节点关系预览，点击查看完整力导向图。
+                              </div>
+                            </div>
+                            <div className="shrink-0 rounded-full border border-[#DEE8F2] bg-white px-[0.65em] py-[0.25em] text-[0.92em] leading-snug text-[#6B7F95]">
+                              {activeAnswer.knowledgePanel.mindMap.nodes.length} 节点 / {activeAnswer.knowledgePanel.mindMap.edges.length} 关系
+                            </div>
+                          </div>
+                          <div className="mt-[1em] overflow-hidden rounded-[1.1em] border border-[#E1EAF4] bg-white">
+                            <MindMapPreview
+                              mindMap={activeAnswer.knowledgePanel.mindMap}
+                              selectedNodeId={selectedNode?.id || null}
+                              onSelectNode={(id) => setSelectedNodeId(id)}
+                              compact
+                            />
+                          </div>
+                          <div className="mt-[0.75em] flex flex-wrap items-center justify-between gap-[0.65em] border-t border-[#E7EEF6] pt-[0.75em]">
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[0.92em] text-[#7B8DA2]">当前问题</div>
+                              <div className="mt-[0.35em] break-words text-[1.15em] font-medium leading-snug text-[#203245]">
+                                {messages.filter((item) => item.role === 'user').slice(-1)[0]?.content || '当前问题'}
+                              </div>
+                            </div>
+                            <div className="shrink-0 rounded-full border border-[#D8E4F0] bg-white p-[0.45em] text-[#6D8197] transition group-hover:border-[#C3D5EA] group-hover:text-[#4B6783]">
+                              <ArrowRight className="h-[1.05em] w-[1.05em]" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-[#EEF2F6] px-[1em] pb-[1em] pt-[1em]">
+                        <div className="overflow-hidden rounded-[1.1em] border border-[#E5EAF1] bg-white">
+                          <div className="grid grid-cols-[5.5em_6.75em_minmax(0,1fr)] bg-[#F4F6F8] text-[1em] font-medium text-[#4A5662]">
+                            <div className="border-r border-[#E5EAF1] px-[0.65em] py-[0.65em]">主题</div>
+                            <div className="border-r border-[#E5EAF1] px-[0.65em] py-[0.65em]">知识</div>
+                            <div className="px-[0.65em] py-[0.65em]">描述</div>
+                          </div>
+                          {activeAnswer.knowledgePanel.tableRows.map((row, index) => (
+                            <div
+                              key={`${row.topic}-${index}`}
+                              className="grid grid-cols-[5.5em_6.75em_minmax(0,1fr)] border-t border-[#EEF2F6] text-[1em] leading-snug text-[#485565]"
+                            >
+                              <div className="break-words border-r border-[#EEF2F6] px-[0.65em] py-[0.65em] text-[#2E3640]">{row.topic}</div>
+                              <div className="break-words border-r border-[#EEF2F6] px-[0.65em] py-[0.65em] text-[#31465B]">{row.knowledge}</div>
+                              <div className="break-words px-[0.65em] py-[0.65em]">{row.description}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="overflow-hidden rounded-[1.1em] border border-[#E4EAF1] bg-white shadow-[0_12px_24px_rgba(105,125,151,0.05)]">
+                      <div className="flex flex-wrap items-center gap-[0.5em] border-b border-[#EEF2F6] px-[1em] py-[0.85em] text-[1.23em] font-semibold text-[#263240]">
+                        <BrainCircuit className="h-[1.05em] w-[1.05em] shrink-0 text-[#5D6F86]" />
+                        <span className="break-words">证据片段</span>
+                      </div>
+                      <div className="space-y-[0.75em] px-[1em] py-[1em]">
+                        {groupedActiveEvidence.length > 0 ? groupedActiveEvidence.map((group) => {
+                          const groupSelected = group.items.some((item) => item.id === selectedEvidenceId);
+                          return (
+                            <div
+                              key={group.id}
+                              className={`rounded-[1em] border px-[1em] py-[0.85em] transition ${
+                                groupSelected ? 'border-[#C9DCF2] bg-[#F4F8FD]' : 'border-[#EBF0F5] bg-[#F8FBFE]'
+                              }`}
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-[0.65em]">
+                                <div className="min-w-0 flex-1">
+                                  <div className="mb-[0.25em] break-words text-[1.15em] font-semibold leading-snug text-[#213042]">{group.title}</div>
+                                  <div className="break-words text-[0.92em] leading-snug text-[#7B8DA2]">
+                                    共 {group.items.length} 条片段，已归并到同一文档模块
+                                  </div>
+                                </div>
+                                <span className="shrink-0 rounded-full border border-[#DCE6F2] bg-white px-[0.5em] py-[0.25em] text-[0.92em] leading-snug text-[#6D8197]">
+                                  {group.sourceType}
+                                </span>
+                              </div>
+                              <div className="mt-[0.75em] space-y-[0.5em]">
+                                {group.items.map((item, snippetIndex) => (
+                                  <button
+                                    key={item.id}
+                                    onClick={() => {
+                                      setSelectedEvidenceId(item.id);
+                                      if (canOpenEvidenceDoc(item)) handleOpenDocPreview(item.docId, item.snippet);
+                                    }}
+                                    className={`block w-full rounded-[0.85em] border px-[0.65em] py-[0.65em] text-left transition ${
+                                      selectedEvidenceId === item.id
+                                        ? 'border-[#C9DCF2] bg-white'
+                                        : `border-[#E5ECF4] bg-white/80 ${canOpenEvidenceDoc(item) ? 'hover:border-[#D7E4F1] hover:bg-white' : ''}`
+                                    }`}
+                                  >
+                                    <div className="flex items-start gap-[0.65em]">
+                                      <span className="mt-[0.15em] inline-flex min-h-[1.35em] min-w-[1.35em] shrink-0 items-center justify-center rounded-full bg-[#EAF1FB] px-[0.35em] text-[0.85em] font-semibold text-[#4B6783]">
+                                        {snippetIndex + 1}
+                                      </span>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="break-words text-[1em] leading-snug text-[#617386]">{item.snippet}</div>
+                                        <div className="mt-[0.35em] break-words text-[0.92em] leading-snug text-[#7B8DA2]">{item.claim}</div>
+                                      </div>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        }) : (
+                          <div className="rounded-[1em] border border-dashed border-[#D8E3EF] bg-[#FBFCFE] px-[1em] py-[1.15em] text-[1.08em] leading-snug text-[#7A8CA1]">
+                            本轮回答暂未返回独立证据片段；若知识库命中成功，这里会展示原文摘录与对应论点。
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="overflow-hidden rounded-[1.1em] border border-[#E4EAF1] bg-white shadow-[0_12px_24px_rgba(105,125,151,0.05)]">
+                      <div className="flex flex-wrap items-center gap-[0.5em] border-b border-[#EEF2F6] px-[1em] py-[0.85em] text-[1.23em] font-semibold text-[#263240]">
+                        <FileText className="h-[1.05em] w-[1.05em] shrink-0 text-[#5D6F86]" />
+                        <span className="break-words">来源文档</span>
+                      </div>
+                      <div className="space-y-[0.75em] px-[1em] py-[1em]">
+                        {activeAnswer.references.length > 0 ? activeAnswer.references.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => handleOpenDocPreview(item.id)}
+                            className="flex w-full items-center justify-between gap-[0.65em] rounded-[1em] border border-[#EBF0F5] bg-[#F8FBFE] px-[1em] py-[0.85em] text-left transition hover:bg-[#F1F6FB]"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="break-words text-[1.15em] font-semibold leading-snug text-[#213042]">{item.title}</div>
+                              <div className="mt-[0.25em] break-words text-[0.92em] text-[#7B8DA2]">{item.type || 'doc'}</div>
+                            </div>
+                            <ArrowRight className="h-[1.05em] w-[1.05em] shrink-0 text-[#70849A]" />
+                          </button>
+                        )) : (
+                          <div className="rounded-[1em] border border-dashed border-[#D8E3EF] bg-[#FBFCFE] px-[1em] py-[1.15em] text-[1.08em] leading-snug text-[#7A8CA1]">
+                            当前回答未附带独立来源文档。
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="break-words rounded-[1.1em] bg-white p-[1.15em] text-[1.15em] leading-snug text-[#888]">
+                    完成一轮问答后，这里会自动生成知识清单。
+                  </div>
+                )}
+              </div>
             </div>
           </aside>
         ) : (
@@ -2312,7 +2713,7 @@ export default function ChatPage() {
               className="inline-flex h-16 w-10 items-center justify-center rounded-l-[18px] border border-r-0 border-[#DCE5F1] bg-white/95 text-[#44566E] shadow-[0_10px_24px_rgba(91,115,143,0.14)] backdrop-blur-sm"
               title="展开知识清单"
             >
-              <PanelRightOpen className="h-4 w-4" />
+              <PanelRightOpen className="h-[1.05em] w-[1.05em]" />
             </button>
           </div>
         )}

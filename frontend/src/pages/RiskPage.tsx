@@ -384,11 +384,15 @@ function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTask
           const result = await createEmoccDetectionTask({
             userHash: selectedUser.userHash,
             dataSource: selectedSource,
-            detectionModelId: selectedDetectionModel ? parseInt(selectedDetectionModel.id) : undefined,
+            detectionModelId: selectedDetectionModel ? parseInt(selectedDetectionModel.id, 10) : undefined,
             taskName: taskName,
           });
+          const emoccId = Number((result as { id?: number }).id);
+          if (!Number.isFinite(emoccId) || emoccId <= 0) {
+            throw new Error('创建成功但未返回有效任务 ID，请刷新列表后重试');
+          }
           newTask = {
-            id: String(result.id),
+            id: String(emoccId),
             taskCode: result.taskCode,
             taskName: result.taskName || finalTaskName,
             taskMode: 'emocc',
@@ -412,7 +416,6 @@ function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTask
             body: JSON.stringify({
               userHash: selectedUser.userHash,
               dataSource: selectedSource,
-              fusionModelId: selectedDetectionModel ? parseInt(selectedDetectionModel.id) : undefined,
               taskName: taskName,
             }),
             signal: controller.signal,
@@ -799,7 +802,6 @@ function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTask
                       />
                       <Bot className={`w-6 h-6 mb-1 ${model.status === 'active' ? 'text-[#2F6BFF]' : 'text-gray-300'}`} />
                       <span className="font-medium text-sm text-[#162033]">{model.name}</span>
-                      <span className="text-xs text-[#64748B] mt-0.5 truncate w-full text-center">{model.path}</span>
                       <span className={`mt-1 text-xs px-2 py-0.5 rounded-full ${model.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
                         {model.status === 'active' ? '可用' : '不可用'}
                       </span>
@@ -879,7 +881,6 @@ function CreateTaskModal({ isOpen, onClose, onCreated, dataSources }: CreateTask
                       />
                       <Brain className={`w-6 h-6 mb-1 ${model.status === 'active' ? 'text-purple-500' : 'text-gray-300'}`} />
                       <span className="font-medium text-sm text-[#162033]">{model.name}</span>
-                      <span className="text-xs text-[#64748B] mt-0.5 truncate w-full text-center">{model.path}</span>
                       {model.supportedDatasets && model.supportedDatasets.length > 0 && (
                         <span className="mt-1 text-[11px] text-[#64748B]">
                           适用：{model.supportedDatasets.join(' / ')}
@@ -1759,13 +1760,20 @@ export default function RiskPage() {
 
   const handleExecute = async (task: RiskTask) => {
     if (executingTaskId) return;
+    const numericTaskId = parseInt(String(task.id), 10);
+    if (task.taskMode === 'emocc' || task.taskMode === 'fealearner') {
+      if (!Number.isFinite(numericTaskId) || numericTaskId <= 0) {
+        alert('任务 ID 无效，请刷新列表后重试，或重新创建任务。');
+        return;
+      }
+    }
     setExecutingTaskId(task.id);
     try {
       let result;
       
       if (task.taskMode === 'emocc') {
         // Emocc 任务：调用专门的执行接口
-        result = await executeEmoccTask(parseInt(task.id));
+        result = await executeEmoccTask(numericTaskId);
         
         if (result.success) {
           setTasks(prev => prev.map(t => t.id === task.id ? {
@@ -1793,7 +1801,7 @@ export default function RiskPage() {
         }
       } else if (task.taskMode === 'fealearner') {
         // FeaLearner 任务：调用专门的执行接口
-        const feaRes = await fetch(`${import.meta.env.VITE_API_BASE || ''}/api/risk/fealearner-tasks/${task.id}/execute`, {
+        const feaRes = await fetch(`${import.meta.env.VITE_API_BASE || ''}/api/risk/fealearner-tasks/${numericTaskId}/execute`, {
           method: 'POST',
         });
         result = await feaRes.json();

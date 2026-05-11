@@ -35,6 +35,7 @@ export default function Layout() {
         isCollapsed={isCollapsed}
         setIsCollapsed={setIsCollapsed}
         isMapPage={isMapPage}
+        isChatPage={isChatPage}
       />
 
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
@@ -47,7 +48,7 @@ export default function Layout() {
           isMapPage
             ? 'p-0 overflow-hidden'
             : isChatPage
-              ? 'overflow-y-auto py-4 pl-4 pr-3 md:py-5 md:pl-6 md:pr-4 lg:py-6 lg:pl-8 lg:pr-5'
+              ? 'overflow-hidden py-4 pl-4 pr-3 md:py-5 md:pl-6 md:pr-4 lg:py-6 lg:pl-8 lg:pr-5'
               : 'px-4 py-4 md:px-6 md:py-5 lg:px-8 lg:py-6 overflow-y-auto'
         }`}>
           <div className={`w-full ${isMapPage ? 'relative flex-1 min-h-0 h-full' : 'flex flex-1 flex-col min-h-0'}`}>

@@ -1,4 +1,10 @@
-# 数据集原始文件服务：从 datasets/ 目录读取原始数据，仅用于初始化同步入库
+# 数据集原始文件服务：从 datasets/ 目录读取原始数据，仅用于初始化同步入库。
+#
+# 约定：datasets/ 中的主贴 CSV 与各自推理用的 .pkl 嵌入按「同一套用户、同一行序」对齐（便于 user_hash / post_index 对齐）。
+# Weibo 子目录下两套源文件分工如下（勿混用）：
+#   - weibo/weibo_1000.csv  + weibo_1000_emoji_batch.csv  → 对应 Emocc-Weibo（Emocc/weibo/data 下 pkl，如 user_post_embeddings_filtered.pkl）
+#   - weibo/weibo_data.csv  → 对应 FeaLearner-Weibo（Fealeaner/data 下 user_post_embeddings_bert_wwm.pkl 等；与 Emocc 的 1000 条子集不同）
+# 当前内置同步入库的 dataset_key「weibo」使用 weibo_1000.csv；FeaLearner 若要以 weibo_data 全量对齐，需单独扩展导入或自定义 dataset_key。
 import os
 import csv
 import json
@@ -307,6 +313,7 @@ class DatasetCSVService:
             "coarse_risk_mapping": {"0": "low", "1": "high"},
         },
         "weibo": {
+            # 与 Emocc-Weibo、pkl 对齐的是 weibo_1000 系列（非 weibo_data.csv，后者对齐 FeaLearner）
             "csv_path": "weibo/weibo_1000.csv",
             "emoji_csv_path": "weibo/weibo_1000_emoji_batch.csv",
             "user_id_column": "user_id",
@@ -801,6 +808,51 @@ class DatasetCSVService:
             for a in page_archives
         ]
 
+        return result, total
+
+    def get_builtin_csv_archives_page(
+        self,
+        dataset_key: str,
+        risk_level: Optional[str] = None,
+        keyword: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> Tuple[List[ArchiveInfo], int]:
+        """
+        MySQL 尚未同步该数据源时，从内建 CSV 聚合用户列表（user_id 为与入库一致的哈希）。
+        供风险检测选人、档案列表等接口回退使用。
+        """
+        if dataset_key not in self.DATASET_CONFIG:
+            return [], 0
+        csv_path = self._get_csv_full_path(self.DATASET_CONFIG[dataset_key]["csv_path"])
+        if not csv_path.exists():
+            return [], 0
+        raw = self._get_aggregated_archives(dataset_key)
+        if not raw:
+            return [], 0
+        if risk_level:
+            raw = [a for a in raw if a.get("risk_level") == risk_level]
+        if keyword and str(keyword).strip():
+            kw = str(keyword).strip().lower()
+            raw = [a for a in raw if kw in (a.get("user_id") or "").lower()]
+        raw.sort(key=lambda x: x["user_id"])
+        total = len(raw)
+        start = (page - 1) * page_size
+        chunk = raw[start : start + page_size]
+        result = [
+            ArchiveInfo(
+                user_id=a["user_id"],
+                dataset_key=a["dataset_key"],
+                post_count=a["post_count"],
+                risk_level=a["risk_level"],
+                risk_value=a["risk_value"],
+                has_timestamp=a["has_timestamp"],
+                has_emojis=a["has_emojis"],
+                user_stats={"male": 0, "female": 0, "unknown": 1},
+                import_timestamp=a.get("import_timestamp"),
+            )
+            for a in chunk
+        ]
         return result, total
 
     # ==================== 用户贴文查询 ====================

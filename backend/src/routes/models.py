@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Any
 from datetime import datetime
 import re
+import json
 
 router = APIRouter(prefix="", tags=["models"])
 
@@ -80,6 +81,15 @@ def convert_model_to_camel(row: dict) -> dict:
     if row.get('is_builtin') and row.get('model_category') == 'detection':
         result['isAvailable'] = True
         result['status'] = 'active'
+
+    sd = result.get('supportedDatasets')
+    if isinstance(sd, str) and sd.strip():
+        try:
+            parsed = json.loads(sd)
+            if isinstance(parsed, list):
+                result['supportedDatasets'] = [str(x) for x in parsed if x is not None]
+        except json.JSONDecodeError:
+            pass
 
     return result
 
