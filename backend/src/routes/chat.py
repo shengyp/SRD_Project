@@ -44,6 +44,8 @@ def _get_agent(session_id: str, preset_intent: str) -> Any:
 
     if session_id in _agent_pool:
         agent, _ = _agent_pool[session_id]
+        if getattr(agent, "preset_intent", "") != preset_intent:
+            agent.preset_intent = preset_intent
         _agent_pool[session_id] = (agent, now)
         return agent
 

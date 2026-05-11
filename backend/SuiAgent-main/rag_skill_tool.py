@@ -4,7 +4,7 @@ import asyncio
 import re
 import jieba
 import json
-from typing import List, Dict, Optional, Union, Tuple
+from typing import List, Dict, Optional, Union, Tuple, Any
 from LLM import callLLM
 
 
@@ -39,6 +39,125 @@ class RAGSkillTool:
         self.index_cache = {}
         self.last_index_load = 0
         self.index_cache_ttl = 3600
+        self._catalog_cache: Optional[Dict[str, Any]] = None
+
+    def _load_catalog(self) -> Dict[str, Any]:
+        if self._catalog_cache is not None:
+            return self._catalog_cache
+
+        catalog_path = self.knowledge_base_path / "knowledge_catalog.json"
+        if not catalog_path.exists():
+            self._catalog_cache = {}
+            return self._catalog_cache
+
+        try:
+            self._catalog_cache = json.loads(catalog_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            print(f"读取 knowledge_catalog.json 失败: {exc}")
+            self._catalog_cache = {}
+        return self._catalog_cache
+
+    @staticmethod
+    def _normalize_text(text: str) -> str:
+        return re.sub(r"\s+", "", (text or "")).lower()
+
+    def _score_candidate(self, query: str, texts: List[str]) -> int:
+        normalized_query = self._normalize_text(query)
+        if not normalized_query:
+            return 0
+
+        score = 0
+        for raw_text in texts:
+            normalized_text = self._normalize_text(str(raw_text))
+            if not normalized_text:
+                continue
+            if normalized_text in normalized_query:
+                score += max(6, len(normalized_text))
+            elif normalized_query in normalized_text:
+                score += 4
+            else:
+                keywords = [kw for kw in jieba.lcut_for_search(normalized_text) if len(kw.strip()) > 1]
+                for kw in keywords:
+                    if kw and kw in normalized_query:
+                        score += min(len(kw), 3)
+        return score
+
+    def _candidate_files_from_catalog(self, query: str, top_k: int = 4) -> List[Path]:
+        catalog = self._load_catalog()
+        themes = catalog.get("themes", []) if isinstance(catalog, dict) else []
+        if not isinstance(themes, list):
+            return []
+
+        ranked_files: List[Tuple[int, Path]] = []
+        for theme in themes:
+            if not isinstance(theme, dict):
+                continue
+            theme_score = self._score_candidate(
+                query,
+                [
+                    theme.get("theme_name_zh", ""),
+                    theme.get("theme_name_en", ""),
+                    theme.get("description", ""),
+                    *theme.get("theme_aliases", []),
+                ],
+            )
+            theme_dir = theme.get("theme_dir", "")
+            subthemes = theme.get("subthemes", [])
+            if not theme_dir or not isinstance(subthemes, list):
+                continue
+
+            for subtheme in subthemes:
+                if not isinstance(subtheme, dict):
+                    continue
+                subtheme_score = self._score_candidate(
+                    query,
+                    [
+                        subtheme.get("name", ""),
+                        subtheme.get("description", ""),
+                        *subtheme.get("keywords", []),
+                    ],
+                )
+                documents = subtheme.get("documents", [])
+                if not isinstance(documents, list):
+                    continue
+
+                for document in documents:
+                    if not isinstance(document, dict):
+                        continue
+                    filename = document.get("filename", "")
+                    if not filename:
+                        continue
+                    file_score = self._score_candidate(
+                        query,
+                        [
+                            document.get("title", ""),
+                            document.get("summary", ""),
+                            *document.get("keywords", []),
+                            *document.get("aliases", []),
+                            document.get("audience", ""),
+                            document.get("source", ""),
+                        ],
+                    )
+                    total_score = theme_score + subtheme_score + file_score
+                    if total_score <= 0:
+                        continue
+                    candidate_path = self.knowledge_base_path / theme_dir / filename
+                    if candidate_path.exists():
+                        ranked_files.append((total_score, candidate_path))
+
+        ranked_files.sort(key=lambda item: item[0], reverse=True)
+
+        selected: List[Path] = []
+        seen = set()
+        for _, file_path in ranked_files:
+            key = str(file_path)
+            if key in seen:
+                continue
+            seen.add(key)
+            selected.append(file_path)
+            if len(selected) >= top_k:
+                break
+        return selected
 
     def _collect_fragments_for_file(
         self,
@@ -375,6 +494,11 @@ class RAGSkillTool:
                 return [llm_response.strip()] if llm_response.strip() else []
 
     async def _locate_target_file(self, query: str) -> List[Path]:
+        catalog_candidates = self._candidate_files_from_catalog(query)
+        if catalog_candidates:
+            print(f"catalog 命中候选文件: {[item.name for item in catalog_candidates]}")
+            return catalog_candidates
+
         root_index_path = self.knowledge_base_path / "data_structure.md"
         if not root_index_path.exists():
             print("根索引文件不存在，无法定位")
@@ -446,7 +570,7 @@ class RAGSkillTool:
         self,
         query: str,
         max_files: int = 2,
-    ) -> Dict[str, Union[List[Dict[str, str]], List[str]]]:
+    ) -> Dict[str, Union[List[Dict[str, str]], List[str], List[Dict[str, Any]]]]:
         """轻量证据检索。
 
         面向聊天链，只负责找证据和来源文件，不额外生成一次答案，
@@ -467,6 +591,7 @@ class RAGSkillTool:
         print(f"初始关键词: {initial_keywords}")
 
         all_context_fragments: List[str] = []
+        hits: List[Dict[str, Any]] = []
         file_infos = [{"name": fp.name, "path": str(fp)} for fp in target_files]
 
         for file_path in target_files:
@@ -476,11 +601,20 @@ class RAGSkillTool:
                 initial_keywords=initial_keywords,
                 lightweight=True,
             )
-            all_context_fragments.extend(file_fragments[: self.top_k])
+            current_file_info = {"name": file_path.name, "path": str(file_path)}
+            for fragment in file_fragments[: self.top_k]:
+                all_context_fragments.append(fragment)
+                hits.append(
+                    {
+                        "file": current_file_info,
+                        "fragment": fragment,
+                    }
+                )
 
         return {
             "sourceFiles": file_infos,
             "fragments": all_context_fragments,
+            "hits": hits,
         }
 
     def _extract_triples(self, context_fragments: List[str],query:str) -> List[Dict]:

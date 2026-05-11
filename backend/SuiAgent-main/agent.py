@@ -96,22 +96,28 @@ class DialoguePlanner:
 6. 只输出 JSON，不要附带解释。
 """
 
-    def _normalize_plan(self, plan: Dict[str, Any], user_input: str) -> Dict[str, Any]:
+    def _normalize_plan(self, plan: Dict[str, Any], user_input: str, risk: str) -> Dict[str, Any]:
         normalized = plan if isinstance(plan, dict) else {}
         retrieval_queries = normalized.get("retrieval_queries")
         if not isinstance(retrieval_queries, list):
             retrieval_queries = []
 
         clean_queries: List[Dict[str, Any]] = []
+        seen_pairs = set()
         for item in retrieval_queries:
             if not isinstance(item, dict):
                 continue
             query = str(item.get("query", "")).strip()
             if not query:
                 continue
+            query_type = str(item.get("type", "knowledge")).strip() or "knowledge"
+            pair = (query_type, query)
+            if pair in seen_pairs:
+                continue
+            seen_pairs.add(pair)
             clean_queries.append(
                 {
-                    "type": str(item.get("type", "knowledge")).strip() or "knowledge",
+                    "type": query_type,
                     "query": query,
                     "priority": int(item.get("priority", 1) or 1),
                 }
@@ -141,6 +147,11 @@ class DialoguePlanner:
             if any(token in user_input for token in ["什么", "怎么", "为何", "原因", "症状", "药", "治疗", "帮助"]):
                 clean_queries = [{"type": "knowledge", "query": user_input, "priority": 1}]
 
+        if risk in {"高", "极高"} and not any(item.get("type") == "safety_plan" for item in clean_queries):
+            clean_queries.insert(0, {"type": "safety_plan", "query": "危机干预 5行动步骤 安全计划", "priority": 1})
+
+        clean_queries.sort(key=lambda item: item.get("priority", 1))
+
         return {
             "retrieval_queries": clean_queries,
             "dialogue_strategy": strategy,
@@ -157,7 +168,7 @@ class DialoguePlanner:
             if text.endswith("```"):
                 text = text[:-3]
             plan = json.loads(text)
-            return self._normalize_plan(plan, user_input)
+            return self._normalize_plan(plan, user_input, risk)
         except Exception as e:
             print(f"planner 输出解析失败: {e}")
             return self._normalize_plan({
@@ -169,7 +180,7 @@ class DialoguePlanner:
                     "pending_nodes": [],
                     "interruption": True,
                 },
-            }, user_input)
+            }, user_input, risk)
 
 
 class ResponseGenerator:
@@ -509,15 +520,19 @@ class SuicideAgent:
         for rq, result in zip(retrieval_queries, retrieval_results):
             if not result:
                 continue
-            file_info = result.get("sourceFiles", [])
-            current_file = file_info[0] if file_info else None
-            snippets = result.get("fragments", [])
+            snippets = result.get("hits", [])
             if not snippets:
                 print(f"查询未命中文本片段: {rq.get('query', '')}")
-            for snippet in snippets:
+            for hit in snippets:
+                if not isinstance(hit, dict):
+                    continue
+                current_file = hit.get("file")
+                snippet = str(hit.get("fragment", "")).strip()
+                if not snippet:
+                    continue
                 evidence_items.append({"snippet": snippet, "file": current_file})
-            if current_file and not any(f["path"] == current_file["path"] for f in target_files_info):
-                target_files_info.append(current_file)
+                if current_file and not any(f["path"] == current_file["path"] for f in target_files_info):
+                    target_files_info.append(current_file)
 
         doc_map = {
             file_info["path"]: f"doc_{index + 1:03d}"
